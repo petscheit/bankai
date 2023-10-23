@@ -18,6 +18,7 @@ The long term goal of this repository is to enable the verification of Ethereum 
     - [Aggregate Public Key](#aggregate-public-key-1)
   - [G1 and G2 Curve Points](#g1-and-g2-curve-points)
     - [Message (G2)](#message-g2)
+  - [Acknowledgments](#acknowledgments)
 
 ## Background: Steps to verify an Ethereum block:
 A quick overview of the steps required to verify an Ethereum block. Two different operations are required:
@@ -213,3 +214,11 @@ The signature is a point on G2 by default, as its generated via the BLS signatur
 
 ### Public Key (G1):
 The public key is a point on G1 by defaul, and must be converted from bytes to a point on G1 to verify the signature.
+
+## Acknowledgments
+I'd like to extend our gratitude to the following individuals and projects:
+
+This project makes use of [Garaga](https://github.com/keep-starknet-strange/garaga). I appreciate the effort put into this library, making our development process smoother. A big thanks to its contributors and maintainers.
+
+Special thanks to feltroidprime for their invaluable support and guidance throughout this project. Their insights and expertise have been instrumental to this project.
+
