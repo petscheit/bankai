@@ -169,9 +169,9 @@ At the moment, this repo contains two different cairo programs that handle a sub
 Verifies the BLS12-381 Signature of a given message and public key. These values can be fetched from a beacon endpoint via the CLI.
 
 Inputs:
-- Signing Root Point (G2)
-- Signature Point (G2)
-- Aggregated Signers Key Point (G1)
+- H(m): Signing Root Point (G2)
+- S: Signature Point (G2)
+- P: Aggregated Signers Key Point (G1)
 
 The signature is verified by comparing the following pairings:
 ```
@@ -215,10 +215,10 @@ The signature is a point on G2 by default, as its generated via the BLS signatur
 ### Public Key (G1):
 The public key is a point on G1 by defaul, and must be converted from bytes to a point on G1 to verify the signature.
 
-
 ## Acknowledgments
 I'd like to extend our gratitude to the following individuals and projects:
 
 This project makes use of [Garaga](https://github.com/keep-starknet-strange/garaga). I appreciate the effort put into this library, making our development process smoother. A big thanks to its contributors and maintainers.
 
 Special thanks to feltroidprime for their invaluable support and guidance throughout this project. Their insights and expertise have been instrumental to this project.
+
