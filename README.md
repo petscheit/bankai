@@ -168,9 +168,9 @@ At the moment, this repo contains two different cairo programs that handle a sub
 Verifies the BLS12-381 Signature of a given message and public key. These values can be fetched from a beacon endpoint via the CLI.
 
 Inputs:
-- Signing Root Point (G2)
-- Signature Point (G2)
-- Aggregated Signers Key Point (G1)
+- H(m): Signing Root Point (G2)
+- S: Signature Point (G2)
+- P: Aggregated Signers Key Point (G1)
 
 The signature is verified by comparing the following pairings:
 ```
