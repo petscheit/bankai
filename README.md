@@ -68,7 +68,7 @@ Parameters:
 - `-r` or `--rpc` - The RPC endpoint to fetch the proof from
 - `-e` or `--export` - Exports the output as a JSON file
 
-`npm run cli -- fetchBlockProofPoints -b 3434343 -r https://your-secret-sepolia-beacon-endpoint.com`
+`npm run cli -- fetchBlockProofPoints -b 3434343 -r https://your-secret-sepolia-beacon-endpoint.com -e MY_INPUTS.json`
 
 Returns:
 
@@ -101,7 +101,7 @@ Parameters:
 - `-r` or `--rpc` - The RPC endpoint to fetch the proof from
 - `-e` or `--export` - Exports the output as a JSON file
 
-`npm run cli -- fetchBlockSigners -b 3434343 -r https://your-secret-sepolia-beacon-endpoint.com`
+`npm run cli -- fetchBlockSigners -b 3434343 -r https://your-secret-sepolia-beacon-endpoint.com -e MY_INPUTS.json`
 
 Returns:
 ```js
@@ -130,7 +130,6 @@ Returns:
 }
 ```
 
-
 ## Cairo Programs
 At the moment, this repo contains two different cairo programs that handle a substep of the entire verification. 
 
@@ -154,18 +153,9 @@ e(P, H(m)) = e(pk x G, H(m))
   = e(G, S)
 ```
 
-To reduce computations, we can use the property of bilinear maps and compute only exponentiation by doing:
-
-```
-  let c1 = miller_loop(&g1_gen_neg, &sig);
-  let c2 = miller_loop(&pub, &msg);
-
-  let m = e12.mul(c1, c2);
-  let res = final_exponentiation(m);
-  let one = e12.one();
-
-  e12.assert_E12(res, one);
-```
+#### Example: 
+- run `npm run cairo-compile:verify_sig` to compile the cairo program
+- run `npm run cairo-run:verify_sig -- <MY_INPUTS.json>` to run the program. You can use the data exported with the CLI as input. The program will return `true` if the signature is valid, and `false` if its invalid.
 
 #### ToDo: 
 - [ ] Verify negating G1 is equivilant to negating the aggregated public key.
@@ -181,17 +171,12 @@ Returns: Aggregated Public Key Point (G1)
 
 Since the public key is a point on G1, the aggregation is done by adding all points together. This is done by recursivly adding the points together. The order of the keys matter, so its important to pass the keys in the correct order.
 
+#### Example:
+- run `npm run cairo-compile:aggregate` to compile the cairo program
+- run `npm run cairo-run:aggregate -- MY_INPUTS.json` to run the program. You can use the data exported with the CLI as input. The program will return the aggregated public key as a point on G1.
+
 #### ToDo:
 - [ ] Instead of adding all signers, we can use the aggregated committee key, and subtract all non-signers. This would reduce the number of operations required significantly. Need to implement subtraction in garaga first
-
-## CLI:
-To use the CLI, access to a sepolia beacon chain rpc endpoint is required. Currently, quicknode offers a (free) endpoint that can be used for after registering. The CLI offers two commands that handle all of the preproccessing of the data (e.g. generate signing root, convert to curve points, etc.). The commands are:
-
-### fetchProofBlock():
-returns all required parameters top verifying the blocks signature. This includes the block hash, the signing root, the aggregated public key, the signature and the signer bits. This output is not compatible with cairo, but can be useful for debugging.
-
-#### fetchProofBlockPoints():
-returns the message, signature and public key as points on the curve. These values can then be used to verify the block header in the cairo program.
 
 ## G1 and G2 Curve Points:
 The BLS12-381 parameters are represented as points on an elliptic curve, either in G1 or G2. This repository contains some classes to handle the conversion between the raw data and the curve points. In Ethereum, the message and signature are represented in G2, while the public key is represented in G1.
