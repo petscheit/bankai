@@ -1,5 +1,28 @@
-s# Cairo Ethereum Consensus Verification
+Cairo Ethereum Consensus Verification
 The long term goal of this repository is to enable the verification of Ethereum blocks in the Cairo language. This requires a number of cryptographic operations which will be added step by step. Currently, a blocks headers signature can be verified in cairo, which is the first step. Below is a quick overview of the steps required to verify a block header, and the steps that are currently implemented.
+
+## Table of Contents
+- [Cairo Ethereum Consensus Verification](#cairo-ethereum-consensus-verification)
+  - [Background: Steps to verify an Ethereum block](#background-steps-to-verify-an-ethereum-block)
+    - [Verify Sync Committee Signature](#verify-sync-committee-signature)
+    - [Update Sync Committee](#update-sync-committee)
+  - [Getting Started](#getting-started)
+    - [CLI](#cli)
+      - [Fetch Block Proof](#fetch-block-proof)
+      - [Fetch Block Proof Points](#fetch-block-proof-points)
+      - [Fetch Block Signers](#fetch-block-signers)
+  - [Cairo Programs](#cairo-programs)
+    - [Verify Block Signature](#verify-block-signature)
+      - [Example](#example)
+      - [ToDo](#todo)
+    - [Aggregate Public Key](#aggregate-public-key)
+      - [Example](#example-1)
+      - [ToDo](#todo-1)
+  - [G1 and G2 Curve Points](#g1-and-g2-curve-points)
+    - [Message (G2)](#message-g2)
+    - [Signature (G2)](#signature-g2)
+    - [Public Key (G1)](#public-key-g1)
+
 
 ## Background: Steps to verify an Ethereum block:
 A quick overview of the steps required to verify an Ethereum block. Two different operations are required:
