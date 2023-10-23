@@ -3,3 +3,7 @@
 
 lib
 node_modules
+
+cairo_programs/deps
+cairo_programs/build
+venv

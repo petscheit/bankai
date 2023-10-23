@@ -29,12 +29,12 @@ export const generateSigningRoot = async (slot: number, root: string, domainId: 
     return signingRoot;
 }
 
-export const aggregatePubkey = (pubkeys: string[], signerBits: string): string => {
+export const aggregatePubkey = (pubkeys: string[], signerBits: string, signers: boolean = true): string => {
     const signerBitsArray = decodeSignerBits(signerBits);
-    const signed = signerBitsArray.filter((_, i) => signerBitsArray[i] === true)
+    const signed = signerBitsArray.filter((_, i) => signerBitsArray[i] === signers)
 
     const pubkeysArray = pubkeys.map((x) => Buffer.from(x.replace("0x", ""), "hex"));
-    const aggPubkey = bls.aggregatePublicKeys(pubkeysArray.filter((_, i) => signerBitsArray[i] === true));
+    const aggPubkey = bls.aggregatePublicKeys(pubkeysArray.filter((_, i) => signerBitsArray[i] === signers));
     return toHexString(aggPubkey);
 }
 
