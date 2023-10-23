@@ -4,6 +4,7 @@ import { ssz } from "@lodestar/types";
 import {toHexString} from "@chainsafe/ssz";
 import {DOMAIN_SYNC_COMMITTEE} from "@chainsafe/lodestar-params";
 import { generateSigningRoot, aggregatePubkey } from "./utils/beacon.js";
+import {bls} from "./bls.js";
 
 export type BeaconHeaderResponse = {
 	root: string;
@@ -73,20 +74,6 @@ export class BeaconClient {
 		return resp;
 	}
 
-
-	async getBeaconBlock(blockId: string | number) {
-		const endpoint = `${this.rpc}/eth/v2/beacon/blocks/${blockId}`
-		const resp = await axios.get(endpoint,
-			{
-				headers: {
-					'Content-Type': 'application/json',
-					'Accept': '*/*'
-				},
-			})
-			.then(resp => resp.data.data)
-			.catch(err => console.log(err));
-	}
-
 	async getSigningRoot(block: capella.SignedBeaconBlock) {
 		const view = this.createView(ssz.capella.BeaconBlock, block.message);
 		const root = toHexString(view.hashTreeRoot());
@@ -118,6 +105,14 @@ export class BeaconClient {
 		}
 
 		return result;
+	}
+
+	async verifyBlockProof(blockProof: BlockProof): Promise<boolean> {
+		return bls.verify(
+			blockProof.signature.replace("0x", ""),
+			blockProof.signingRoot.replace("0x", ""),
+			blockProof.aggregaredPubkey.replace("0x", "")
+		);
 	}
 
 	// creates ssz view, which enables the standard ssz operations

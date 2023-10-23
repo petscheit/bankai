@@ -26,4 +26,16 @@ export class PublicKey extends G1Point {
 		return this;
 	}
 
+	aggregateSubtract(pubkeys: PublicKey[]) {
+		let result = this.value;
+		for(let i = 0; i < pubkeys.length; i++) {
+			result = result.subtract(pubkeys[i].value);
+		}
+		return new PublicKey().fromRaw(result);
+	}
+
+	aggregateAdd(pubkeys: PublicKey[]) {
+		return new PublicKey().fromRaw(bls.aggregatePublicKeys(pubkeys.map((x) => x.value)))
+	}
+
 }

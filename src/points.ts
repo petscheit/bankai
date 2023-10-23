@@ -35,10 +35,10 @@ export class G2Point {
 		if (val.length != 384) throw new Error("Invalid hex length");
 		let points = splitPoints(val);
 		return {
-			[this.name + "x0"]: "0x" + points[1], // noble switches the print order of x0 and x1
-			[this.name + "x1"]: "0x" + points[0],
-			[this.name + "y0"]: "0x" + points[3],
-			[this.name + "y1"]: "0x" + points[2],
+			"x0": "0x" + points[1], // noble switches the print order of x0 and x1
+			"x1": "0x" + points[0],
+			"y0": "0x" + points[3],
+			"y1": "0x" + points[2],
 		}
 	}
 
@@ -69,8 +69,8 @@ export class G1Point {
 		if (val.length != 192) throw new Error("Invalid hex length");
 		let points = splitPoints(val);
 		return {
-			[this.name + "x"]: "0x" + points[0],
-			[this.name + "y"]: "0x" + points[1]
+			["x"]: "0x" + points[0],
+			["y"]: "0x" + points[1]
 		}
 	}
 
