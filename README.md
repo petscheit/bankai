@@ -1,4 +1,4 @@
-Bankai - Cairo Ethereum Consensus Verification
+## Bankai - Cairo Ethereum Consensus Verification
 The long term goal of this repository is to enable the verification of Ethereum blocks in the Cairo language. This requires a number of cryptographic operations which will be added step by step. Currently, a blocks headers signature can be verified in cairo, which is the first step. Below is a quick overview of the steps required to verify a block header, and the steps that are currently implemented.
 
 - [Cairo Ethereum Consensus Verification](#cairo-ethereum-consensus-verification)
