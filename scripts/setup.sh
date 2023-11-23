@@ -1,7 +1,7 @@
 echo "Installing and building JS packages..."
 npm i && npm run build
 
-echo "Fetching Garaga as submodule..."
+echo "Fetching Garaga & sandstorm as submodule..."
 git submodule update --init
 echo "Moving BLS files to deps directory..."
 mkdir -p cairo_programs/deps/garaga
