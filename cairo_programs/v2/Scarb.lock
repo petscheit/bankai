@@ -29,5 +29,6 @@ dependencies = [
 name = "header"
 version = "0.1.0"
 dependencies = [
+ "alexandria_data_structures",
  "alexandria_math",
 ]

@@ -82,7 +82,7 @@ fn unpack_u256(value: u256) -> Array<u8> {
     let thrityone: u8 = ((value.high / 5192296858534827628530496329220096) & 0xFF).try_into().unwrap(); // 2^112
     let thirtytwo: u8 = ((value.high / 1329227995784915872903807060280344576) & 0xFF).try_into().unwrap(); // 2^120
 
-    return array![one,two,three,four,five,six,seven,eight,nine,ten,eleven,twelve,thirteen,fourteen,fifteen,sixteen,seventeen,eighteen,nineteen,twenty,twentyone,twentytwo,twentythree,twentyfour,twentyfive,twentysix,twentyseven,twentyeight,twentynine,thirty,thrityone,thirtytwo];
+    return array![thirtytwo, thrityone, thirty, twentynine, twentyeight, twentyseven, twentysix, twentyfive, twentyfour, twentythree, twentytwo, twentyone, twenty, nineteen, eighteen, seventeen, sixteen, fifteen, fourteen, thirteen, twelve, eleven, ten, nine, eight, seven, six, five, four, three, two, one];
 }
 
 

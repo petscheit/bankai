@@ -1,8 +1,10 @@
 mod unpack;
-
+mod merkle;
 use alexandria_math::sha256::sha256;
 use unpack::unpack_u64;
+use unpack::unpack_u16;
 use unpack::unpack_u256;
+use merkle::compute_root;
 use debug::PrintTrait;
 
 #[derive(Copy, Drop)]
@@ -20,12 +22,17 @@ trait HeaderTrait {
 
 impl HeaderImpl of HeaderTrait {
     fn hash_tree_root(self: @BeaconHeader)  {
-        let hashed_slot: Array<u8> = sha256(unpack_u64(*self.slot));
-        let hashed_proposer_index: Array<u8> = sha256(unpack_u64(*self.proposer_index));
-        let hashed_parent_root: Array<u8> = sha256(unpack_u256(*self.parent_root));
-        let hashed_state_root: Array<u8> = sha256(unpack_u256(*self.state_root));
-        let hashed_body_root: Array<u8> = sha256(unpack_u256(*self.body_root));
-        return array![hashed_slot, hashed_proposer_index, hashed_parent_root, hashed_state_root, hashed_body_root];
+        let unpacked_slot: Array<u8> = unpack_u64(*self.slot);
+        let unpacked_proposer_index: Array<u8> = unpack_u64(*self.proposer_index);
+        let unpacked_parent_root: Array<u8> = unpack_u256(*self.parent_root);
+        // // unpacked_parent_root.print();
+        // let hash = sha256(unpacked_parent_root);
+        // hash.print();
+        let unpacked_state_root: Array<u8> = unpack_u256(*self.state_root);
+        let unpacked_body_root: Array<u8> = unpack_u256(*self.body_root);
+        // let vals = array![unpacked_slot, unpacked_proposer_index, unpacked_parent_root, unpacked_state_root, unpacked_body_root, unpack_u16(0)];
+        let vals = array![unpacked_slot, unpacked_proposer_index, unpacked_parent_root, unpacked_state_root, unpacked_body_root, unpack_u16(0)];
+        compute_root(vals);
     }
 }
 
