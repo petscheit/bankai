@@ -1,4 +1,3 @@
-use alexandria_data_structures::array_ext::ArrayImpl;
 use alexandria_math::sha256::sha256;
 use debug::PrintTrait;
 
@@ -10,15 +9,13 @@ fn compute_root(values: Array<Array<u8>>) -> Array<u8> {
         if i >= values.len() {
             break;
         }
-        let a = values.at(i);
-        let b = values.at(i + 1);
-        let concat = concat_arrays(a, b);
-        let hash: Array<u8> = sha256(concat);
-        l1.append(hash);
+
+        let concat = concat_arrays(values.at(i), values.at(i + 1));
+        l1.append(sha256(concat));
         i = i + 2;
     };
 
-    l1.append(array![0xf5, 0xa5, 0xfd, 0x42, 0xd1, 0x6a, 0x20, 0x30, 0x27, 0x98, 0xef, 0x6e, 0xd3, 0x09, 0x97, 0x9b, 0x43, 0x00, 0x3d, 0x23, 0x20, 0xd9, 0xf0, 0xe8, 0xea, 0x98, 0x31, 0xa9, 0x27, 0x59, 0xfb, 0x4b]);
+    l1.append(array![0xf5, 0xa5, 0xfd, 0x42, 0xd1, 0x6a, 0x20, 0x30, 0x27, 0x98, 0xef, 0x6e, 0xd3, 0x09, 0x97, 0x9b, 0x43, 0x00, 0x3d, 0x23, 0x20, 0xd9, 0xf0, 0xe8, 0xea, 0x98, 0x31, 0xa9, 0x27, 0x59, 0xfb, 0x4b]); // this is H(0, 0) which is always the same for header
 
     let mut l2: Array<Array<u8>> = ArrayTrait::new();
     i = 0;
@@ -35,15 +32,9 @@ fn compute_root(values: Array<Array<u8>>) -> Array<u8> {
         i = i + 2;
     };
 
+    let concat = concat_arrays(l2.at(0), l2.at(1));
 
-    let a = l2.at(0);
-    let b = l2.at(1);
-    let concat = concat_arrays(a, b);
-    let res = sha256(concat);
-    res.print();
-
-
-    return array![0];
+    return sha256(concat);
     
 }
 
