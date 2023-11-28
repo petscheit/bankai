@@ -54,10 +54,9 @@ fn main() {
     };
     let root = header.hash_tree_root();
 
-    signing_root::compute(root, header.slot.value);
+    let signing_root = signing_root::compute(root, header.slot.value);
 
-
-    // root.print();
+    signing_root.print();
 }
 
 #[cfg(test)]
