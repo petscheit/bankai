@@ -1,8 +1,15 @@
 mod primitives;
 mod merkle;
-use merkle::{compute_root};
-use primitives::{U64, U64Impl, Hash, HashImpl};
+mod domain;
+mod utils;
+
+use merkle::header_container;
+use primitives::types::{U64, U64Impl, Hash, HashImpl};
+use domain::signing_root;
 use debug::PrintTrait;
+
+use utils::print::ArrayPrintImpl;
+
 
 #[derive(Copy, Drop)]
 struct BeaconHeader {
@@ -20,7 +27,7 @@ trait HeaderTrait {
 
 impl HeaderImpl of HeaderTrait {
     fn hash_tree_root(self: BeaconHeader) -> Array<u8>  {
-        return compute_root(self.serialize());
+        return header_container::hash_tree_root(self.serialize());
     }
 
     fn serialize(self: BeaconHeader) -> Array<Array<u8>> {
@@ -47,24 +54,10 @@ fn main() {
     };
     let root = header.hash_tree_root();
 
-    root.print();
-}
+    signing_root::compute(root, header.slot.value);
 
-impl RectanglePrintImpl of PrintTrait<Array<u8>> {
-    fn print(self: Array<u8>) {
-        let mut i = 0;
-        let length = self.len();
-        'Array<u8>['.print();
-        loop {
-            if i >= length {
-                break;
-            }
-            let byte: u8 = *(self.at(i));
-            byte.print();
-            i = i + 1;
-        };
-        ']____'.print();
-    }
+
+    // root.print();
 }
 
 #[cfg(test)]
