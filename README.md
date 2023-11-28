@@ -28,7 +28,7 @@ A quick overview of the steps required to verify an Ethereum block. Two differen
 Required State: Valid Sync committee of the block
 
 - [x] 1. Fetch block hash (client)
-- [x] 2. Generate the signing root of the block (client)
+- [x] 2. Generate the signing root of the header (client & cairo)
 - [x] 3. Convert the signing root to a point on G2 (client)
 - [x] 4. Generate aggregated public key of block signers (cairo)
 - [ ] 5. Ensure signers are in the sync committee and have >2/3 majority
