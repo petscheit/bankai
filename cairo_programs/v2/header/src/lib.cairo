@@ -1,8 +1,15 @@
 mod primitives;
 mod merkle;
-use merkle::{compute_root};
-use primitives::{U64, U64Impl, Hash, HashImpl};
+mod domain;
+mod utils;
+
+use merkle::header_container;
+use primitives::types::{U64, U64Impl, Hash, HashImpl};
+use domain::signing_root;
 use debug::PrintTrait;
+
+use utils::print::ArrayPrintImpl;
+
 
 #[derive(Copy, Drop)]
 struct BeaconHeader {
@@ -16,11 +23,16 @@ struct BeaconHeader {
 trait HeaderTrait {
     fn hash_tree_root(self: BeaconHeader) -> Array<u8>;
     fn serialize(self: BeaconHeader) -> Array<Array<u8>>;
+    fn get_signing_root(self: BeaconHeader) -> Array<u8>;
 }
 
 impl HeaderImpl of HeaderTrait {
+    fn get_signing_root(self: BeaconHeader) -> Array<u8> {
+        return signing_root::compute(self.hash_tree_root(), self.slot.value);
+    }
+
     fn hash_tree_root(self: BeaconHeader) -> Array<u8>  {
-        return compute_root(self.serialize());
+        return header_container::hash_tree_root(self.serialize());
     }
 
     fn serialize(self: BeaconHeader) -> Array<Array<u8>> {
@@ -47,24 +59,9 @@ fn main() {
     };
     let root = header.hash_tree_root();
 
-    root.print();
-}
+    let signing_root = signing_root::compute(root, header.slot.value);
 
-impl RectanglePrintImpl of PrintTrait<Array<u8>> {
-    fn print(self: Array<u8>) {
-        let mut i = 0;
-        let length = self.len();
-        'Array<u8>['.print();
-        loop {
-            if i >= length {
-                break;
-            }
-            let byte: u8 = *(self.at(i));
-            byte.print();
-            i = i + 1;
-        };
-        ']____'.print();
-    }
+    signing_root.print();
 }
 
 #[cfg(test)]
@@ -88,6 +85,26 @@ mod tests {
             0xCA, 0x34, 0x25, 0x7B, 0x42, 0xAA, 0xB2, 0x0F,
             0xA8, 0xCC, 0x4C, 0x3C, 0x61, 0x83, 0xE7, 0x35,
             0x55, 0xA3, 0xFF, 0x3E, 0xEF, 0x5E, 0x40, 0xD5
+        ], 'Failed');
+    }
+
+    #[test]
+    #[available_gas(10000000000)]
+    fn header_signing_root_computed_correctly() {
+        let header = BeaconHeader {
+            slot: U64 {value: 3434343}, 
+            proposer_index: U64 {value: 1393}, 
+            parent_root: Hash {value: 0x8bfa968d1064d7c6b1fef896f56ad511bb5854d2dfd6e6a9952736d07c9aa0a9}, 
+            state_root: Hash {value: 0x9712b4a722614bd9359d3e1e5aae3a1785ff113df738f2780f8a590794f50b86}, 
+            body_root: Hash {value: 0x00fc081845403d1b2180d48bcb4af7204a4c8a3c85c6c811445c876a50a1fdf2}
+        };
+        let signing_root = header.get_signing_root();
+
+        assert(signing_root == array![
+            0xD5, 0x1C, 0x1D, 0xDE, 0x35, 0x69, 0x2D, 0x27, 
+            0x6D, 0x24, 0xCB, 0x18, 0x13, 0x80, 0xC9, 0x32, 
+            0x5C, 0x77, 0xE8, 0x35, 0xE7, 0xBE, 0x40, 0xFA, 
+            0x9C, 0xA0, 0x7E, 0x97, 0xE7, 0x35, 0xE2, 0x58
         ], 'Failed');
     }
 }
