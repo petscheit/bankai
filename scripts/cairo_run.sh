@@ -1,14 +1,17 @@
 #!/bin/bash
 
-if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <filename> <program_input>"
-    exit 1
+# Check if input file path is provided, otherwise use default
+if [ -z "$1" ]; then
+    INPUT_FILE="input.json"
+else
+    INPUT_FILE="$1"
 fi
-
-source venv/bin/activate
 
 echo "Running Cairo program..."
 
-cairo-run --program=cairo_programs/build/$1 --program_input=$2 --layout=small --print_output --print_info
+cairo-run --program=cairo/build/main.json --program_input="$INPUT_FILE" --layout=all_cairo --print_output --print_info
 
-echo "Success!"
+if [ $? -eq 0 ]; then
+    echo "Cairo program execution successful!"
+fi
+

@@ -1,0 +1,32 @@
+{
+  "name": "tools",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/main.js",
+    "type": "module",
+  "scripts": {
+    "setup": "./scripts/setup.sh",
+    "cairo-compile:aggregate": "./scripts/cairo_compile.sh pub_agg.cairo",
+    "cairo-compile:verify_sig": "./scripts/cairo_compile.sh verify_sig.cairo",
+    "cairo-run:aggregate": "./scripts/cairo_run.sh pub_agg.json",
+    "cairo-run:verify_sig": "./scripts/cairo_run.sh verify_sig.json",
+    "build": "tsc",
+    "cli": "npm run build && node lib/main.js"
+  }, 
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/commander": "^2.12.2",
+    "@types/node": "^20.8.2"
+  },
+  "dependencies": {
+    "@chainsafe/bls": "^7.1.2",
+    "@chainsafe/lodestar-params": "^0.39.0",
+    "@lodestar/config": "^1.11.3",
+    "@lodestar/types": "^1.11.3",
+    "@noble/bls12-381": "^1.4.0",
+    "axios": "^1.5.1",
+    "commander": "^11.1.0"
+  }
+}

@@ -1,0 +1,3 @@
+[submodule "cairo/packages/garaga_zero"]
+	path = cairo/packages/garaga_zero
+	url = https://github.com/petscheit/garaga-zero.git
