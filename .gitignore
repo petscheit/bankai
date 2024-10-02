@@ -8,6 +8,7 @@ cairo_programs/build
 cairo_programs/deps
 cairo/packages/*
 cairo/build
+build
 venv
 
 .DS_Store
