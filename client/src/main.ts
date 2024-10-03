@@ -9,6 +9,24 @@ import {bls} from "./bls.js";
 import {toHexString} from "@chainsafe/ssz";
 import {ssz} from "@lodestar/types";
 
+async function fetchEpochProof(epoch: number, rpc: string) {
+	let client = new BeaconClient(rpc);
+	// Fetch the first block of the following epoch, as this seal the targeted epoch
+	const slot = (epoch + 1) * 32
+	let blockProof = await client.getBlockProof(slot)
+	const valid = await client.verifyBlockProof(blockProof)
+
+	// Fetch the signers of this specific block
+	const syncCommittee = await client.getSyncCommitteeSignature(slot)
+	const validatorPubs = await client.getSyncCommitteeValidatorPubs(slot)
+	const signerBits = decodeSignerBits(syncCommittee.signerBits);
+	const signers = validatorPubs.filter((_, i) => signerBits[i] === true).map((x) => new PublicKey().fromBytes(x).toHexObject())
+
+	blockProof["signers"] = signers
+
+	return blockProof
+}
+
 async function fetchBlockProof(blockId: number | string, rpc: string) {
 	let client = new BeaconClient(rpc);
 	const blockProof =  await client.getBlockProof(blockId);
@@ -136,6 +154,23 @@ program
 		}
 
 	});
+
+program
+	.command('fetchEpochProof')
+	.description('Fetch the proof for an epoch.')
+	.requiredOption('-e, --epoch <number>', 'Epoch number.')
+	.requiredOption('-r, --rpc <string>', 'Beacon Chain RPC endpoint. (Quicknode free-tier recommended)')
+	.option('-x, --export <path>', 'Path to export the results as a JSON file.')
+	.action(async (cmdObj) => {
+		const { epoch, rpc, export: exportPath } = cmdObj;
+
+		console.log(`Fetching epoch proof: ${epoch}`);
+		const result = await fetchEpochProof(epoch, rpc);
+
+		if (exportPath) {
+			exportToJsonFile(exportPath, result);
+		}
+	})
 
 
 program.parse(process.argv);
