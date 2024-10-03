@@ -15,14 +15,18 @@ async function fetchEpochProof(epoch: number, rpc: string) {
 	const slot = (epoch + 1) * 32
 	let blockProof = await client.getBlockProof(slot)
 	const valid = await client.verifyBlockProof(blockProof)
+	const blockRoot = await client.getBlockRoot(slot)
+	console.log("Proof verifies:", valid)
 
 	// Fetch the signers of this specific block
-	const syncCommittee = await client.getSyncCommitteeSignature(slot)
-	const validatorPubs = await client.getSyncCommitteeValidatorPubs(slot)
+	const syncCommittee = await client.getSyncCommitteeSignature(slot + 1)
+	const validatorPubs = await client.getSyncCommitteeValidatorPubs(slot + 1)
 	const signerBits = decodeSignerBits(syncCommittee.signerBits);
 	const signers = validatorPubs.filter((_, i) => signerBits[i] === true).map((x) => new PublicKey().fromBytes(x).toHexObject())
 
 	blockProof["signers"] = signers
+	blockProof["blockRoot"] = blockRoot
+	blockProof["slot"] = slot
 
 	return blockProof
 }
@@ -164,8 +168,7 @@ program
 	.action(async (cmdObj) => {
 		const { epoch, rpc, export: exportPath } = cmdObj;
 
-		console.log(`Fetching epoch proof: ${epoch}`);
-		const result = await fetchEpochProof(epoch, rpc);
+		const result = await fetchEpochProof(parseInt(epoch), rpc);
 
 		if (exportPath) {
 			exportToJsonFile(exportPath, result);

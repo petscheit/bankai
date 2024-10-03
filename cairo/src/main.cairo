@@ -1,15 +1,16 @@
-%builtins range_check poseidon range_check96 add_mod mul_mod
+%builtins output range_check poseidon range_check96 add_mod mul_mod
 
 from starkware.cairo.common.cairo_builtins import PoseidonBuiltin, ModBuiltin
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.alloc import alloc
 from cairo.src.constants import g1_negative
-
+from cairo.src.domain import Domain
 from definitions import bn, bls, UInt384, one_E12D, N_LIMBS, BASE, E12D, G1Point, G2Point, G1G2Pair
 from ec_ops import add_ec_points, is_on_curve_g1
 from pairing import multi_pairing
 
 func main{
+    output_ptr: felt*,
     range_check_ptr,
     poseidon_ptr: PoseidonBuiltin*,
     range_check96_ptr: felt*,
@@ -18,17 +19,20 @@ func main{
 }() {
     alloc_locals;
 
-    let (agg_pub, n_signers) = aggregate_signer_pubs();
-
+    // let (agg_pub, n_signers) = aggregate_signer_pubs();
+    local agg_key: G1Point;
     local msg_point: G2Point;
     local sig_point: G2Point;
     %{
-        from cairo.py.utils import write_g2, write_g1g2
-
+        from cairo.py.utils import write_g2, write_g1g2, write_g1
+        write_g1(ids.agg_key, program_input["pub"])
         write_g2(ids.sig_point, program_input["sig"])
         write_g2(ids.msg_point, program_input["msg"])
     %}
-    verify_signature(agg_pub, msg_point, sig_point);
+    verify_signature(agg_key, msg_point, sig_point);
+
+    assert [output_ptr] = 1;
+    let output_ptr = output_ptr + 1;
 
     return ();
 }
@@ -52,7 +56,6 @@ func verify_signature{
     return ();
 
 }
-
 
 // Per aggregation, this costs around 890 steps. Currently we add all the signer keys together, which is quite wasteful.
 // In the future, we should subtract the non-signers from the aggregate key of the current committee
@@ -89,13 +92,13 @@ func aggregate_signer_pubs_inner {
     range_check_ptr, range_check96_ptr: felt*, add_mod_ptr: ModBuiltin*, mul_mod_ptr: ModBuiltin*
 }(signers: G1Point*, n_signers: felt) -> (res: G1Point) {
     if (n_signers == 1) {
-        let (on_curve) = is_on_curve_g1(1, [signers]);
-        assert on_curve = 1;
+        // let (on_curve) = is_on_curve_g1(1, [signers]);
+        // assert on_curve = 1;
         return ([signers], );
     }
 
-    let (on_curve) = is_on_curve_g1(1, signers[0]);
-    assert on_curve = 1;
+    // let (on_curve) = is_on_curve_g1(1, signers[0]);
+    // assert on_curve = 1;
     
     let (res) = aggregate_signer_pubs_inner(signers + G1Point.SIZE, n_signers - 1);
     return add_ec_points(1, res, signers[0]);

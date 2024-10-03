@@ -74,6 +74,12 @@ export class BeaconClient {
 		return resp;
 	}
 
+	async getBlockRoot(blockId: string | number): Promise<string> {
+		const block = await this.getBlock(blockId)
+		const view = this.createView(ssz.capella.BeaconBlock, block.message);
+		return toHexString(view.hashTreeRoot());
+	}
+
 	async getSigningRoot(block: capella.SignedBeaconBlock) {
 		const view = this.createView(ssz.capella.BeaconBlock, block.message);
 		const root = toHexString(view.hashTreeRoot());
