@@ -12,3 +12,8 @@ build
 venv
 
 .DS_Store
+
+pie.zip
+pie.encoded.txt
+
+client/epoch_data.json
