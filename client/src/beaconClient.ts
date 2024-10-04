@@ -76,19 +76,19 @@ export class BeaconClient {
 
 	async getBlockRoot(blockId: string | number): Promise<string> {
 		const block = await this.getBlock(blockId)
-		const view = this.createView(ssz.capella.BeaconBlock, block.message);
+		const view = this.createView(ssz.deneb.BeaconBlock, block.message);
 		return toHexString(view.hashTreeRoot());
 	}
 
 	async getSigningRoot(block: capella.SignedBeaconBlock) {
-		const view = this.createView(ssz.capella.BeaconBlock, block.message);
+		const view = this.createView(ssz.deneb.BeaconBlock, block.message);
 		const root = toHexString(view.hashTreeRoot());
 		return generateSigningRoot(block.message.slot, root, DOMAIN_SYNC_COMMITTEE, this.rpc);
 	}
 
 	async getSyncCommitteeSignature(slot: number): Promise<SyncCommitteeSignature> {
 		const nextBlock = await this.getBlock(slot + 1);
-		let body = ssz.capella.BeaconBlockBody.fromJson(nextBlock.message.body)
+		let body = ssz.deneb.BeaconBlockBody.fromJson(nextBlock.message.body)
 		const signature = toHexString(body.syncAggregate.syncCommitteeSignature)
 		const signerBits = toHexString(ssz.altair.SyncCommitteeBits.toView(body.syncAggregate.syncCommitteeBits).uint8Array)
 		return {signature, signerBits}
