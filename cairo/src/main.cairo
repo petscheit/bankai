@@ -1,17 +1,20 @@
-%builtins output range_check poseidon range_check96 add_mod mul_mod
+%builtins output range_check bitwise poseidon range_check96 add_mod mul_mod
 
-from starkware.cairo.common.cairo_builtins import PoseidonBuiltin, ModBuiltin
+from starkware.cairo.common.cairo_builtins import PoseidonBuiltin, ModBuiltin, BitwiseBuiltin
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.alloc import alloc
-from cairo.src.constants import g1_negative
-from cairo.src.domain import Domain
 from definitions import bn, bls, UInt384, one_E12D, N_LIMBS, BASE, E12D, G1Point, G2Point, G1G2Pair
 from ec_ops import add_ec_points, is_on_curve_g1
 from pairing import multi_pairing
+from cairo.src.ssz import SSZ
+from starkware.cairo.common.uint256 import Uint256
+from cairo.src.constants import g1_negative
+from cairo.src.domain import Domain
 
 func main{
     output_ptr: felt*,
     range_check_ptr,
+    bitwise_ptr: BitwiseBuiltin*,
     poseidon_ptr: PoseidonBuiltin*,
     range_check96_ptr: felt*,
     add_mod_ptr: ModBuiltin*,
@@ -23,18 +26,71 @@ func main{
     local agg_key: G1Point;
     local msg_point: G2Point;
     local sig_point: G2Point;
+    local slot: felt;
     %{
         from cairo.py.utils import write_g2, write_g1g2, write_g1
-        write_g1(ids.agg_key, program_input["pub"])
-        write_g2(ids.sig_point, program_input["sig"])
-        write_g2(ids.msg_point, program_input["msg"])
+        write_g1(ids.agg_key, program_input["proofPoints"]["publicKey"])
+        write_g2(ids.sig_point, program_input["proofPoints"]["signature"])
+        write_g2(ids.msg_point, program_input["proofPoints"]["msg"])
+        ids.slot = int(program_input["header"]["slot"], 10)
     %}
+    %{ print("Running Verification for Slot: ", ids.slot) %}
+
+    let (header_root) = hash_header();
+    %{ print("HeaderRoot: ", hex(ids.header_root.high * 2**128 + ids.header_root.low)) %}
+
+    let signing_root = Domain.compute_signing_root(header_root, slot);
+    %{ print("SigningRoot: ", hex(ids.signing_root.high * 2**128 + ids.signing_root.low)) %}
+    let (_agg_key, n_signers) = aggregate_signer_pubs();
+    %{ print("N_Signers: ", ids.n_signers) %}
+
+    with_attr error_message("NOT_ENOUGH_SIGNERS") {
+        // this ensures more then 80% of the committee signed the block
+        assert [range_check_ptr] = n_signers - 410;
+        tempvar range_check_ptr = range_check_ptr + 1;
+    }
+
     verify_signature(agg_key, msg_point, sig_point);
 
-    assert [output_ptr] = 1;
-    let output_ptr = output_ptr + 1;
+    assert [output_ptr] = header_root.low;
+    assert [output_ptr + 1] = header_root.high;
+    let output_ptr = output_ptr + 2;
 
     return ();
+}
+
+func hash_header{
+    range_check_ptr,
+    bitwise_ptr: BitwiseBuiltin*,
+}() -> (header_root: Uint256) {
+    alloc_locals;
+
+    local slot: Uint256;
+    local proposer_index: Uint256;
+    local parent_root: Uint256;
+    local state_root: Uint256;
+    local body_root: Uint256;
+    %{  
+        from cairo.py.utils import split_uint256
+        ids.slot.low = int(program_input["header"]["slot"], 10)
+        ids.slot.high = 0
+
+        ids.proposer_index.low = int(program_input["header"]["proposer_index"], 10)
+        ids.proposer_index.high = 0
+
+        parent_root = split_uint256(int(program_input["header"]["parent_root"], 16))
+        ids.parent_root.low, ids.parent_root.high = parent_root
+
+        state_root = split_uint256(int(program_input["header"]["state_root"], 16))
+        ids.state_root.low, ids.state_root.high = state_root
+
+        body_root = split_uint256(int(program_input["header"]["body_root"], 16))
+        ids.body_root.low, ids.body_root.high = body_root
+    %}
+
+    let header_root = SSZ.hash_header_root(slot, proposer_index, parent_root, state_root, body_root);
+
+    return (header_root=header_root);
 }
 
 func verify_signature{
@@ -92,13 +148,13 @@ func aggregate_signer_pubs_inner {
     range_check_ptr, range_check96_ptr: felt*, add_mod_ptr: ModBuiltin*, mul_mod_ptr: ModBuiltin*
 }(signers: G1Point*, n_signers: felt) -> (res: G1Point) {
     if (n_signers == 1) {
-        // let (on_curve) = is_on_curve_g1(1, [signers]);
-        // assert on_curve = 1;
+        let (on_curve) = is_on_curve_g1(1, [signers]);
+        assert on_curve = 1;
         return ([signers], );
     }
 
-    // let (on_curve) = is_on_curve_g1(1, signers[0]);
-    // assert on_curve = 1;
+    let (on_curve) = is_on_curve_g1(1, signers[0]);
+    assert on_curve = 1;
     
     let (res) = aggregate_signer_pubs_inner(signers + G1Point.SIZE, n_signers - 1);
     return add_ec_points(1, res, signers[0]);

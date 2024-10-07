@@ -14,6 +14,7 @@ async function fetchEpochProof(epoch: number, rpc: string) {
 	// Fetch the first block of the following epoch, as this seal the targeted epoch
 	const slot = (epoch + 1) * 32
 	let blockProof = await client.getBlockProof(slot)
+	const header = await client.getHeader(slot)
 	const valid = await client.verifyBlockProof(blockProof)
 	const blockRoot = await client.getBlockRoot(slot)
 	console.log("Proof verifies:", valid)
@@ -24,10 +25,17 @@ async function fetchEpochProof(epoch: number, rpc: string) {
 	const signerBits = decodeSignerBits(syncCommittee.signerBits);
 	const signers = validatorPubs.filter((_, i) => signerBits[i] === true).map((x) => new PublicKey().fromBytes(x).toHexObject())
 
+	const proofPoints = {
+		msg: (await new Message(blockProof.signingRoot).hashToCurve()).toHexObject(),
+		signature: (await new Signature().fromBytes(blockProof.signature)).toHexObject(),
+		publicKey: (new PublicKey().fromBytes(blockProof.aggregaredPubkey)).toHexObject()
+	}
+
+	blockProof["proofPoints"] = proofPoints
 	blockProof["signers"] = signers
 	blockProof["blockRoot"] = blockRoot
-	blockProof["slot"] = slot
-
+	blockProof["header"] = header["header"]["message"]
+	blockProof["headerRoot"] = header["root"]
 	return blockProof
 }
 

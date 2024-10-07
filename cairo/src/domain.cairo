@@ -32,6 +32,7 @@ namespace Domain {
     }
 }
 
+// ToDo: these should be precomputed and hardcoded
 namespace ForkSepolia {
     func genesis_validator_root() -> Uint256 {
         return (Uint256(low=0xcf3f9209c00e4efbaaddac09ed9b8078, high=0xd8ea171f3c94aea21ebc42a1ed61052a));

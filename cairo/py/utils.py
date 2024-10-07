@@ -42,5 +42,11 @@ def generate_signers_array(pubs: list[dict]):
         values.append([x_chunks, y_chunks])
     return values
 
+def split_uint256(value: int):
+    return [value & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, value >> 128]
+
+
+# print(split_uint256(0xCB81D775883FCD8E6F9F32DA1CE6D3E74A958AA6ADBAF4402DC90A8BDB718FE202D894D10B4D62653B51E0FFFF682B9))
+
 
 # print(int_to_uint384(0xCB81D775883FCD8E6F9F32DA1CE6D3E74A958AA6ADBAF4402DC90A8BDB718FE202D894D10B4D62653B51E0FFFF682B9))
