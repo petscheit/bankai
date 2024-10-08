@@ -24,6 +24,7 @@ async function fetchEpochProof(epoch: number, rpc: string) {
 	const validatorPubs = await client.getSyncCommitteeValidatorPubs(slot + 1)
 	const signerBits = decodeSignerBits(syncCommittee.signerBits);
 	const signers = validatorPubs.filter((_, i) => signerBits[i] === true).map((x) => new PublicKey().fromBytes(x).toHexObject())
+	const nonSigners = validatorPubs.filter((_, i) => signerBits[i] === false).map((x) => new PublicKey().fromBytes(x).toHexObject())
 
 	const proofPoints = {
 		msg: (await new Message(blockProof.signingRoot).hashToCurve()).toHexObject(),
@@ -36,6 +37,12 @@ async function fetchEpochProof(epoch: number, rpc: string) {
 	blockProof["blockRoot"] = blockRoot
 	blockProof["header"] = header["header"]["message"]
 	blockProof["headerRoot"] = header["root"]
+	const aggregates =  {
+		committee: new PublicKey().fromBytes(bls.aggregatePublicKeys(validatorPubs.map((x) => x.replace("0x", "")))).toHexObject(),
+		signers,
+		nonSigners
+	}
+	blockProof["aggregates"] = aggregates
 	return blockProof
 }
 

@@ -56,6 +56,8 @@ pip install uv
 uv pip compile cairo/packages/garaga_zero/pyproject.toml --output-file cairo/packages/garaga_zero/tools/make/requirements.txt -q
 uv pip install -r cairo/packages/garaga_zero/tools/make/requirements.txt
 
+pip install py_ecc
+
 echo "Applying patch to instances.py..."
 patch venv/lib/python3.10/site-packages/starkware/cairo/lang/instances.py < cairo/packages/garaga_zero/tools/make/instances.patch
 

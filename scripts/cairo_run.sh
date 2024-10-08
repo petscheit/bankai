@@ -26,7 +26,7 @@ cairo-run --program=cairo/build/main.json \
     --program_input="$INPUT_FILE" \
     --layout=all_cairo \
     --print_info \
-    $PIE_FLAG
+    $PIE_FLAG \
     # --cairo_layout_params_file=dynamic_params.json \
     # --proof_mode \
 
