@@ -43,7 +43,7 @@ func main{
     let (agg_key, n_non_signers) = fast_aggregate_signer_pubs();
     let n_signers = 512 - n_non_signers;
     %{ print("N_Signers: ", ids.n_signers) %}
-    
+
     with_attr error_message("NOT_ENOUGH_SIGNERS") {
         // this ensures more then 80% of the committee signed the block
         assert [range_check_ptr] = n_signers - 410;
