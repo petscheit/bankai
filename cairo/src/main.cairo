@@ -11,6 +11,8 @@ from cairo.src.ssz import SSZ
 from cairo.src.constants import g1_negative
 from cairo.src.domain import Domain
 from cairo.src.signer import fast_aggregate_signer_pubs
+from cairo.src.utils import pow2alloc128
+from cairo.src.sha256 import SHA256
 
 func main{
     output_ptr: felt*,
@@ -23,6 +25,9 @@ func main{
 }() {
     alloc_locals;
 
+    let (pow2_array) = pow2alloc128();
+    let (sha256_ptr, sha256_ptr_start) = SHA256.init();
+
     local msg_point: G2Point;
     local sig_point: G2Point;
     local slot: felt;
@@ -34,10 +39,14 @@ func main{
     %}
     %{ print("Running Verification for Slot: ", ids.slot) %}
 
-    let (header_root) = hash_header();
+    with pow2_array, sha256_ptr {
+        let (header_root) = hash_header();
+    }
     %{ print("HeaderRoot: ", hex(ids.header_root.high * 2**128 + ids.header_root.low)) %}
 
-    let signing_root = Domain.compute_signing_root(header_root, slot);
+    with pow2_array, sha256_ptr {
+        let signing_root = Domain.compute_signing_root(header_root, slot);
+    }
     %{ print("SigningRoot: ", hex(ids.signing_root.high * 2**128 + ids.signing_root.low)) %}
 
     let (agg_key, n_non_signers) = fast_aggregate_signer_pubs();
@@ -56,12 +65,22 @@ func main{
     assert [output_ptr + 1] = header_root.high;
     let output_ptr = output_ptr + 2;
 
+
+    let len = (sha256_ptr - sha256_ptr_start) / 64;
+    %{ print("Sha256 Iterations: ", ids.len) %}
+
+
+    // ATTENTION: NEVER EVER REMOVE THIS!!!
+    SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
+
     return ();
 }
 
 func hash_header{
     range_check_ptr,
     bitwise_ptr: BitwiseBuiltin*,
+    pow2_array: felt*,
+    sha256_ptr: felt*
 }() -> (header_root: Uint256) {
     alloc_locals;
 

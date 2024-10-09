@@ -120,38 +120,3 @@ func fast_aggregate_signer_pubs_inner{
     // Subtract the current non-signer's public key from the aggregated result
     return sub_ec_points(1, res, non_signers[0]);
 }
-
-// func sub_ec_points_test{
-//     range_check_ptr, range_check96_ptr: felt*, add_mod_ptr: ModBuiltin*, mul_mod_ptr: ModBuiltin*
-// }() {
-
-//     alloc_locals;
-//     local p: G1Point;
-//     local q: G1Point;
-//     // local agg: G1Point;
-
-//     %{
-//         write_g1(ids.p, program_input["aggregates"]["committee"])
-//         write_g1(ids.q, program_input["aggregates"]["nonSigners"][0])
-//     %}
-
-//     %{
-//         print("p.x", ids.p.x.d0, ids.p.x.d1, ids.p.x.d2, ids.p.x.d3)
-//         print("p.y", ids.p.y.d0, ids.p.y.d1, ids.p.y.d2, ids.p.y.d3)
-//         print("q.x", ids.q.x.d0, ids.q.x.d1, ids.q.x.d2, ids.q.x.d3)
-//         print("q.y", ids.q.y.d0, ids.q.y.d1, ids.q.y.d2, ids.q.y.d3)
-//     %}
-
-//     let (local agg) = add_ec_points(1, p, q);
-
-//     let (derived_q) = sub_ec_points(1, agg, p);
-
-//     %{
-//         print("quu.x", ids.q.x.d0, ids.q.x.d1, ids.q.x.d2, ids.q.x.d3)
-//         print("deq.x", ids.derived_q.x.d0, ids.derived_q.x.d1, ids.derived_q.x.d2, ids.derived_q.x.d3)
-//         print("quu.y", ids.q.y.d0, ids.q.y.d1, ids.q.y.d2, ids.q.y.d3)
-//         print("deq.y", ids.derived_q.y.d0, ids.derived_q.y.d1, ids.derived_q.y.d2, ids.derived_q.y.d3)
-//     %}    
-
-//     return ();
-// }

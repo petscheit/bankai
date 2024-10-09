@@ -65,6 +65,9 @@ namespace ForkSepolia {
 
     func get_fork_root{
         range_check_ptr,
+        bitwise_ptr: BitwiseBuiltin*,
+        pow2_array: felt*,
+        sha256_ptr: felt*
     }(slot: felt) -> Uint256 {
         let fork = get_fork_version(slot);
         let genesis_validator_root = ForkSepolia.genesis_validator_root();
@@ -143,6 +146,9 @@ namespace Domain {
 
     func compute_signing_root{
         range_check_ptr,
+        bitwise_ptr: BitwiseBuiltin*,
+        pow2_array: felt*,
+        sha256_ptr: felt*
     }(message:Uint256, slot: felt) -> Uint256 {
         let domain = get_domain(slot);
         let root = SSZ.hash_pair_container(message, domain);
