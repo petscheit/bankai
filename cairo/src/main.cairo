@@ -65,11 +65,6 @@ func main{
     assert [output_ptr + 1] = header_root.high;
     let output_ptr = output_ptr + 2;
 
-
-    let len = (sha256_ptr - sha256_ptr_start) / 64;
-    %{ print("Sha256 Iterations: ", ids.len) %}
-
-
     // ATTENTION: NEVER EVER REMOVE THIS!!!
     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
 

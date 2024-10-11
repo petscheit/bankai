@@ -45,8 +45,16 @@ def generate_signers_array(pubs: list[dict]):
 def split_uint256(value: int):
     return [value & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, value >> 128]
 
+# This function chunks from MSB to LSB
+def hex_to_chunks_32(hex_string: str):
+    # Remove '0x' prefix if present
+    if hex_string.startswith(('0x', '0X')):
+        hex_string = hex_string[2:]
 
-# print(split_uint256(0xCB81D775883FCD8E6F9F32DA1CE6D3E74A958AA6ADBAF4402DC90A8BDB718FE202D894D10B4D62653B51E0FFFF682B9))
+    # if we have an odd number of characters, prepend a 0
+    if len(hex_string) % 2 == 1:
+        hex_string = '0' + hex_string
 
-
-# print(int_to_uint384(0xCB81D775883FCD8E6F9F32DA1CE6D3E74A958AA6ADBAF4402DC90A8BDB718FE202D894D10B4D62653B51E0FFFF682B9))
+    # Now split into 8-character (32-bit) chunks
+    chunks = [int(hex_string[i:i+8], 16) for i in range(0, len(hex_string), 8)]
+    return chunks

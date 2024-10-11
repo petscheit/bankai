@@ -204,3 +204,86 @@ namespace MerkleUtils {
 //     return ();
 // }
 
+// func main{
+//     range_check_ptr,
+//     bitwise_ptr: BitwiseBuiltin*
+// }() {
+//     alloc_locals;
+//     let (pow2_array) = pow2alloc128();
+//     let (sha256_ptr, sha256_ptr_start) = SHA256.init();
+
+//     let (leafs: Uint256*) = alloc();
+
+//     assert leafs[0] =  Uint256(low=0xeeeeeeeeffffffff0000000011111111, high=0xaaaaaaaabbbbbbbbccccccccdddddddd);
+//     assert leafs[1] =  Uint256(low=0xeeeeeeeeffffffff0000000011111111, high=0xaaaaaaaabbbbbbbbccccccccdddddddd);
+//     assert leafs[2] =  Uint256(low=0xeeeeeeeeffffffff0000000011111111, high=0xaaaaaaaabbbbbbbbccccccccdddddddd);
+//     assert leafs[3] =  Uint256(low=0xeeeeeeeeffffffff0000000011111111, high=0xaaaaaaaabbbbbbbbccccccccdddddddd);
+//     assert leafs[4] =  Uint256(low=0xeeeeeeeeffffffff0000000011111111, high=0xaaaaaaaabbbbbbbbccccccccdddddddd);
+//     assert leafs[5] =  Uint256(low=0xeeeeeeeeffffffff0000000011111111, high=0xaaaaaaaabbbbbbbbccccccccdddddddd);
+//     assert leafs[6] =  Uint256(low=0xeeeeeeeeffffffff0000000011111111, high=0xaaaaaaaabbbbbbbbccccccccdddddddd);
+//     assert leafs[7] =  Uint256(low=0xeeeeeeeeffffffff0000000011111111, high=0xaaaaaaaabbbbbbbbccccccccdddddddd);
+
+//     with pow2_array, sha256_ptr {
+//         let output = MerkleTree.compute_root(leafs=leafs, leafs_len=8);
+//     }
+
+//     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
+
+//         // %{ print("output: ", hex(ids.output[0]), hex(ids.output[1])) %}
+
+//     let sha_iterations = (sha256_ptr - sha256_ptr_start) / 32;
+//     %{ print("Sha256 Iterations: ", ids.sha_iterations) %}
+
+    %{
+        def print_batch(offset):
+            left = memory[ids.sha256_ptr_start + offset] * 2**224 \
+                + memory[ids.sha256_ptr_start + offset + 1] * 2**192 \
+                + memory[ids.sha256_ptr_start + offset + 2] * 2**160 \
+                + memory[ids.sha256_ptr_start + offset + 3] * 2**128 \
+                + memory[ids.sha256_ptr_start + offset + 4] * 2**96 \
+                + memory[ids.sha256_ptr_start + offset + 5] * 2**64 \
+                + memory[ids.sha256_ptr_start + offset + 6] * 2**32 \
+                + memory[ids.sha256_ptr_start + offset + 7]
+
+            right = memory[ids.sha256_ptr_start + offset + 8] * 2**224 \
+                + memory[ids.sha256_ptr_start + offset + 9] * 2**192 \
+                + memory[ids.sha256_ptr_start + offset + 10] * 2**160 \
+                + memory[ids.sha256_ptr_start + offset + 11] * 2**128 \
+                + memory[ids.sha256_ptr_start + offset + 12] * 2**96 \
+                + memory[ids.sha256_ptr_start + offset + 13] * 2**64 \
+                + memory[ids.sha256_ptr_start + offset + 14] * 2**32 \
+                + memory[ids.sha256_ptr_start + offset + 15]
+            
+            iv = memory[ids.sha256_ptr_start + offset + 16] * 2**224 \
+                + memory[ids.sha256_ptr_start + offset + 17] * 2**192 \
+                + memory[ids.sha256_ptr_start + offset + 18] * 2**160 \
+                + memory[ids.sha256_ptr_start + offset + 19] * 2**128 \
+                + memory[ids.sha256_ptr_start + offset + 20] * 2**96 \
+                + memory[ids.sha256_ptr_start + offset + 21] * 2**64 \
+                + memory[ids.sha256_ptr_start + offset + 22] * 2**32 \
+                + memory[ids.sha256_ptr_start + offset + 23]
+
+            output = memory[ids.sha256_ptr_start + offset + 24] * 2**224 \
+                + memory[ids.sha256_ptr_start + offset + 25] * 2**192 \
+                + memory[ids.sha256_ptr_start + offset + 26] * 2**160 \
+                + memory[ids.sha256_ptr_start + offset + 27] * 2**128 \
+                + memory[ids.sha256_ptr_start + offset + 28] * 2**96 \
+                + memory[ids.sha256_ptr_start + offset + 29] * 2**64 \
+                + memory[ids.sha256_ptr_start + offset + 30] * 2**32 \
+                + memory[ids.sha256_ptr_start + offset + 31]
+            print("Sha256ProcessBlock{")
+            print(" left: ", hex(left), ",")
+            print(" right: ", hex(right), ",")
+            print(" iv: ", hex(iv), ",")
+            print(" output: ", hex(output))
+            print("}")
+            print()
+
+        i = 0
+        while i < ids.sha_iterations:
+            print_batch(i * 32)
+            i += 1
+    %}
+
+//     return ();
+// }
