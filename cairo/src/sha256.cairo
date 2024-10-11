@@ -1,4 +1,4 @@
-// %builtins range_check bitwise
+%builtins range_check bitwise
 
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
 from starkware.cairo.common.uint256 import Uint256
@@ -18,7 +18,7 @@ namespace SHA256 {
 
     func finalize{
         range_check_ptr,
-        bitwise_ptr: BitwiseBuiltin*
+        bitwise_ptr: BitwiseBuiltin*,
     }(sha256_start_ptr: felt*, sha256_end_ptr: felt*) {
         finalize_sha256(sha256_start_ptr, sha256_end_ptr);
         return ();
@@ -26,19 +26,21 @@ namespace SHA256 {
 
     func hash_pair{
         range_check_ptr,
-        sha256_ptr: felt*
+        sha256_ptr: felt*,
+        pow2_array: felt*
     }(input: felt*) -> (output: felt*) {
         alloc_locals;
-        let output = sha256(data=input, n_bytes=64);
+        let (output) = sha256(data=input, n_bytes=64);
         return (output=output);
     }
 
     func hash_bytes{
         range_check_ptr,
-        sha256_ptr: felt*
+        sha256_ptr: felt*,
+        pow2_array: felt*
     }(input: felt*, n_bytes: felt) -> (output: felt*) {
         alloc_locals;
-        let output = sha256(data=input, n_bytes=n_bytes);
+        let (output) = sha256(data=input, n_bytes=n_bytes);
         return (output=output);
     }
 }
@@ -157,24 +159,16 @@ func sha256_inner{range_check_ptr, pow2_array: felt*, sha256_ptr: felt*}(data: f
             memset(dst=sha256_ptr + n_full_words + 1, value=0, n=14 - n_full_words);
             // append binary length
             assert sha256_ptr[15] = n_bytes * 8;
-
-            let state = sha256_ptr + SHA256_INPUT_CHUNK_SIZE_FELTS;
-            let output = state + SHA256_STATE_SIZE_FELTS;
-            _sha256_chunk{message=sha256_ptr, state=state, output=output}();
+            _sha256_chunk(); // fill outputs
 
             tempvar sha256_ptr = sha256_ptr + SHA256_INPUT_CHUNK_SIZE_FELTS + SHA256_STATE_SIZE_FELTS;
-
             return ();
         } else {
             // 55 < msg.len < 64 -> We need two more blocks
             
             // Fill current block with required padding
             memset(dst=sha256_ptr + n_full_words + 1, value=0, n=15 - n_full_words); 
-
-            let state = sha256_ptr + SHA256_INPUT_CHUNK_SIZE_FELTS;
-            let output = state + SHA256_STATE_SIZE_FELTS;
-            _sha256_chunk{message=sha256_ptr, state=state, output=output}();
-
+            _sha256_chunk(); // fill outputs
             tempvar sha256_ptr = sha256_ptr + SHA256_INPUT_CHUNK_SIZE_FELTS + SHA256_STATE_SIZE_FELTS;
 
             // write the output to the state of the next block
@@ -185,10 +179,7 @@ func sha256_inner{range_check_ptr, pow2_array: felt*, sha256_ptr: felt*}(data: f
             memset(dst=sha256_ptr, value=0, n=15);
             assert sha256_ptr[15] = n_bytes * 8;
 
-            let state = sha256_ptr + SHA256_INPUT_CHUNK_SIZE_FELTS;
-            let output = state + SHA256_STATE_SIZE_FELTS;
-            _sha256_chunk{message=sha256_ptr, state=state, output=output}();
-
+            _sha256_chunk(); // fill outputs
             tempvar sha256_ptr = sha256_ptr + SHA256_INPUT_CHUNK_SIZE_FELTS + SHA256_STATE_SIZE_FELTS;
 
             return ();
@@ -197,22 +188,23 @@ func sha256_inner{range_check_ptr, pow2_array: felt*, sha256_ptr: felt*}(data: f
     } else {
         // otherwise we fill the entire block with our input
         memcpy(dst=sha256_ptr, src=data, len=16);
-
-        let state = sha256_ptr + SHA256_INPUT_CHUNK_SIZE_FELTS;
-        let output = state + SHA256_STATE_SIZE_FELTS;
-        _sha256_chunk{message=sha256_ptr, state=state, output=output}();
-
-        // move sha256_ptr to output start
+        _sha256_chunk(); // fill outputs
         tempvar sha256_ptr = sha256_ptr + SHA256_INPUT_CHUNK_SIZE_FELTS + SHA256_STATE_SIZE_FELTS;
+        
+        // copy output to the state of the next block
         memcpy(dst=sha256_ptr + 24, src=sha256_ptr, len=8);
-
         tempvar sha256_ptr = sha256_ptr + SHA256_STATE_SIZE_FELTS;
+
         return sha256_inner(data=data + 16, n_bytes=n_bytes, remaining_bytes=remaining_bytes - 64);
     }
 }
 
 // Computes the sha256 hash of the input chunk from `message` to `message + SHA256_INPUT_CHUNK_SIZE_FELTS`
-func _sha256_chunk{range_check_ptr, message: felt*, state: felt*, output: felt*}() {
+func _sha256_chunk{range_check_ptr, sha256_ptr: felt*}() {
+    let message = sha256_ptr;
+    let state = sha256_ptr + SHA256_INPUT_CHUNK_SIZE_FELTS;
+    let output = state + SHA256_STATE_SIZE_FELTS;
+
     %{
         from starkware.cairo.common.cairo_sha256.sha256_utils import (
             compute_message_schedule, sha2_compress_function)
@@ -229,31 +221,31 @@ func _sha256_chunk{range_check_ptr, message: felt*, state: felt*, output: felt*}
     return ();
 }
 
-// func main{
-//     range_check_ptr,
-//     bitwise_ptr: BitwiseBuiltin*
-// }() {
+func main{
+    range_check_ptr,
+    bitwise_ptr: BitwiseBuiltin*
+}() {
 
-//     alloc_locals;
+    alloc_locals;
 
-//     let (sha256_ptr, sha256_ptr_start) = SHA256.init();
-//     let (pow2_array) = pow2alloc128();
+    let (sha256_ptr, sha256_ptr_start) = SHA256.init();
+    let (pow2_array) = pow2alloc128();
 
-//     let (input: felt*) = alloc();
-//     %{
-//         segments.write_arg(ids.input, [0x11111111,0x22222222,0x33333333,0x44444444,0x55555555,0x66666666,0x77777777,0x88888888,0x99999999,0xaaaaaaaa,0xbbbbbbbb,0xcccccccc,0xdddddddd,0xeeeeeeee, 0xffffffff, 0xffffffff])
-//         #segments.write_arg(ids.input, [0x22222222, 0x02])
-//     %}
+    let (input: felt*) = alloc();
+    %{
+        segments.write_arg(ids.input, [0x11111111,0x22222222,0x33333333,0x44444444,0x55555555,0x66666666,0x77777777,0x88888888,0x99999999,0xaaaaaaaa,0xbbbbbbbb,0xcccccccc,0xdddddddd,0xeeeeeeee, 0xffffffff, 0xffffffff])
+        #segments.write_arg(ids.input, [0x22222222, 0x02])
+    %}
 
-//     with sha256_ptr, pow2_array {
-//         // let (output) = SHA256.hash_bytes(input, 64);
-//         let (output) = sha256(input, 64);
+    with sha256_ptr, pow2_array {
+        // let (output) = SHA256.hash_bytes(input, 64);
+        let (output) = sha256(input, 64);
 
-//         // let hash = HashUtils.chunks_to_uint256(output=output);
-//     }
-//     // %{ print("Hash: ", hex(ids.hash.high * 2**128 + ids.hash.low)) %}
+        // let hash = HashUtils.chunks_to_uint256(output=output);
+    }
+    // %{ print("Hash: ", hex(ids.hash.high * 2**128 + ids.hash.low)) %}
 
-//     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
+    // SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
 
-//     return ();
-// }
+    return ();
+}
