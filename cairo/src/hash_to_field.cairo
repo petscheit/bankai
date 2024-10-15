@@ -98,18 +98,8 @@ namespace HashToField32 {
 
         // start by retrieving z_pad array, using it as hash_train
         let msg_hash_train = Z_PAD();
-
-        let (q, r) = felt_divmod(msg_bytes_len, BYTES_PER_CHUNK);
-        local msg_chunks_len: felt;
-        if (r == 0) {
-            msg_chunks_len = q;
-        } else {
-            msg_chunks_len = q + 1;
-        }
-
-        %{ print(f"msg_chunks_len: {ids.msg_chunks_len}") %}
         // append msg to msg_hash_train
-        memcpy(dst=msg_hash_train + Z_PAD_LEN, src=msg, len=msg_chunks_len);
+        memcpy(dst=msg_hash_train + Z_PAD_LEN, src=msg, len=8);
 
         // Append other required values
         assert [msg_hash_train + 24] = 0x01000042; // to_bytes(n_bytes, 2) + 0x0 + DST (starts at 42)
