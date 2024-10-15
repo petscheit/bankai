@@ -1,4 +1,4 @@
-%builtins range_check bitwise
+// %builtins range_check bitwise
 
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
 from starkware.cairo.common.uint256 import Uint256
@@ -94,6 +94,35 @@ namespace HashUtils {
 
         tempvar output_ptr = output_ptr + 8;
         return chunk_leafs(leafs=leafs + Uint256.SIZE, leafs_len=leafs_len, index=index + 1);
+    }
+
+    func chunk_uint256{
+        range_check_ptr,
+        pow2_array: felt*
+    }(leaf: Uint256) -> (output: felt*) {
+        let (output: felt*) = alloc();
+
+        // Process left-high
+        let (q0, r0) = felt_divmod(leaf.high, pow2_array[32]);
+        let (q1, r1) = felt_divmod(q0, pow2_array[32]);
+        let (q2, r2) = felt_divmod(q1, pow2_array[32]);
+        let (q3, r3) = felt_divmod(q2, pow2_array[32]);
+        assert [output] = r3;
+        assert [output + 1] = r2;
+        assert [output + 2] = r1;
+        assert [output + 3] = r0;
+
+        // Proccess left-low
+        let (q4, r4) = felt_divmod(leaf.low, pow2_array[32]);
+        let (q5, r5) = felt_divmod(q4, pow2_array[32]);
+        let (q6, r6) = felt_divmod(q5, pow2_array[32]);
+        let (q7, r7) = felt_divmod(q6, pow2_array[32]);
+        assert [output + 4] = r7;
+        assert [output + 5] = r6;
+        assert [output + 6] = r5;
+        assert [output + 7] = r4;
+
+        return (output=output);
     }
 
     func chunks_to_uint256{pow2_array: felt*}(output: felt*) -> Uint256 {

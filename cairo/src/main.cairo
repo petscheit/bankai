@@ -5,7 +5,7 @@ from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.uint256 import Uint256
 from definitions import bn, bls, UInt384, one_E12D, N_LIMBS, BASE, E12D, G1Point, G2Point, G1G2Pair
-from pairing import multi_pairing
+from bls12_381.multi_pairing_2 import multi_pairing_2P
 
 from cairo.src.ssz import SSZ
 from cairo.src.constants import g1_negative
@@ -120,7 +120,7 @@ func verify_signature{
     assert inputs[1] = pk_msg_pair;
 
     // We check the pairs are on the curve in the pairing function
-    let (res) = multi_pairing(inputs, 2, 1);
+    let (res) = multi_pairing_2P(inputs);
     let (one) = one_E12D();
     assert res = one;
     return ();
