@@ -1,4 +1,3 @@
-// %builtins range_check bitwise
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin, UInt384, ModBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.memcpy import memcpy
@@ -9,11 +8,8 @@ from cairo.packages.garaga_zero.src.basic_field_ops import u512_mod_p
 from cairo.packages.garaga_zero.src.definitions import get_P
 from cairo.src.utils import felt_divmod
 from cairo.src.sha256 import SHA256, HashUtils
-from cairo.src.ssz import MerkleUtils
-from cairo.src.utils import pow2alloc128
 
-
-// HashToField functionality, using sha256 and 32bytes messages
+// HashToField functionality, using SHA256 and 32-byte messages
 // DST is "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_"
 namespace HashToField32 {
     const B_IN_BYTES = 32; // hash function output size
@@ -25,7 +21,7 @@ namespace HashToField32 {
     const CURVE_L = 64; // ceil((CURVE.P.bitlength + CURVE_K) / 8)
     const CURVE_L_IN_FELTS = 16; // 64 bits, require 16 chunks
 
-    // Returns z_pad, len is CHUNKS_PER_BLOCK * 2
+    // Returns a zero-padded array of length CHUNKS_PER_BLOCK * 2
     func Z_PAD() -> felt* {
         let (z_pad: felt*) = alloc();
         assert [z_pad] = 0;
@@ -48,7 +44,7 @@ namespace HashToField32 {
         return z_pad;
     }
 
-    // 0x01 | DST | DST.len
+    // Returns the concatenation of 0x01, DST, and DST length
     func ONE_DST_PRIME() -> felt* {
         let (one_dst: felt*) = alloc();
         assert [one_dst] = 0x01424C53;
@@ -67,11 +63,16 @@ namespace HashToField32 {
         return one_dst;
     }
 
-    // Expands a message, according to https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-11#section-5.4.1
-    // Params:
-    // msg - the message to expand, in BE 4bytes chunks
-    // msg_bytes_len - the length of the message in bytes
-    // n_bytes - the number of bytes to output
+    // Expands a message according to the algorithm specified in:
+    // https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-11#section-5.4.1
+    // Current implementation only supports 32-byte messages.
+    // Parameters:
+    // - msg: the message to expand, in big-endian 4-byte chunks
+    // - msg_bytes_len: the length of the message in bytes
+    // - n_bytes: the number of bytes to output
+    //
+    // Returns:
+    // - result: the expanded message
     func expand_msg_xmd{
         range_check_ptr,
         bitwise_ptr: BitwiseBuiltin*,
@@ -96,17 +97,17 @@ namespace HashToField32 {
             tempvar range_check_ptr = range_check_ptr + 1;
         }
 
-        // start by retrieving z_pad array, using it as hash_train
+        // Prepare the initial hash input:
+        // Z_pad || msg || N_BYTES ||  0x0 || DST || len(DST)
         let msg_hash_train = Z_PAD();
-        // append msg to msg_hash_train
         memcpy(dst=msg_hash_train + Z_PAD_LEN, src=msg, len=8);
 
-        // Append other required values
+        // Append other required values (DST and lengths)
         assert [msg_hash_train + 24] = 0x01000042; // to_bytes(n_bytes, 2) + 0x0 + DST (starts at 42)
         assert [msg_hash_train + 25] = 0x4C535F53;
         assert [msg_hash_train + 26] = 0x49475F42;
         assert [msg_hash_train + 27] = 0x4C533132;
-        assert [msg_hash_train + 28] = 0x33383147;
+        assert [msg_hash_train + 28] = 0x33383147; 
         assert [msg_hash_train + 29] = 0x325F584D;
         assert [msg_hash_train + 30] = 0x443A5348;
         assert [msg_hash_train + 31] = 0x412D3235;
@@ -115,14 +116,16 @@ namespace HashToField32 {
         assert [msg_hash_train + 34] = 0x4F5F4E55;
         assert [msg_hash_train + 35] = 0x4C5F2B; // DST + DST.len
 
+        // Compute the initial hash (b_0)
         let (msg_hash) = SHA256.hash_bytes(msg_hash_train, 111 + msg_bytes_len); // 64b z_pad + msg_bytes_len + 2b block_size, 0x0 ++ 43b dst + 1b dst_len
 
+        // Prepare input for the first block hash (b_1)
         let (hash_args: felt*) = alloc();
         memcpy(dst=hash_args, src=msg_hash, len=B_IN_FELTS);
-
         let one_dst_prime = ONE_DST_PRIME();
         memcpy(dst=hash_args + 8, src=one_dst_prime, len=12);
 
+        // Compute the first block hash (b_1)
         let (hash_1) = SHA256.hash_bytes(hash_args, 77); // 32b msg + 1b 0x1 + 43b dst + 1b dst_len
 
         // Create hash_train and copy first hash. The hash_train contains all 
@@ -140,7 +143,8 @@ namespace HashToField32 {
         return (result=result);
 
     }
-
+    
+    // Inner recursive function for expand_msg_xmd
     func expand_msg_xmd_inner{
         range_check_ptr,
         bitwise_ptr: BitwiseBuiltin*,
@@ -154,21 +158,33 @@ namespace HashToField32 {
             return ();
         }
 
+        // XOR the initial hash (b_0) with the previous block hash
         let xored = _xor_hash_segments(msg_hash, hash_train + index * B_IN_FELTS);
+
+        // Prepare the input for the next block hash:
+        // (b_0 XOR b_i) || i+1 || DST || len(DST)
         assert [xored + 8] = [one_dst_prime] + 0x01000000 * (index + 1);
         memcpy(dst=xored + 9, src=one_dst_prime + 1, len=11);
-        let (hash) = SHA256.hash_bytes(xored, 77); // 32b msg + 1b 0x1 + 43b dst + 1b dst_len
+
+        // Compute the next block hash
+        let (hash) = SHA256.hash_bytes(xored, 77);
+        // Store the new block hash in the output array
         memcpy(dst=hash_train + (index + 1) * B_IN_FELTS, src=hash, len=B_IN_FELTS);
 
         return expand_msg_xmd_inner(msg_hash=msg_hash, hash_train=hash_train, ell=ell, index=index+1);
     }
 
+    // Hashes a message to a field element
+    // Implementation of algorithm from:
     // https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-11#section-5.3
-    // Inputs:
-    // msg - a byte string containing the message to hash, chunked in BE 4bytes
-    // count - the number of elements of F to output.
-    // Outputs:
-    // [u_0, ..., u_(count - 1)], a list of field elements.
+    //
+    // Parameters:
+    // - msg: a byte string containing the message to hash, chunked in big-endian 4-bytes
+    // - msg_bytes_len: length of the message in bytes
+    // - count: the number of field elements to output
+    //
+    // Returns:
+    // - fields: an array of field elements [u_0, ..., u_(count - 1)]
     func hash_to_field{
         range_check_ptr,
         bitwise_ptr: BitwiseBuiltin*,
@@ -190,7 +206,8 @@ namespace HashToField32 {
         return (fields=result_fields);
     }
 
-    // This function runs once for each count required in the hash_to_field function
+    // Inner recursive function for hash_to_field
+    // Processes each count required in the hash_to_field function
     func hash_to_field_inner{
         range_check96_ptr: felt*,
         add_mod_ptr: ModBuiltin*,
@@ -214,7 +231,8 @@ namespace HashToField32 {
         return hash_to_field_inner(expanded_msg=expanded_msg, count=count, index=index+1);
     }
 
-    // this function runs CURVE_M times (degree of the extension field)
+    // Innermost recursive function for hash_to_field
+    // Runs CURVE_M times (degree of the extension field)
     func hash_to_field_inner_inner{
         range_check96_ptr: felt*,
         add_mod_ptr: ModBuiltin*,
@@ -227,41 +245,31 @@ namespace HashToField32 {
         }
 
         let (result) = _u512_mod_p(expanded_msg + offset);
-        %{ print(hex(ids.result.d3 * 2**288 + ids.result.d2 * 2**192 + ids.result.d1 * 2**96 + ids.result.d0)) %}
+        // %{ print(hex(ids.result.d3 * 2**288 + ids.result.d2 * 2**192 + ids.result.d1 * 2**96 + ids.result.d0)) %}
         assert fields[degree_index] = result;
 
         return hash_to_field_inner_inner(expanded_msg=expanded_msg, count_index=count_index, degree_index=degree_index+1, offset=offset + CURVE_L_IN_FELTS);
     }
 
-    // Convert 512 bit bytes array to UInt384 and calls u512_mod_p
+    // Converts a 512-bit byte array to UInt384 and calls u512_mod_p
     func _u512_mod_p{
         range_check96_ptr: felt*,
         add_mod_ptr: ModBuiltin*,
         mul_mod_ptr: ModBuiltin*,
         pow2_array: felt*
     }(value: felt*) -> (result: UInt384){
-        let value_high = UInt384(
-            d0=value[7] + value[6] * pow2_array[32] + value[5] * pow2_array[64],
-            d1=value[4] + value[3] * pow2_array[32] + value[2] * pow2_array[64],
-            d2=value[1] + value[0] * pow2_array[32],
-            d3=0
+        let (p: UInt384) = get_P(1);
+
+        let (result) = u512_mod_p(
+            low=(v0=value[8], v1=value[9], v2=value[10], v3=value[11], v4=value[12], v5=value[13], v6=value[14], v7=value[15]), 
+            high=(v0=value[0], v1=value[1], v2=value[2], v3=value[3], v4=value[4], v5=value[5], v6=value[6], v7=value[7]),
+            p=p
         );
-
-        let value_low = UInt384(
-            d0=value[15] + value[14] * pow2_array[32] + value[13] * pow2_array[64],
-            d1=value[12] + value[11] * pow2_array[32] + value[10] * pow2_array[64],
-            d2=value[9] + value[8] * pow2_array[32],
-            d3=0
-        );
-
-        let (P: UInt384) = get_P(1);
-
-        let (result) = u512_mod_p(value_low, value_high, P);
 
         return (result=result);
     }
 
-    // XORs two 256 bit hashes
+    // XORs two 256-bit hashes
     func _xor_hash_segments{
         range_check_ptr,
         bitwise_ptr: BitwiseBuiltin*,
