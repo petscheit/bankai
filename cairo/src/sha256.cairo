@@ -1,4 +1,4 @@
-// %builtins range_check bitwise
+%builtins range_check bitwise
 
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
 from starkware.cairo.common.uint256 import Uint256
@@ -250,31 +250,88 @@ func _sha256_chunk{range_check_ptr, sha256_ptr: felt*}() {
     return ();
 }
 
-func main{
-    range_check_ptr,
-    bitwise_ptr: BitwiseBuiltin*
-}() {
 
+func main{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}() {
     alloc_locals;
 
     let (sha256_ptr, sha256_ptr_start) = SHA256.init();
     let (pow2_array) = pow2alloc128();
+    local length: felt;
 
-    let (input: felt*) = alloc();
     %{
-        segments.write_arg(ids.input, [0x11111111,0x22222222,0x33333333,0x44444444,0x55555555,0x66666666,0x77777777,0x88888888,0x99999999,0xaaaaaaaa,0xbbbbbbbb,0xcccccccc,0xdddddddd,0xeeeeeeee, 0xffffffff, 0xffffffff])
-        #segments.write_arg(ids.input, [0x22222222, 0x02])
+        import random
+        import os
+
+        def generate_hex_array(N):
+            hex_array = [os.urandom(i).hex() for i in range(1, N + 1)]
+            return hex_array
+
+        preimages = generate_hex_array(150)
+        print(preimages)
+
+        ids.length = len(preimages)
     %}
 
     with sha256_ptr, pow2_array {
-        // let (output) = SHA256.hash_bytes(input, 64);
-        let (output) = sha256(input, 64);
-
-        // let hash = HashUtils.chunks_to_uint256(output=output);
+        run_test(index=length - 1);
     }
-    // %{ print("Hash: ", hex(ids.hash.high * 2**128 + ids.hash.low)) %}
 
-    // SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
+    SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
 
     return ();
+}
+
+func run_test{range_check_ptr, bitwise_ptr: BitwiseBuiltin*, sha256_ptr: felt*, pow2_array: felt*}(
+    index: felt
+) {
+    alloc_locals;
+
+    if (index == 0) {
+        return ();
+    }
+
+    let (input: felt*) = alloc();
+    local n_bytes: felt;
+    local expected: Uint256;
+    %{
+        from garaga.hints.io import bigint_split
+        import math
+        import hashlib
+
+        def hex_to_chunks_32(hex_string: str):
+            # Remove '0x' prefix if present
+            if hex_string.startswith(('0x', '0X')):
+                hex_string = hex_string[2:]
+
+            # if we have an odd number of characters, prepend a 0
+            if len(hex_string) % 2 == 1:
+                hex_string = '0' + hex_string
+
+            # Now split into 8-character (32-bit) chunks
+            chunks = [int(hex_string[i:i+8], 16) for i in range(0, len(hex_string), 8)]
+            return chunks
+
+        preimage = int(preimages[ids.index], 16)
+        n_bytes = (preimage.bit_length() + 7) // 8
+        ids.n_bytes = n_bytes
+        print(n_bytes)
+        print(math.ceil(n_bytes / 4))
+        expected = hashlib.sha256(preimage.to_bytes(length=ids.n_bytes, byteorder='big')).hexdigest()
+        ids.expected.high, ids.expected.low = divmod(int(expected, 16), 2**128)
+
+        print([hex(x) for x in hex_to_chunks_32(hex(preimage))])
+
+        chunks = bigint_split(preimage, math.ceil(n_bytes / 4), 2**32)
+        print([hex(x) for x in chunks])
+        segments.write_arg(ids.input, chunks)
+    %}
+
+    with sha256_ptr, pow2_array {
+        let (output) = sha256(data=input, n_bytes=n_bytes);
+        let hash = HashUtils.chunks_to_uint256(output=output);
+        assert hash.high = expected.high;
+        assert hash.low = expected.low;
+    }
+
+    return run_test(index=index - 1);
 }
