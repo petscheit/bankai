@@ -1,4 +1,4 @@
-%builtins range_check bitwise range_check96 add_mod mul_mod
+// %builtins range_check bitwise range_check96 add_mod mul_mod
 
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin, ModBuiltin
 from starkware.cairo.common.alloc import alloc
@@ -24,10 +24,8 @@ func main{
     );
 
     with pow2_array, sha256_ptr {
-        hash_to_curve(1, value);
+        return hash_to_curve(1, value);
     }
-
-    return ();
 }
 
 // U [

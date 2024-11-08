@@ -6,7 +6,7 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.uint256 import Uint256
 from definitions import bn, bls, UInt384, one_E12D, N_LIMBS, BASE, E12D, G1Point, G2Point, G1G2Pair
 from bls12_381.multi_pairing_2 import multi_pairing_2P
-
+from hash_to_curve import hash_to_curve
 from cairo.src.ssz import SSZ
 from cairo.src.constants import g1_negative
 from cairo.src.domain import Domain
@@ -49,6 +49,10 @@ func main{
     }
     %{ print("SigningRoot: ", hex(ids.signing_root.high * 2**128 + ids.signing_root.low)) %}
 
+    with pow2_array, sha256_ptr {
+        let (cleared_msg_point) = hash_to_curve(1, signing_root);
+    }
+
     let (agg_key, n_non_signers) = fast_aggregate_signer_pubs();
     let n_signers = 512 - n_non_signers;
     %{ print("N_Signers: ", ids.n_signers) %}
@@ -59,7 +63,7 @@ func main{
         tempvar range_check_ptr = range_check_ptr + 1;
     }
 
-    verify_signature(agg_key, msg_point, sig_point);
+    verify_signature(agg_key, cleared_msg_point, sig_point);
 
     assert [output_ptr] = header_root.low;
     assert [output_ptr + 1] = header_root.high;

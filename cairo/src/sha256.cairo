@@ -1,4 +1,4 @@
-%builtins range_check bitwise
+// %builtins range_check bitwise
 
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
 from starkware.cairo.common.uint256 import Uint256

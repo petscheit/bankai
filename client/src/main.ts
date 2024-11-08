@@ -25,7 +25,8 @@ async function fetchEpochProof(epoch: number, rpc: string) {
 	const signerBits = decodeSignerBits(syncCommittee.signerBits);
 	const signers = validatorPubs.filter((_, i) => signerBits[i] === true).map((x) => new PublicKey().fromBytes(x).toHexObject())
 	const nonSigners = validatorPubs.filter((_, i) => signerBits[i] === false).map((x) => new PublicKey().fromBytes(x).toHexObject())
-
+	console.log("Signing Root: ", blockProof.signingRoot)
+	console.log("Msg Point: ", (await new Message(blockProof.signingRoot).hashToCurve()).toHexObject())
 	const proofPoints = {
 		msg: (await new Message(blockProof.signingRoot).hashToCurve()).toHexObject(),
 		signature: (await new Signature().fromBytes(blockProof.signature)).toHexObject(),
