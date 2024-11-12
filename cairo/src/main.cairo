@@ -12,7 +12,7 @@ from cairo.src.constants import g1_negative
 from cairo.src.domain import Domain
 from cairo.src.signer import fast_aggregate_signer_pubs
 from cairo.src.utils import pow2alloc128
-from cairo.src.sha256 import SHA256
+from sha import SHA256
 
 func main{
     output_ptr: felt*,
@@ -28,13 +28,11 @@ func main{
     let (pow2_array) = pow2alloc128();
     let (sha256_ptr, sha256_ptr_start) = SHA256.init();
 
-    local msg_point: G2Point;
     local sig_point: G2Point;
     local slot: felt;
     %{
         from cairo.py.utils import write_g2, write_g1g2, write_g1
         write_g2(ids.sig_point, program_input["proofPoints"]["signature"])
-        write_g2(ids.msg_point, program_input["proofPoints"]["msg"])
         ids.slot = int(program_input["header"]["slot"], 10)
     %}
     %{ print("Running Verification for Slot: ", ids.slot) %}
@@ -50,7 +48,7 @@ func main{
     %{ print("SigningRoot: ", hex(ids.signing_root.high * 2**128 + ids.signing_root.low)) %}
 
     with pow2_array, sha256_ptr {
-        let (cleared_msg_point) = hash_to_curve(1, signing_root);
+        let (msg_point) = hash_to_curve(1, signing_root);
     }
 
     let (agg_key, n_non_signers) = fast_aggregate_signer_pubs();
@@ -63,7 +61,7 @@ func main{
         tempvar range_check_ptr = range_check_ptr + 1;
     }
 
-    verify_signature(agg_key, cleared_msg_point, sig_point);
+    verify_signature(agg_key, msg_point, sig_point);
 
     assert [output_ptr] = header_root.low;
     assert [output_ptr + 1] = header_root.high;

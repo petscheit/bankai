@@ -118,5 +118,5 @@ func fast_aggregate_signer_pubs_inner{
     // Recursively process the remaining non-signer keys
     let (res) = fast_aggregate_signer_pubs_inner(agg_key, non_signers + G1Point.SIZE, n_non_signers - 1);
     // Subtract the current non-signer's public key from the aggregated result
-    return sub_ec_points(1, res, non_signers[0]);
+    return sub_ec_points(1, res, non_signers[0]); // try adding non signers and the subbing result
 }

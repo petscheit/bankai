@@ -4,7 +4,7 @@ from starkware.cairo.common.uint256 import Uint256, uint256_reverse_endian
 from starkware.cairo.common.builtin_keccak.keccak import keccak_uint256s_bigend
 from starkware.cairo.common.memcpy import memcpy
 from starkware.cairo.common.alloc import alloc
-from cairo.src.sha256 import SHA256
+from sha import SHA256
 from cairo.src.utils import pow2alloc128, felt_divmod
 
 namespace SSZ {
@@ -17,7 +17,7 @@ namespace SSZ {
         alloc_locals;
 
         let input = MerkleUtils.chunk_pair(left, right);
-        let (result_chunks) = SHA256.hash_pair(input=input-16);
+        let (result_chunks) = SHA256.hash_64(input=input-16);
         let result = MerkleUtils.chunks_to_uint256(output=result_chunks);
         return result;
     }
@@ -114,7 +114,7 @@ namespace MerkleTree {
 
         // for each iteration, we must move the pointer 16 felts back to the next pair
         tempvar tree_ptr = tree_ptr - 16;
-        let (node) = SHA256.hash_pair(input=tree_ptr);
+        let (node) = SHA256.hash_64(input=tree_ptr);
 
         // write the hash to the correct position in the tree
         memcpy(dst=tree_ptr - (1 + tree_range - index) * 8, src=node, len=8);
