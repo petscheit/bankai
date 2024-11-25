@@ -51,6 +51,15 @@ func main{
         let (msg_point) = hash_to_curve(1, signing_root);
     }
 
+    %{ 
+        from garaga.hints.io import bigint_pack
+        print("MsgPoint:")
+        print(hex(bigint_pack(ids.msg_point.x0, 4, 2**96)))
+        print(hex(bigint_pack(ids.msg_point.x1, 4, 2**96)))
+        print(hex(bigint_pack(ids.msg_point.y0, 4, 2**96)))
+        print(hex(bigint_pack(ids.msg_point.y1, 4, 2**96)))
+    %}
+
     let (agg_key, n_non_signers) = fast_aggregate_signer_pubs();
     let n_signers = 512 - n_non_signers;
     %{ print("N_Signers: ", ids.n_signers) %}

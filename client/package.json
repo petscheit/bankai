@@ -11,7 +11,7 @@
     "cairo-run:aggregate": "./scripts/cairo_run.sh pub_agg.json",
     "cairo-run:verify_sig": "./scripts/cairo_run.sh verify_sig.json",
     "build": "tsc",
-    "cli": "node lib/main.js"
+    "cli": "npm run build && node lib/main.js"
   },
   "keywords": [],
   "author": "",

@@ -27,8 +27,8 @@ cairo-run --program=cairo/build/main.json \
     --layout=all_cairo \
     --print_info \
     $PIE_FLAG \
+    # --proof_mode
     # --cairo_layout_params_file=dynamic_params.json \
-    # --proof_mode \
 
 # End timing
 end_time=$(date +%s.%N)
