@@ -1,0 +1,27 @@
+[package]
+name = "client-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ethereum_ssz = "0.8.0"
+ethereum_ssz_derive = "0.8.0"
+reqwest = { version = "0.12.9", features = ["json"] }
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = "1.0.133"
+serde_with = { version = "3.11.0", features = ["hex"] }
+tokio = { version = "1.0", features = ["full"] }
+alloy = { version = "0.6.4", features = [
+    "rpc",
+    "rpc-types",
+    "rpc-types-beacon",
+    "rpc-client",
+    "network",
+    "providers",
+    "eips",
+    "transports",
+    "transport-http",
+    "consensus",
+    "k256",
+] }
+serde_bytes = "0.11"
