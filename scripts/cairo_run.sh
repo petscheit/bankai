@@ -1,13 +1,19 @@
 #!/bin/bash
 
-INPUT_FILE="input.json"
+INPUT_FILE="main_input.json"
 PIE_FLAG=""
+PROGRAM="main"  # Default program
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         --pie)
             PIE_FLAG="--cairo_pie_output=pie.zip"
+            shift
+            ;;
+        --committee)
+            PROGRAM="committee_update"
+            INPUT_FILE="committee_input.json"  # Default committee input file
             shift
             ;;
         *)
@@ -17,12 +23,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "Running Cairo program..."
+echo "Running Cairo program: $PROGRAM..."
 
 # Start timing
 start_time=$(date +%s.%N)
 
-cairo-run --program=cairo/build/main.json \
+cairo-run --program=cairo/build/${PROGRAM}.json \
     --program_input="$INPUT_FILE" \
     --layout=all_cairo \
     --print_info \
