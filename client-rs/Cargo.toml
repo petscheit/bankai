@@ -4,24 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ethereum_ssz = "0.8.0"
-ethereum_ssz_derive = "0.8.0"
-reqwest = { version = "0.12.9", features = ["json"] }
-serde = { version = "1.0.215", features = ["derive"] }
+alloy-primitives = "0.8.13"
+hex = "0.4.3"
+serde = "1.0.215"
+serde_derive = "1.0.215"
 serde_json = "1.0.133"
-serde_with = { version = "3.11.0", features = ["hex"] }
 tokio = { version = "1.0", features = ["full"] }
-alloy = { version = "0.6.4", features = [
-    "rpc",
-    "rpc-types",
-    "rpc-types-beacon",
-    "rpc-client",
-    "network",
-    "providers",
-    "eips",
-    "transports",
-    "transport-http",
-    "consensus",
-    "k256",
-] }
-serde_bytes = "0.11"
+beacon-state-proof = { git = "https://github.com/petscheit/beacon-state-proof" }
+sha2 = "0.10.8"
+reqwest = { version = "0.12.9", features = ["json"] }

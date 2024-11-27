@@ -1,90 +1,87 @@
-use ssz_derive::{Decode, Encode};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde_with::{serde_as, Bytes};
+use crate::sync_committee::SyncCommitteeUpdateError;
+use crate::utils::merkle;
+use alloy_primitives::{FixedBytes, U64};
+use beacon_state_proof::state_proof_fetcher::{SyncCommitteeProof, TreeHash};
+use serde::Serialize;
+use sha2::{Digest, Sha256};
 
-#[derive(Debug, Encode, Decode)]
-pub struct SyncCommittee {
-    pub(crate) pubkeys: Vec<[u8; 48]>,
-    pub(crate) aggregate_pubkey: [u8; 48],
+#[derive(Debug)]
+pub struct SyncCommitteeUpdateProof {
+    /// Slot of the proof
+    pub beacon_slot: U64,
+    /// Branch of the proof
+    pub next_sync_committee_branch: Vec<FixedBytes<32>>,
+    /// The aggregated next sync committee pubkey
+    pub next_aggregate_sync_committee: FixedBytes<48>,
+    /// The SyncCommittee container contains a list of pubkeys, and the aggregate pubkey
+    pub committee_keys_root: FixedBytes<32>,
 }
 
-impl Deserialize for SyncCommittee {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        Ok(SyncCommittee { pubkeys: Vec::deserialize(deserializer)?, aggregate_pubkey: [0u8; 48] })
+impl SyncCommitteeUpdateProof {
+    pub fn compute_state_root(&self) -> Result<FixedBytes<32>, SyncCommitteeUpdateError> {
+        // Since the keys are 48 bytes, we pad them to 64 bytes and hash them for the root
+        let mut padded_aggregate = vec![0u8; 64];
+        padded_aggregate[..48].copy_from_slice(&self.next_aggregate_sync_committee[..]);
+        let aggregate_root: FixedBytes<32> =
+            FixedBytes::from_slice(&Sha256::digest(&padded_aggregate));
+
+        let mut leaf_data = [0u8; 64];
+        leaf_data[0..32].copy_from_slice(self.committee_keys_root.as_slice());
+        leaf_data[32..64].copy_from_slice(aggregate_root.as_slice());
+        let leaf = FixedBytes::from_slice(&Sha256::digest(&leaf_data));
+
+        let state_root =
+            merkle::hash_merkle_path(self.next_sync_committee_branch.clone(), leaf, 55);
+
+        Ok(state_root)
+        // Ok(aggregate_root)
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct LightClientUpdateResponse {
-    pub version: String,
-    pub data: LightClientUpdate,
+impl From<SyncCommitteeProof> for SyncCommitteeUpdateProof {
+    fn from(committee_proof: SyncCommitteeProof) -> Self {
+        let committee_keys_root = &committee_proof.next_sync_committee.pubkeys.tree_hash_root();
+        Self {
+            beacon_slot: U64::from(committee_proof.slot),
+            next_sync_committee_branch: committee_proof
+                .proof
+                .into_iter()
+                .map(|bytes| FixedBytes::from_slice(&bytes.as_bytes()))
+                .collect(),
+            next_aggregate_sync_committee: FixedBytes::from_slice(
+                &committee_proof
+                    .next_sync_committee
+                    .aggregate_pubkey
+                    .as_serialized(),
+            ),
+            committee_keys_root: FixedBytes::from_slice(committee_keys_root.as_bytes()),
+        }
+    }
 }
 
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct LightClientUpdate {
-    pub attested_header: AttestedHeader,
-    pub next_sync_committee: SyncCommittee,
-    pub next_sync_committee_branch: Vec<String>,
-    pub finalized_header: FinalizedHeader,
-    pub finality_branch: Vec<String>,
-    pub sync_aggregate: SyncAggregate,
-    pub signature_slot: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AttestedHeader {
-    pub beacon: BeaconBlockHeader,
-    pub execution: ExecutionHeader,
-    pub execution_branch: Vec<String>,
-}
-
-pub type FinalizedHeader = AttestedHeader;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BeaconBlockHeader {
-    pub slot: String,
-    pub proposer_index: String,
-    pub parent_root: String,
-    pub state_root: String,
-    pub body_root: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ExecutionHeader {
-    pub parent_hash: String,
-    pub fee_recipient: String,
-    pub state_root: String,
-    pub receipts_root: String,
-    pub logs_bloom: String,
-    pub prev_randao: String,
-    pub block_number: String,
-    pub gas_limit: String,
-    pub gas_used: String,
-    pub timestamp: String,
-    pub extra_data: String,
-    pub base_fee_per_gas: String,
-    pub block_hash: String,
-    pub transactions_root: String,
-    pub withdrawals_root: String,
-    pub blob_gas_used: String,
-    pub excess_blob_gas: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SyncAggregate {
-    pub sync_committee_bits: String,
-    pub sync_committee_signature: String,
-}
-
-impl Deserialize for SyncCommittee {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+impl Serialize for SyncCommitteeUpdateProof {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        D: Deserializer<'de>,
+        S: serde::Serializer,
     {
-        Ok(SyncCommittee { pubkeys: Vec::deserialize(deserializer)?, aggregate_pubkey: [0u8; 48] })
+        use serde::ser::SerializeStruct;
+
+        let mut state = serializer.serialize_struct("SyncCommitteeUpdateProof", 4)?;
+
+        state.serialize_field("beacon_slot", &self.beacon_slot)?;
+        state.serialize_field(
+            "next_sync_committee_branch",
+            &self.next_sync_committee_branch,
+        )?;
+        state.serialize_field(
+            "next_aggregate_sync_committee",
+            &hex::encode(self.next_aggregate_sync_committee),
+        )?;
+        state.serialize_field(
+            "committee_keys_root",
+            &hex::encode(self.committee_keys_root),
+        )?;
+
+        state.end()
     }
 }
