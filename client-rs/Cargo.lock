@@ -394,7 +394,7 @@ dependencies = [
  "blst",
  "ethereum-types",
  "ethereum_hashing",
- "ethereum_serde_utils",
+ "ethereum_serde_utils 0.5.2",
  "ethereum_ssz",
  "hex",
  "rand",
@@ -438,6 +438,9 @@ name = "bytes"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ac0150caa2ae65ca5bd83f25c7de183dea78d4d366469f148435e2acfbad0da"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "c-kzg"
@@ -473,6 +476,7 @@ version = "0.1.0"
 dependencies = [
  "alloy-primitives 0.8.13",
  "beacon-state-proof",
+ "ethereum_serde_utils 0.7.0",
  "hex",
  "reqwest 0.12.9",
  "serde",
@@ -875,6 +879,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ethereum_serde_utils"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70cbccfccf81d67bff0ab36e591fa536c8a935b078a7b0e58c1d00d418332fc9"
+dependencies = [
+ "alloy-primitives 0.8.13",
+ "hex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "ethereum_ssz"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1130,6 +1147,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
 dependencies = [
  "foldhash",
+ "serde",
 ]
 
 [[package]]
@@ -1152,6 +1170,9 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "hex-literal"
@@ -1536,6 +1557,7 @@ checksum = "707907fe3c25f5424cce2cb7e1cbcafee6bdbe735ca90ef77c29e84591e5b9da"
 dependencies = [
  "equivalent",
  "hashbrown 0.15.2",
+ "serde",
 ]
 
 [[package]]
@@ -1617,7 +1639,7 @@ dependencies = [
  "c-kzg",
  "derivative",
  "ethereum_hashing",
- "ethereum_serde_utils",
+ "ethereum_serde_utils 0.5.2",
  "ethereum_ssz",
  "ethereum_ssz_derive",
  "hex",
@@ -2084,6 +2106,7 @@ dependencies = [
  "libc",
  "rand_chacha",
  "rand_core",
+ "serde",
 ]
 
 [[package]]
@@ -2719,7 +2742,7 @@ checksum = "625b20de2d4b3891e6972f4ce5061cb11bd52b3479270c4b177c134b571194a9"
 dependencies = [
  "arbitrary",
  "derivative",
- "ethereum_serde_utils",
+ "ethereum_serde_utils 0.5.2",
  "ethereum_ssz",
  "itertools",
  "serde",
@@ -3106,7 +3129,7 @@ dependencies = [
  "eth2_interop_keypairs",
  "ethereum-types",
  "ethereum_hashing",
- "ethereum_serde_utils",
+ "ethereum_serde_utils 0.5.2",
  "ethereum_ssz",
  "ethereum_ssz_derive",
  "hex",
