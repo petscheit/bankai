@@ -10,7 +10,7 @@ from hash_to_curve import hash_to_curve
 from cairo.src.ssz import SSZ
 from cairo.src.constants import g1_negative
 from cairo.src.domain import Domain
-from cairo.src.signer import fast_aggregate_signer_pubs
+from cairo.src.signer import fast_aggregate_signer_pubs, aggregate_signer_pubs, faster_fast_aggregate_signer_pubs
 from cairo.src.utils import pow2alloc128
 from sha import SHA256
 
@@ -32,7 +32,7 @@ func main{
     local slot: felt;
     %{
         from cairo.py.utils import write_g2, write_g1g2, write_g1
-        write_g2(ids.sig_point, program_input["proofPoints"]["signature"])
+        write_g2(ids.sig_point, program_input["signature_point"])
         ids.slot = int(program_input["header"]["slot"], 10)
     %}
     %{ print("Running Verification for Slot: ", ids.slot) %}
@@ -60,10 +60,11 @@ func main{
         print(hex(bigint_pack(ids.msg_point.y1, 4, 2**96)))
     %}
 
-    let (agg_key, n_non_signers) = fast_aggregate_signer_pubs();
+    let (agg_key, n_non_signers) = faster_fast_aggregate_signer_pubs();
+    // let (agg_key, n_non_signers) = aggregate_signer_pubs();
     let n_signers = 512 - n_non_signers;
     %{ print("N_Signers: ", ids.n_signers) %}
-
+    hex_print_g1(agg_key);
     with_attr error_message("NOT_ENOUGH_SIGNERS") {
         // this ensures more then 80% of the committee signed the block
         assert [range_check_ptr] = n_signers - 410;
@@ -78,6 +79,23 @@ func main{
 
     // ATTENTION: NEVER EVER REMOVE THIS!!!
     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
+
+    return ();
+}
+
+func hex_print_g1(point: G1Point) {
+    let x = point.x;
+    let y = point.y;
+
+    %{
+        from garaga.hints.io import bigint_pack
+        print("G1Point:")
+
+        print("x", hex(bigint_pack(ids.x, 4, 2**96)))
+        print("y", hex(bigint_pack(ids.y, 4, 2**96)))
+        print("________________________________")
+
+    %}
 
     return ();
 }

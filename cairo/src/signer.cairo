@@ -76,8 +76,8 @@ func fast_aggregate_signer_pubs{
     // Python hint to populate non_signers array, set committee_pub, and n_non_signers
     %{
         from cairo.py.utils import generate_signers_array
-        non_signers = generate_signers_array(program_input["aggregates"]["nonSigners"])
-        write_g1(ids.committee_pub, program_input["aggregates"]["committee"])
+        non_signers = generate_signers_array(program_input["non_signers"])
+        write_g1(ids.committee_pub, program_input["sync_committee_agg_pub"])
 
         for i, non_signer in enumerate(non_signers):
             memory[ids.non_signers._reference_value + i * 8] = non_signer[0][0]
@@ -119,4 +119,64 @@ func fast_aggregate_signer_pubs_inner{
     let (res) = fast_aggregate_signer_pubs_inner(agg_key, non_signers + G1Point.SIZE, n_non_signers - 1);
     // Subtract the current non-signer's public key from the aggregated result
     return sub_ec_points(1, res, non_signers[0]); // try adding non signers and the subbing result
+}
+
+
+func faster_fast_aggregate_signer_pubs{
+    range_check_ptr, range_check96_ptr: felt*, add_mod_ptr: ModBuiltin*, mul_mod_ptr: ModBuiltin*
+}() -> (agg_pub: G1Point, n_non_signers: felt) {
+    alloc_locals;
+
+    // Allocate memory for non-signers and declare committee_pub and n_non_signers
+    let (non_signers: G1Point*) = alloc();
+    local committee_pub: G1Point;
+    local n_non_signers: felt;
+
+    // Python hint to populate non_signers array, set committee_pub, and n_non_signers
+    %{
+        from cairo.py.utils import generate_signers_array
+        non_signers = generate_signers_array(program_input["non_signers"])
+        write_g1(ids.committee_pub, program_input["sync_committee_agg_pub"])
+
+        for i, non_signer in enumerate(non_signers):
+            memory[ids.non_signers._reference_value + i * 8] = non_signer[0][0]
+            memory[ids.non_signers._reference_value + i * 8 + 1] = non_signer[0][1]
+            memory[ids.non_signers._reference_value + i * 8 + 2] = non_signer[0][2]
+            memory[ids.non_signers._reference_value + i * 8 + 3] = non_signer[0][3]
+            memory[ids.non_signers._reference_value + i * 8 + 4] = non_signer[1][0]
+            memory[ids.non_signers._reference_value + i * 8 + 5] = non_signer[1][1]
+            memory[ids.non_signers._reference_value + i * 8 + 6] = non_signer[1][2]
+            memory[ids.non_signers._reference_value + i * 8 + 7] = non_signer[1][3]
+
+        ids.n_non_signers = len(non_signers)
+    %}
+
+    // Call the recursive function to aggregate public keys
+    let (agg_non_signer_pub) = faster_fast_aggregate_signer_pubs_inner(non_signers, n_non_signers);
+    let (signer_key) = sub_ec_points(1, committee_pub, agg_non_signer_pub);
+
+    return (agg_pub=signer_key, n_non_signers=n_non_signers);
+}
+
+// Recursive helper function for fast aggregation of signer public keys
+// In this version we add the non-signers (which is cheaper then subtracting)
+// And then we subtract the result from the committee aggregate key. Saves avg 5k steps in normal epoch proof.
+func faster_fast_aggregate_signer_pubs_inner{
+    range_check_ptr, range_check96_ptr: felt*, add_mod_ptr: ModBuiltin*, mul_mod_ptr: ModBuiltin*
+}(non_signers: G1Point*, n_non_signers: felt) -> (res: G1Point) {
+     // Base case: if there are no non-signers, verify agg_key is on the curve and return it
+     if (n_non_signers == 1) {
+        let (on_curve) = is_on_curve_g1(1, non_signers[0]);
+        assert on_curve = 1;
+        return (non_signers[0], );
+    }
+
+    // Verify that the current non-signer's public key is on the curve
+    let (on_curve) = is_on_curve_g1(1, non_signers[0]);
+    assert on_curve = 1;
+    
+    // Recursively process the remaining non-signer keys
+    let (res) = faster_fast_aggregate_signer_pubs_inner(non_signers + G1Point.SIZE, n_non_signers - 1);
+    // Subtract the current non-signer's public key from the aggregated result
+    return add_ec_points(1, res, non_signers[0]); // try adding non signers and the subbing result
 }
