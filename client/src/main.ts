@@ -14,37 +14,24 @@ async function fetchEpochProof(epoch: number, rpc: string) {
 	// Fetch the first block of the following epoch, as this seal the targeted epoch
 	const slot = (epoch + 1) * 32
 	let blockProof = await client.getBlockProof(slot)
+	console.log("Block Proof: ", blockProof)
 	const header = await client.getHeader(slot)
 	const valid = await client.verifyBlockProof(blockProof)
-	const blockRoot = await client.getBlockRoot(slot)
 	console.log("Proof verifies:", valid)
-
-	// Fetch the signers of this specific block
-	const syncCommittee = await client.getSyncCommitteeSignature(slot + 1)
-	const validatorPubs = await client.getSyncCommitteeValidatorPubs(slot + 1)
+	const syncCommittee = await client.getSyncCommitteeSignature(slot)
+	const validatorPubs = await client.getSyncCommitteeValidatorPubs(slot)
 	const signerBits = decodeSignerBits(syncCommittee.signerBits);
 	const signers = validatorPubs.filter((_, i) => signerBits[i] === true).map((x) => new PublicKey().fromBytes(x).toHexObject())
 	const nonSigners = validatorPubs.filter((_, i) => signerBits[i] === false).map((x) => new PublicKey().fromBytes(x).toHexObject())
-	console.log("Signing Root: ", blockProof.signingRoot)
-	console.log("Msg Point: ", (await new Message(blockProof.signingRoot).hashToCurve()).toHexObject())
-	const proofPoints = {
-		msg: (await new Message(blockProof.signingRoot).hashToCurve()).toHexObject(),
-		signature: (await new Signature().fromBytes(blockProof.signature)).toHexObject(),
-		publicKey: (new PublicKey().fromBytes(blockProof.aggregaredPubkey)).toHexObject()
+
+	const result = {
+		header: header["header"]["message"],
+		signature_point: (await new Signature().fromBytes(blockProof.signature)).toHexObject(),
+		sync_committee_agg_pub: new PublicKey().fromBytes(bls.aggregatePublicKeys(validatorPubs.map((x) => x.replace("0x", "")))).toHexObject(),
+		non_signers: nonSigners,
 	}
 
-	blockProof["proofPoints"] = proofPoints
-	blockProof["signers"] = signers
-	blockProof["blockRoot"] = blockRoot
-	blockProof["header"] = header["header"]["message"]
-	blockProof["headerRoot"] = header["root"]
-	const aggregates =  {
-		committee: new PublicKey().fromBytes(bls.aggregatePublicKeys(validatorPubs.map((x) => x.replace("0x", "")))).toHexObject(),
-		signers,
-		nonSigners
-	}
-	blockProof["aggregates"] = aggregates
-	return blockProof
+	return result
 }
 
 async function fetchBlockProof(blockId: number | string, rpc: string) {
