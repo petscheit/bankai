@@ -58,3 +58,7 @@ def hex_to_chunks_32(hex_string: str):
     # Now split into 8-character (32-bit) chunks
     chunks = [int(hex_string[i:i+8], 16) for i in range(0, len(hex_string), 8)]
     return chunks
+
+
+def print_u256(ptr):
+    print(hex(ptr.high * 2**128 + ptr.low))

@@ -76,13 +76,6 @@ namespace MerkleTree {
         // move the pointer to the start of the chunked leafs
         let chunked_leafs = chunked_leafs - leafs_len * 8;
 
-        // %{
-        //     i = 0
-        //     while i < ids.leafs_len * 8:
-        //         print("chunked_leafs[", i, "]: ", hex(memory[ids.chunked_leafs + i]))
-        //         i += 1
-        // %}
-
         let (tree: felt*) = alloc();
         let tree_len = 2 * leafs_len - 1; // number nodes in the tree (not accounting for chunking)
 
@@ -119,6 +112,42 @@ namespace MerkleTree {
         // write the hash to the correct position in the tree
         memcpy(dst=tree_ptr - (1 + tree_range - index) * 8, src=node, len=8);
         return compute_merkle_root_inner(tree_range=tree_range, index=index + 1);
+    }
+
+    func hash_merkle_path{
+        range_check_ptr,
+        bitwise_ptr: BitwiseBuiltin*,
+        pow2_array: felt*,
+        sha256_ptr: felt*
+    }(path: felt**, path_len: felt, leaf: felt*, index: felt) -> Uint256 {
+        alloc_locals;
+        
+        // Base case - if no more siblings to process, return the current value
+        if (path_len == 0) {
+            let result = MerkleUtils.chunks_to_uint256(output=leaf);
+            return result;
+        }
+
+        // Check if current node is left or right child
+        let (new_index, r) = felt_divmod(index, 2);
+        if (r == 0) {
+            // for some reason this break if I append to leaf, instead of doing this
+            let (input: felt*) = alloc();
+            memcpy(dst=input, src=leaf, len=8);
+            memcpy(dst=input + 8, src=node, len=8);
+            let (result_chunks) = SHA256.hash_64(input=input);
+        } else {
+            memcpy(dst=[node] + 8, src=leaf, len=8);
+            let (result_chunks) = SHA256.hash_64(input=node);
+        }
+        
+        // Recurse with remaining path
+        return hash_merkle_path(
+            path=path + 1,
+            path_len=path_len - 1,
+            leaf=result_chunks,
+            index=new_index
+        );
     }
 }
 
