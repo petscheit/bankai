@@ -65,3 +65,15 @@ def print_u256(msg, ptr):
 
 def print_u384(msg, ptr):
     print(f"{msg}: {hex(ptr.d3 * 2**288 + ptr.d2 * 2**192 + ptr.d1 * 2**96 + ptr.d0)}")
+
+def print_g1(msg, ptr):
+    print(f"{msg}:")
+    print_u384("x", ptr.x)
+    print_u384("y", ptr.y)
+
+def print_g2(msg, ptr):
+    print(f"{msg}:")
+    print_u384("x0", ptr.x0)
+    print_u384("x1", ptr.x1)
+    print_u384("y0", ptr.y0)
+    print_u384("y1", ptr.y1)

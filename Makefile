@@ -27,4 +27,6 @@ build-committee-and-run:
 	./scripts/cairo_compile.sh cairo/src/committee_update.cairo
 	./scripts/cairo_run.sh
 
-	
+test:
+	./cairo/tests/committee.sh
+	./cairo/tests/epoch.sh

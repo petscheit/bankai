@@ -31,7 +31,7 @@ func main{
     local sig_point: G2Point;
     local slot: felt;
     %{
-        from cairo.py.utils import write_g2, write_g1g2, write_g1
+        from cairo.py.utils import write_g2, write_g1g2, write_g1, print_g2
         write_g2(ids.sig_point, program_input["signature_point"])
         ids.slot = int(program_input["header"]["slot"], 10)
     %}
@@ -51,51 +51,27 @@ func main{
         let (msg_point) = hash_to_curve(1, signing_root);
     }
 
-    %{ 
-        from garaga.hints.io import bigint_pack
-        print("MsgPoint:")
-        print(hex(bigint_pack(ids.msg_point.x0, 4, 2**96)))
-        print(hex(bigint_pack(ids.msg_point.x1, 4, 2**96)))
-        print(hex(bigint_pack(ids.msg_point.y0, 4, 2**96)))
-        print(hex(bigint_pack(ids.msg_point.y1, 4, 2**96)))
-    %}
+    %{ print_g2("MsgPoint", ids.msg_point) %}
 
-    let (agg_key, n_non_signers) = faster_fast_aggregate_signer_pubs();
-    // let (agg_key, n_non_signers) = aggregate_signer_pubs();
+    with sha256_ptr, pow2_array {
+        let (committee_hash, agg_key, n_non_signers) = faster_fast_aggregate_signer_pubs();
+    }
     let n_signers = 512 - n_non_signers;
-    %{ print("N_Signers: ", ids.n_signers) %}
-    hex_print_g1(agg_key);
+
     with_attr error_message("NOT_ENOUGH_SIGNERS") {
-        // this ensures more then 80% of the committee signed the block
         assert [range_check_ptr] = n_signers - 410;
         tempvar range_check_ptr = range_check_ptr + 1;
     }
 
+    SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
     verify_signature(agg_key, msg_point, sig_point);
 
     assert [output_ptr] = header_root.low;
     assert [output_ptr + 1] = header_root.high;
-    let output_ptr = output_ptr + 2;
-
-    // ATTENTION: NEVER EVER REMOVE THIS!!!
-    SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
-
-    return ();
-}
-
-func hex_print_g1(point: G1Point) {
-    let x = point.x;
-    let y = point.y;
-
-    %{
-        from garaga.hints.io import bigint_pack
-        print("G1Point:")
-
-        print("x", hex(bigint_pack(ids.x, 4, 2**96)))
-        print("y", hex(bigint_pack(ids.y, 4, 2**96)))
-        print("________________________________")
-
-    %}
+    assert [output_ptr + 2] = committee_hash.low;
+    assert [output_ptr + 3] = committee_hash.high;
+    assert [output_ptr + 4] = n_signers;
+    let output_ptr = output_ptr + 5;
 
     return ();
 }

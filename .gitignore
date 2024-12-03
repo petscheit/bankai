@@ -14,6 +14,7 @@ venv
 .DS_Store
 
 pie.zip
+*.log
 pie.encoded.txt
 
 client/epoch_data.json

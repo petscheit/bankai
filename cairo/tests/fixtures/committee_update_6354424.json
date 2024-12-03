@@ -1,0 +1,13 @@
+{
+  "beacon_slot": "0x60f5f8",
+  "committee_keys_root": "fe3b267242605d86dc24f5dc1e07af15ffbcd5ce2ca0a6429464c370cff3d422",
+  "expected_state_root": "0x0326f3d84280dbbbb1464d4c150fa90d78355dff4768a119bbcb2e56143647c2",
+  "next_aggregate_sync_committee": "9991b019efd0ca1d96623865b9fafd97b5cfcb96d0cd23bcad8a8c3a25e8312b589a30022341d0c3b35ee2a6350ef0db",
+  "next_sync_committee_branch": [
+    "0x8f12a03654a1c1bd7a9cdc6e2e15bc20ea008786a29e2803e69615cf2c68cc11",
+    "0x0a547dedbd328c77a24632a418a6cd5ad63f0856b6a1d91078545918ded5bfc8",
+    "0x0ea8502a42cacb9d6445c7998f2c512d823df6527bdeedb31beeecc907342f7e",
+    "0xf981030af096f4002da557ad27f98fd76f5488ca38c8290fd3af9e421ead51e4",
+    "0x5bc9e0ad2a9af99bd0f6d42fcb0506409c6e2049157a15cce1bd98af43c58eb2"
+  ]
+}

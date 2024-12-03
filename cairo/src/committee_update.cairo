@@ -55,7 +55,10 @@ func main{
         let leaf_hash = compute_leaf_hash(committee_keys_root, aggregate_committee_key);
         // The next sync committee is always at index 55
         let state_root = MerkleTree.hash_merkle_path(path=path, path_len=path_len, leaf=leaf_hash, index=55);
-        %{ print_u256("Derived state root", ids.state_root) %}
+        %{ 
+            expected_root = int(program_input["expected_state_root"], 16)
+            assert expected_root == ids.state_root.high * 2**128 + ids.state_root.low
+        %}
         let committee_hash = compute_committee_hash(aggregate_committee_key);
 
     }

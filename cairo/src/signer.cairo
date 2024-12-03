@@ -127,8 +127,8 @@ func fast_aggregate_signer_pubs_inner{
 
 
 func faster_fast_aggregate_signer_pubs{
-    range_check_ptr, range_check96_ptr: felt*, add_mod_ptr: ModBuiltin*, mul_mod_ptr: ModBuiltin*
-}() -> (agg_pub: G1Point, n_non_signers: felt) {
+    range_check_ptr, pow2_array: felt*, range_check96_ptr: felt*, add_mod_ptr: ModBuiltin*, mul_mod_ptr: ModBuiltin*, sha256_ptr: felt*
+}() -> (committee_hash: Uint256, agg_pub: G1Point, n_non_signers: felt) {
     alloc_locals;
 
     // Allocate memory for non-signers and declare committee_pub and n_non_signers
@@ -155,11 +155,17 @@ func faster_fast_aggregate_signer_pubs{
         ids.n_non_signers = len(non_signers)
     %}
 
-    // Call the recursive function to aggregate public keys
-    let (agg_non_signer_pub) = faster_fast_aggregate_signer_pubs_inner(non_signers, n_non_signers);
-    let (signer_key) = sub_ec_points(1, committee_pub, agg_non_signer_pub);
 
-    return (agg_pub=signer_key, n_non_signers=n_non_signers);
+    // Call the recursive function to aggregate public keys
+    if (n_non_signers != 0) {
+        let (agg_non_signer_pub) = faster_fast_aggregate_signer_pubs_inner(non_signers, n_non_signers);
+        let (signer_key) = sub_ec_points(1, committee_pub, agg_non_signer_pub);
+        let committee_hash = commit_committee_key(point=committee_pub);
+        return (committee_hash=committee_hash, agg_pub=signer_key, n_non_signers=n_non_signers);
+    } else {
+        let committee_hash = commit_committee_key(point=committee_pub);
+        return (committee_hash=committee_hash, agg_pub=committee_pub, n_non_signers=n_non_signers);
+    }
 }
 
 // Recursive helper function for fast aggregation of signer public keys
