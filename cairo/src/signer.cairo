@@ -1,7 +1,11 @@
 from starkware.cairo.common.cairo_builtins import ModBuiltin
+from starkware.cairo.common.uint256 import Uint256
+from starkware.cairo.common.memcpy import memcpy
+from starkware.cairo.common.alloc import alloc
+
 from definitions import G1Point
 from ec_ops import add_ec_points, is_on_curve_g1, sub_ec_points
-from starkware.cairo.common.alloc import alloc
+from sha import HashUtils, SHA256
 
 // This file contains functions for aggregating public keys of signers in a BLS signature scheme.
 
@@ -179,4 +183,24 @@ func faster_fast_aggregate_signer_pubs_inner{
     let (res) = faster_fast_aggregate_signer_pubs_inner(non_signers + G1Point.SIZE, n_non_signers - 1);
     // Subtract the current non-signer's public key from the aggregated result
     return add_ec_points(1, res, non_signers[0]); // try adding non signers and the subbing result
+}
+
+// This function generates the hash of an aggregate committee key.
+// This hash is stored in the cairo1 state, and is used to check if the correct committee was used
+func commit_committee_key{
+    range_check_ptr,
+    sha256_ptr: felt*,
+    pow2_array: felt*,
+}(point: G1Point) -> Uint256 {
+    alloc_locals;
+
+    let (x_chunks) = HashUtils.chunk_uint384(point.x);
+    let (y_chunks) = HashUtils.chunk_uint384(point.y);
+
+    // Concatenate x and y chunks and compute the hash
+    memcpy(dst=x_chunks + 12, src=y_chunks, len=12);
+    let (committee_point_hash_chunks) = SHA256.hash_bytes(x_chunks, 96);
+    let committee_point_hash = HashUtils.chunks_to_uint256(committee_point_hash_chunks);
+
+    return committee_point_hash;
 }

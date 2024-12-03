@@ -10,6 +10,7 @@ from starkware.cairo.common.memset import memset
 from definitions import UInt384
 
 from cairo.src.utils import pow2alloc128, felt_divmod
+from cairo.src.signer import commit_committee_key
 from cairo.src.ssz import MerkleTree
 from sha import SHA256, HashUtils
 from ec_ops import derive_g1_point_from_x
@@ -54,16 +55,19 @@ func main{
         let leaf_hash = compute_leaf_hash(committee_keys_root, aggregate_committee_key);
         // The next sync committee is always at index 55
         let state_root = MerkleTree.hash_merkle_path(path=path, path_len=path_len, leaf=leaf_hash, index=55);
-        let committee_point_hash = compute_committee_point_hash(aggregate_committee_key);
+        %{ print_u256("Derived state root", ids.state_root) %}
+        let committee_hash = compute_committee_hash(aggregate_committee_key);
+
     }
+    %{ print_u256("Derived committee hash", ids.committee_hash) %}
 
     // Finalize SHA256 and write output
     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
 
     assert [output_ptr] = state_root.low;
     assert [output_ptr + 1] = state_root.high;
-    assert [output_ptr + 2] = committee_point_hash.low;
-    assert [output_ptr + 3] = committee_point_hash.high;
+    assert [output_ptr + 2] = committee_hash.low;
+    assert [output_ptr + 3] = committee_hash.high;
     assert [output_ptr + 4] = slot;
     let output_ptr = output_ptr + 5;
 
@@ -90,7 +94,7 @@ func compute_leaf_hash{
 }
 
 // Compute the hash of the committee point h(x||y)
-func compute_committee_point_hash{
+func compute_committee_hash{
     range_check_ptr,
     sha256_ptr: felt*,
     range_check96_ptr: felt*,
@@ -108,15 +112,9 @@ func compute_committee_point_hash{
 
     // Derive the full G1 point and hash it
     let (point) = derive_g1_point_from_x(curve_id=1, x=x_point, s=s);
-    let (x_chunks) = HashUtils.chunk_uint384(point.x);
-    let (y_chunks) = HashUtils.chunk_uint384(point.y);
+    let committee_hash = commit_committee_key(point=point);
 
-    // Concatenate x and y chunks and compute the hash
-    memcpy(dst=x_chunks + 12, src=y_chunks, len=12);
-    let (committee_point_hash_chunks) = SHA256.hash_bytes(x_chunks, 96);
-    let committee_point_hash = HashUtils.chunks_to_uint256(committee_point_hash_chunks);
-
-    return committee_point_hash;
+    return committee_hash;
 }
 
 // Structure to hold flags for compressed G1 points
