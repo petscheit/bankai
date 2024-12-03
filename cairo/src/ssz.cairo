@@ -134,11 +134,11 @@ namespace MerkleTree {
             // for some reason this break if I append to leaf, instead of doing this
             let (input: felt*) = alloc();
             memcpy(dst=input, src=leaf, len=8);
-            memcpy(dst=input + 8, src=node, len=8);
+            memcpy(dst=input + 8, src=[path], len=8);
             let (result_chunks) = SHA256.hash_64(input=input);
         } else {
-            memcpy(dst=[node] + 8, src=leaf, len=8);
-            let (result_chunks) = SHA256.hash_64(input=node);
+            memcpy(dst=[path] + 8, src=leaf, len=8);
+            let (result_chunks) = SHA256.hash_64(input=[path]);
         }
         
         // Recurse with remaining path

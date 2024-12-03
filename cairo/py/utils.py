@@ -60,5 +60,8 @@ def hex_to_chunks_32(hex_string: str):
     return chunks
 
 
-def print_u256(ptr):
-    print(hex(ptr.high * 2**128 + ptr.low))
+def print_u256(msg, ptr):
+    print(f"{msg}: {hex(ptr.high * 2**128 + ptr.low)}")
+
+def print_u384(msg, ptr):
+    print(f"{msg}: {hex(ptr.d3 * 2**288 + ptr.d2 * 2**192 + ptr.d1 * 2**96 + ptr.d0)}")
