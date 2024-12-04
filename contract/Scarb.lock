@@ -4,3 +4,12 @@ version = 1
 [[package]]
 name = "bankai"
 version = "0.1.0"
+dependencies = [
+ "integrity",
+]
+
+[[package]]
+name = "integrity"
+version = "2.0.0"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:f5e91cd5280bc0c02cfb12ce1a521e25064956dd12f3e38fca3d841c538723a0"

@@ -38,7 +38,7 @@ func main{
     %{ print("Running Verification for Slot: ", ids.slot) %}
 
     with pow2_array, sha256_ptr {
-        let (header_root) = hash_header();
+        let (header_root, state_root) = hash_header();
     }
     %{ print("HeaderRoot: ", hex(ids.header_root.high * 2**128 + ids.header_root.low)) %}
 
@@ -68,10 +68,13 @@ func main{
 
     assert [output_ptr] = header_root.low;
     assert [output_ptr + 1] = header_root.high;
-    assert [output_ptr + 2] = committee_hash.low;
-    assert [output_ptr + 3] = committee_hash.high;
-    assert [output_ptr + 4] = n_signers;
-    let output_ptr = output_ptr + 5;
+    assert [output_ptr + 2] = state_root.low;
+    assert [output_ptr + 3] = state_root.high;
+    assert [output_ptr + 4] = committee_hash.low;
+    assert [output_ptr + 5] = committee_hash.high;
+    assert [output_ptr + 6] = n_signers;
+    assert [output_ptr + 7] = slot;
+    let output_ptr = output_ptr + 8;
 
     return ();
 }
@@ -81,7 +84,7 @@ func hash_header{
     bitwise_ptr: BitwiseBuiltin*,
     pow2_array: felt*,
     sha256_ptr: felt*
-}() -> (header_root: Uint256) {
+}() -> (header_root: Uint256, state_root: Uint256) {
     alloc_locals;
 
     local slot: Uint256;
@@ -109,7 +112,7 @@ func hash_header{
 
     let header_root = SSZ.hash_header_root(slot, proposer_index, parent_root, state_root, body_root);
 
-    return (header_root=header_root);
+    return (header_root=header_root, state_root=state_root);
 }
 
 func verify_signature{
