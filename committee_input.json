@@ -1,0 +1,12 @@
+{
+    "beacon_slot": "0x588080",
+    "next_sync_committee_branch": [
+        "0x5c0250435f7865d60a44273d1d31dc4879f56788b97c2e870cb1ad28bb410cd3",
+        "0x55bfdaa0a2dc7f7dc1c7d1805024ebd46275aff2ca258a352ffa490ba4fba240",
+        "0x01c88682f1edc71fb7b6a98ca51bb02db54d47cd14e47839c783affad62e1e8e",
+        "0xaac377adb80b6682e32a415a6cfdae52c1a8ab2c35104bfaca93a186500c5f8c",
+        "0xca2ae27db554061659700e8ee083c4fe33a770cb0928656f07d3e8e42ce0aa5a"
+    ],
+    "next_aggregate_sync_committee": "a2bd66fd33ceee206928f19f316b567d06085b7f1563e41f1373bf75d99eb22d795509d5462e984a6691eafb50fb5cef",
+    "committee_keys_root": "514bf17725567be663d2f370ecdf8fc31f267c222517e49a2728578c1f7abf5d"
+}

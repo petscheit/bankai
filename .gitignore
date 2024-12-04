@@ -4,6 +4,20 @@
 lib
 node_modules
 
-cairo_programs/deps
 cairo_programs/build
+cairo_programs/deps
+cairo/packages/*
+cairo/build
+build
 venv
+
+.DS_Store
+
+pie.zip
+*.log
+pie.encoded.txt
+
+client/epoch_data.json
+nimbus-data
+
+**/*.pyc

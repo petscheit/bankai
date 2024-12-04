@@ -1,224 +1,144 @@
-## Bankai - Cairo Ethereum Consensus Verification
-The long term goal of this repository is to enable the verification of Ethereum blocks in the Cairo language. This requires a number of cryptographic operations which will be added step by step. Currently, a blocks headers signature can be verified in cairo, which is the first step. Below is a quick overview of the steps required to verify a block header, and the steps that are currently implemented.
+# Bankai - Cairo Ethereum Consensus Verification
 
-- [Cairo Ethereum Consensus Verification](#cairo-ethereum-consensus-verification)
-  - [Background: Steps to verify an Ethereum block](#background-steps-to-verify-an-ethereum-block)
-    - [Verify Sync Committee Signature](#verify-sync-committee-signature)
-    - [Update Sync Committee](#update-sync-committee)
-  - [Getting Started](#getting-started)
-    - [CLI](#cli)
-      - [Fetch Block Proof](#fetch-block-proof)
-      - [Fetch Block Proof Points](#fetch-block-proof-points)
-      - [Fetch Block Signers](#fetch-block-signers)
-    - [Running Cairo Programs](#running-cairo-programs)
-      - [Verify Block Signature](#verify-block-signature)
-      - [Aggregate Public Key](#aggregate-public-key)
-  - [Cairo Programs](#cairo-programs)
-    - [Verify Block Signature](#verify-block-signature-1)
-    - [Aggregate Public Key](#aggregate-public-key-1)
-  - [G1 and G2 Curve Points](#g1-and-g2-curve-points)
-    - [Message (G2)](#message-g2)
-  - [Acknowledgments](#acknowledgments)
+A Cairo implementation for verifying Ethereum consensus via sync committee.
 
-## Background: Steps to verify an Ethereum block:
-A quick overview of the steps required to verify an Ethereum block. Two different operations are required:
+## Table of Contents
+- [Overview](#overview)
+- [Background](#background)
+  - [Block Verification Process](#block-verification-process)
+  - [Sync Committee Updates](#sync-committee-updates)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+- [Usage](#usage)
+  - [CLI Commands](#cli-commands)
+  - [Running Cairo Programs](#running-cairo-programs)
+- [Examples](#examples)
+- [Acknowledgments](#acknowledgments)
 
-### Verify Sync Committee Signature
+## Overview
+Bankai enables Ethereum consensus verification in Cairo by implementing sync committee verification logic. The project consists of two main components: block verification and sync committee updates.
 
-Required State: Valid Sync committee of the block
+## Background
 
-- [x] 1. Fetch block hash (client)
-- [x] 2. Generate the signing root of the header (client & cairo)
-- [x] 3. Convert the signing root to a point on G2 (client)
-- [x] 4. Generate aggregated public key of block signers (cairo)
-- [ ] 5. Ensure signers are in the sync committee and have >2/3 majority
-- [x] 6. Verify signature (cairo)
+### Block Verification Process
+The verification of an Ethereum block requires the following steps:
 
-To make this verification trustless, step 2-6 must be done in a cairo program.
+1. ✓ Compute block hash and signing root
+2. ✓ Convert message to G2 point (hash_to_curve)
+3. ✓ Aggregate signer public keys
+4. ✓ Compute committee hash
+5. ✓ Validate signature
+6. ✓ Verify signer threshold
+7. ✓ Generate verification outputs
 
-### Update Sync Committee:
-Required State: Verified header containing the new sync committee (verified by the above process)
+Implementation details can be found in `main.cairo` (~200k steps).
 
-- [ ] 1. Generate a state inclusion proof for the new sync committee
-- [ ] 2. Recreate beacon chain state root via SSZ merkleization
-- [ ] 3. Store new sync committee for respective epochs
+### Sync Committee Updates
+To maintain continuous operation, the system validates sync committee updates through:
+
+1. ✓ Merkle path validation
+2. ✓ Public key decompression
+3. ✓ Committee hash computation
+4. ✓ Hash verification
+
+Implementation details can be found in `committee_update.cairo` (~40k steps).
 
 ## Getting Started
-- run `npm i` to install all dependencies
-- run `npm run setup` to setup the local cairo environment
 
-### CLI
-The CLI can be used to fetch the required parameters for the verification. To use the CLI a beacon chain RPC endpoint is required. Currently, quicknode offers a free endpoint that can be used for testing. To use the CLI, run `npm run cli -- <command> <args>`. The following commands are available:
+### Prerequisites
+- Beacon Chain RPC endpoint
+- Rust toolchain
+- Cairo development environment
 
-#### Fetch Block Proof
-This command is not required for using the cairo programs, but can be useful for debugging. It fetches all required parameters for verifying the signature of a block and is hex encoded, making it easier to deal with.
+### Installation
+```bash
+# Install dependencies and setup environment
+make setup
 
-Parameters:
-- `-b` or `--block` - The block number to fetch the proof for
-- `-r` or `--rpc` - The RPC endpoint to fetch the proof from
-- `-e` or `--export` - Exports the output as a JSON file
+# Set your Beacon RPC URL
+export RPC_URL_BEACON=<YOUR_BEACON_RPC_URL>
 
-`npm run cli -- fetchBlockProof -b 3434343 -r https://your-secret-sepolia-beacon-endpoint.com -e proof.json`
-
-Returns:
-
-```js
-{
-  blockRoot: '0xa9de3f6e28173037ca34257b42aab20fa8cc4c3c6183e73555a3ff3eef5e40d5',
-  signingRoot: '0xd51c1dde35692d276d24cb181380c9325c77e835e7be40fa9ca07e97e735e258',
-  signature: '0x95166efbcfc7a7bed65d4141108f5cbe15411a876db47ef556586ef87ef91ba5d172a6e4179c93d773beab4271cd3e6511a82e93aab8472c21dc79161abf15577b34564005d3c36863d097fa2f88a0e6253910cbb3e61fa0f1e61e822407cca7',
-  signerBits: '0xffffffffffb7f7fffffbfefbfeffffdbffffffefdffff7ffffff77ff7fbfff7fbf7fdfffffffffef9ffffffffffeffbfffffffeefbfffffbfffffffdffffdeff',
-  aggregaredPubkey: '0x8cb81d775883fcd8e6f9f32da1ce6d3e74a958aa6adbaf4402dc90a8bdb718fe202d894d10b4d62653b51e0ffff682b9'
-}
+# Activate Python environment
+source .venv/bin/activate
 ```
 
+## Usage
 
-#### Fetch Block Proof Points
-Fetches and generates the data required for running the signature check in cairo. A couple of things happen under the hood:
-- Generates the signing root of the block, by applying the domaining logic to the block hash
-- Fetches the sync committee signers, and generates the aggregated public key
-- Fetches the signature of the block header
-- Converts all values to (G1/G2) points on the curve
+### CLI Commands
 
-These values can then be used as inputs for the cairo verification program.
-
-Parameters:
-- `-b` or `--block` - The block number to fetch the proof for
-- `-r` or `--rpc` - The RPC endpoint to fetch the proof from
-- `-e` or `--export` - Exports the output as a JSON file
-
-`npm run cli -- fetchBlockProofPoints -b 3434343 -r https://your-secret-sepolia-beacon-endpoint.com -e MY_INPUTS.json`
-
-Returns:
-
-```js
-{
-  sig: {
-    x0: '2717654981033153384371002073109890108758842394922743387082180563420439571270475913025321986075025323716183278996647',
-    x1: '3245683462426865563976215644211420631990628660398343262203501487531719433413082187443407207330314139968454595001957',
-    y0: '2989423361219887010340602378842184712180956146851149327633000413492124172889934354047857860025839410798624825057865',
-    y1: '364270301102007508604236414822913048770830799933086997082647176198028599859549106697093613457344305038067424683642'
-  },
-  pub: {
-    x: '1957663992887248273038721973612762572179510549810033620204590218948159893374339423935740985951737943879228199436985',
-    y: '337064653469649321059724378161505517480755454067531273175739420804454452913499694660046803110495723569852414811101'
-  },
-  msg: {
-    x0: '2376836005588823590832355686757551839806976611876938693520937831890474521087776986139112416473585415180961492929156',
-    x1: '1206179909977510143702043790768032354203103146376304321938440279014752549848875845657875840476089206457626131805163',
-    y0: '1098650632560096473256354234109145535790592340280843578325165666754124094423343926482992304695649017941057567932801',
-    y1: '978459796102980576570505777445808813685038478608728143767319725825501583173045652828825481621594634090727144659837'
-  }
-}
+#### Generate Epoch Update Proof
+```bash
+cargo run -- epoch-update --slot <SLOT> [--export <OUTPUT_FILE>]
 ```
 
-#### Fetch Block Signers:
-Fetches and returns a list of all the sync committe members public keys that signed a specific block. The order of the keys is important for aggregating the public key later on. The resulting values are encoded as G1 points, and can be used as inputs for the cairo program. The command also returns the committee aggregate (all members), the signers aggregate (all signers) and the non-signers aggregate (all non-signers). These values are not required for the verification, but can be useful for debugging.
+#### Generate Committee Update Proof
+```bash
+cargo run -- committee-update --slot <SLOT> [--export <OUTPUT_FILE>]
+```
 
-Parameters:
-- `-b` or `--block` - The block number to fetch the proof for
-- `-r` or `--rpc` - The RPC endpoint to fetch the proof from
-- `-e` or `--export` - Exports the output as a JSON file
+**CLI Options:**
+- `--rpc-url, -r`: Beacon Chain RPC URL (defaults to RPC_URL_BEACON env var)
+- `--slot, -s`: Target slot number
+- `--export, -e`: Output file path (optional)
 
-`npm run cli -- fetchBlockSigners -b 3434343 -r https://your-secret-sepolia-beacon-endpoint.com -e MY_INPUTS.json`
+### Running Cairo Programs
 
-Returns:
-```js
+#### Epoch Update Verification
+```bash
+# Copy CLI output to main_input.json, then:
+make build-main
+make run-main
+```
+
+#### Committee Update Verification
+```bash
+# Copy CLI output to committee_input.json, then:
+make build-committee
+make run-committee
+```
+
+## Examples
+
+### Epoch Update Proof Output
+```json
 {
-  totalSigners: 480,
-  signers: {
-    pk0: {
-      x: '327760309966947479300718637057990157694893189073459534177163952376017427978170470717349116193385194069106752359760',
-      y: '432766611839774662871458728216626394713771940885954716148704575376319526233897834864607974129351702495035260326023'
+    "header": {
+        "slot": "5169248",
+        "proposer_index": "191",
+        "parent_root": "0x5e40ffc16ab99419cd8f5c3c4394144811b3c27e6d2d6c4ddb8a1ff15ff54552",
+        "state_root": "0x5d7dfe0e508d03c8caf05fce7df40b4083f9ad72c8a2e6db5555748040a7efed",
+        "body_root": "0x1ee2c12b52d6ff28f8da7f604c7f7d54a06ff76d2803657cbb19cc3c9f87baf4"
     },
-    pk1: {
-      x: '1427380063432123607512340653230045875355175784259329042437673993960025718252096591713666287746656641099748193141546',
-      y: '730333754263170048824130221636284292353056570341776516393879644972004546278474496120959327494584262973772166574531'
+    "signature_point": {
+        "x0": "0x0ab7ccea53fe7f14c6873c54bde8c522640645a9da00bd90668617eb4ac0f7c631bdb854627353332cbe8a3bc8d2847a",
+        "x1": "0x021cf2a040faa3c9eb4f9f708946ad7553032edc8bc55ba3dd22cc2ac380c083dde25e6e66fef7f3efe016792d8f9ff7",
+        "y0": "0x18dce2581664c9e7ab5608bce9093057657705792557a443561e4d51eaaf2f8b4d061a8ed739375975da38bf5949fddf",
+        "y1": "0x00e22da68c5f8675fddf8ec9ddded7604e6be523af5753ac6edd7da08623b4a8b2d9bb1026d12262ce426367b36cea6a"
     },
-    ...
-    pk479: {
-      x: '2986200977995358693501988905818968241864897212637291820947499821072408806050376725972204506692328269651102950621711',
-      y: '317884619498278685450994081234396718788211723448541288494462531516736381680362608624234807353666199972882194921898'
-    }
-  },
-  aggregates: {
-    committee: '0xaa6d2746b6f607fcb807db56def0dd08aa4a0cd3202d6f4ca4999cc55f58fb97c6938823b199d816d232ac5c6eb08d99',
-    signers: '0x8cb81d775883fcd8e6f9f32da1ce6d3e74a958aa6adbaf4402dc90a8bdb718fe202d894d10b4d62653b51e0ffff682b9',
-    nonSigners: '0x934008434c03c35332841f1b1675532c54c214e855215fc77cd1b2371330049a8d68f310e75c36ebce62349b7fed8f1f'
-  }
+    "sync_committee_agg_pub": {
+        "x": "0x155a4ea93d92fb321c0229ad33055a04903007e77ce41bbba1812f8464e73478d64d2c59296a22ce66607d8a7c8d06d0",
+        "y": "0x151ee28a26cd768a9900f142749ee84cda21ccde6672330a321266f66648e2d4068621a093ee8e45574280b0c76bbf9c"
+    },
+    "non_signers": []
 }
 ```
 
-### Running Cairo Programs:
-A quick guide on how to run the cairo programs. The implementation details of the specific program are outlined further below.
-
-#### Verify Block Signature:
-- generate the inputs via the CLI (see above, `fetchBlockProofPoints`)
-- run `npm run cairo-compile:verify_sig` to compile the program
-- run `npm run cairo-run:verify_sig -- <MY_INPUTS.json>` to run the program. You can use the data exported with the CLI as input. The program will return `true` if the signature is valid, and `false` if its invalid.
-
-#### Aggregate Public Key:
-- generate the inputs via the CLI (see above, `fetchBlockSigners`)
-- run `npm run cairo-compile:aggregate` to compile the program
-- run `npm run cairo-run:aggregate -- MY_INPUTS.json` to run the program. You can use the data exported with the CLI as input. The program will return the aggregated public key as a point on G1.
-
-## Cairo Programs
-At the moment, this repo contains two different cairo programs that handle a substep of the entire verification. 
-
-### Verify Block Signature:
-Verifies the BLS12-381 Signature of a given message and public key. These values can be fetched from a beacon endpoint via the CLI.
-
-Inputs:
-- H(m): Signing Root Point (G2)
-- S: Signature Point (G2)
-- P: Aggregated Signers Key Point (G1)
-
-The signature is verified by comparing the following pairings:
+### Committee Update Proof Output
+```json
+{
+  "beacon_slot": "0x61ac23",
+  "next_sync_committee_branch": [
+    "0x19338363d25e56f44f7f86c05d3572ea3e8261908d4ae18180cd79cb81b223df",
+    "0xbafd8a06427c883bbfb30daf5982bc6be18b6ad2283330436c7282aac17b8f0c",
+    "0xa5bd9ea26eff6d9bb8bfd9b9263648356d9c9b22e5102426484e5fb9bba8cbc5",
+    "0x0a5cff8418c296764b19680920d2e22338ebb2bc4715a9705262fa78780b94e2",
+    "0x15137476162cdfade235b4aa9b289b1392f693fc1283ff31575ad2f93bd9fa46"
+  ],
+  "next_aggregate_sync_committee": "a0bacb01ef15aba46b6b067b6abf214343ae826ef7ea7efc8861e13c1c6c708266cfff55f7be6b520e58feebbea6061d",
+  "committee_keys_root": "9042f86bfc6e2826da86dcfa645530060cfc9347a1c733ca05350041d8993046"
+}
 ```
-e(P, H(m)) = e(G,S)
-```
-
-This works because:
-```
-e(P, H(m)) = e(pk x G, H(m))
-  = e(G, pk x H(m))
-  = e(G, S)
-```
-
-#### ToDo: 
-- [ ] Verify negating G1 is equivilant to negating the aggregated public key.
-
-### Aggregate Public Key:
-This program can be used to aggregate the public key of a number of signers. This is required when verifying an Ethereum block, as the signature is checked against an aggregated key.
-
-Inputs:
-- Signer Points ([]G1)
-- Total Signers
-
-Returns: Aggregated Public Key Point (G1)
-
-Since the public key is a point on G1, the aggregation is done by adding all points together. This is done by recursivly adding the points together. The order of the keys matter, so its important to pass the keys in the correct order.
-
-#### ToDo:
-- [ ] Instead of adding all signers, we can use the aggregated committee key, and subtract all non-signers. This would reduce the number of operations required significantly. Need to implement subtraction in garaga first
-
-## G1 and G2 Curve Points:
-The BLS12-381 parameters are represented as points on an elliptic curve, either in G1 or G2. This repository contains some classes to handle the conversion between the raw data and the curve points. In Ethereum, the message and signature are represented in G2, while the public key is represented in G1.
-
-
-### Message (G2):
-The message of the signature in Ethereum is not the block hash directly, but the signing root. This includes the block hash, but adds a domain to the message. Using `hashToCurve()` the message bytes can be converted to a point on G2.
-
-### Signature (G2):
-The signature is a point on G2 by default, as its generated via the BLS signature scheme. To verify it, it must be decoded from bytes to a point on G2.
-
-### Public Key (G1):
-The public key is a point on G1 by defaul, and must be converted from bytes to a point on G1 to verify the signature.
 
 ## Acknowledgments
-I'd like to extend our gratitude to the following individuals and projects:
-
-This project makes use of [Garaga](https://github.com/keep-starknet-strange/garaga). I appreciate the effort put into this library, making our development process smoother. A big thanks to its contributors and maintainers.
-
-Special thanks to feltroidprime for their invaluable support and guidance throughout this project. Their insights and expertise have been instrumental to this project.
-
+This project is built upon [Garaga](https://github.com/keep-starknet-strange/garaga). Special thanks to the Felt team for making this implementation possible.
