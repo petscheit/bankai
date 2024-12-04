@@ -18,3 +18,5 @@ rand = "0.8.5"
 alloy-rpc-types-beacon = "0.7.2"
 itertools = "0.13.0"
 bls12_381 = "0.8.0"
+clap = { version = "4.5.22", features = ["derive"] }
+

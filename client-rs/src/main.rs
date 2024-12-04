@@ -3,21 +3,25 @@ mod types;
 mod utils;
 mod epoch_update;
 
-use epoch_update::generate_epoch_proof;
-use sync_committee::{SyncCommitteeUpdate, SyncCommitteeUpdateError};
-use types::SyncCommitteeUpdateProof;
+use epoch_update::EpochUpdate;
+use sync_committee::SyncCommitteeUpdate;
+use types::{SyncCommitteeUpdateProof, EpochProofInputs};
 use utils::rpc::BeaconRpcClient;
 // use rand::Rng;
 // use std::fs::File;
 // use std::io::Write;
+use clap::{Parser, Subcommand};
+use std::env;
 
 #[derive(Debug)]
 pub enum Error {
-    SyncCommittee(SyncCommitteeUpdateError),
     InvalidProof,
     RpcError(reqwest::Error),
     DeserializeError(serde_json::Error),
-    FetchSyncCommitteeError
+    FetchSyncCommitteeError,
+    FailedFetchingBeaconState,
+    InvalidBLSPoint,
+    MissingRpcUrl,
 }
 
 struct BankaiClient {
@@ -31,38 +35,70 @@ impl BankaiClient {
 
     pub async fn get_sync_committee_update(&self, slot: u64) -> Result<SyncCommitteeUpdateProof, Error> {
         let proof: SyncCommitteeUpdateProof =
-            SyncCommitteeUpdate::generate_proof(&self.client.rpc_url, slot)
-                .await
-                .map_err(Error::SyncCommittee)?;
-
-        let state_root = proof.compute_state_root().map_err(Error::SyncCommittee)?;
-        let rpc_state_root = self.client.get_header(slot).await?;
-        if format!("0x{}", hex::encode(state_root)) != rpc_state_root.data.root.to_string() {
-            return Err(Error::InvalidProof);
-        }
+            SyncCommitteeUpdate::generate_proof(&self.client, slot)
+                .await?;
 
         Ok(proof)
     }
 
-    pub async fn get_epoch_proof(&self, slot: u64) -> Result<(), Error> {
-        let header = self.client.get_header(slot).await?;
-        let sync_agg = self.client.get_sync_aggregate(slot).await?;
-        let validator_pubs = self.client.get_sync_committee_validator_pubs(slot).await?;
-        let epoch_proof = generate_epoch_proof(header.into(), sync_agg, validator_pubs)?;
-        // Convert to JSON and print
-        let json = serde_json::to_string_pretty(&epoch_proof)
-            .map_err(Error::DeserializeError)?;
-        println!("{}", json);
-        Ok(())
+    pub async fn get_epoch_proof(&self, slot: u64) -> Result<EpochProofInputs, Error> {
+        let epoch_proof = EpochUpdate::generate_epoch_proof(&self.client, slot).await?;
+        Ok(epoch_proof)
     }
     
 }
 
+#[derive(Subcommand)]
+enum Commands {
+    /// Generate a sync committee update proof for a given slot
+    CommitteeUpdate {
+        #[arg(long,short)]
+        slot: u64,
+    },
+    /// Generate an epoch update proof for a given slot
+    EpochUpdate {
+        #[arg(long,short)]
+        slot: u64,
+    },
+}
+
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    /// Optional RPC URL (defaults to RPC_URL_BEACON environment variable)
+    #[arg(long)]
+    rpc_url: Option<String>,
+
+    #[command(subcommand)]
+    command: Commands,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let bankai = BankaiClient::new("https://side-radial-morning.ethereum-sepolia.quiknode.pro/006c5ea080a9f60afbb3cc1eb8cc7ab486c9d128".to_string());
+    let cli = Cli::parse();
+    
+    let rpc_url = cli.rpc_url.or_else(|| env::var("RPC_URL_BEACON").ok())
+        .ok_or(Error::MissingRpcUrl)?;
+    
+    let bankai = BankaiClient::new(rpc_url);
 
-    bankai.get_epoch_proof(5808224).await?;
+    match cli.command {
+        Commands::CommitteeUpdate { slot } => {
+            println!("SyncCommittee command received with slot: {}", slot);
+            let proof = bankai.get_sync_committee_update(slot).await?;
+            let json = serde_json::to_string_pretty(&proof)
+                .map_err(Error::DeserializeError)?;
+            println!("{}", json);
+        }
+        Commands::EpochUpdate { slot } => {
+            println!("Epoch command received with slot: {}", slot);
+            let proof = bankai.get_epoch_proof(slot).await?;
+            let json = serde_json::to_string_pretty(&proof)
+                .map_err(Error::DeserializeError)?;
+            println!("{}", json);
+        }
+    }
+
     Ok(())
 }
 
