@@ -140,7 +140,7 @@ func faster_fast_aggregate_signer_pubs{
     %{
         from cairo.py.utils import generate_signers_array
         non_signers = generate_signers_array(program_input["non_signers"])
-        write_g1(ids.committee_pub, program_input["sync_committee_agg_pub"])
+        write_g1(ids.committee_pub, program_input["committee_pub"])
 
         for i, non_signer in enumerate(non_signers):
             memory[ids.non_signers._reference_value + i * 8] = non_signer[0][0]

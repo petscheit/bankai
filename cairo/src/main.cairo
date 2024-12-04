@@ -33,7 +33,7 @@ func main{
     %{
         from cairo.py.utils import write_g2, write_g1g2, write_g1, print_g2
         write_g2(ids.sig_point, program_input["signature_point"])
-        ids.slot = int(program_input["header"]["slot"], 10)
+        ids.slot = int(program_input["header"]["slot"], 16)
     %}
     %{ print("Running Verification for Slot: ", ids.slot) %}
 
@@ -91,10 +91,10 @@ func hash_header{
     local body_root: Uint256;
     %{  
         from cairo.py.utils import split_uint256
-        ids.slot.low = int(program_input["header"]["slot"], 10)
+        ids.slot.low = int(program_input["header"]["slot"], 16)
         ids.slot.high = 0
 
-        ids.proposer_index.low = int(program_input["header"]["proposer_index"], 10)
+        ids.proposer_index.low = int(program_input["header"]["proposer_index"], 16)
         ids.proposer_index.high = 0
 
         parent_root = split_uint256(int(program_input["header"]["parent_root"], 16))
