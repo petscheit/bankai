@@ -38,8 +38,17 @@ impl BeaconRpcClient {
 
     /// Fetches the beacon chain header for a specific slot.
     /// This provides information about the block at the given slot number.
+    /// Returns Error::BlockNotFound if no block exists at the specified slot.
     pub async fn get_header(&self, slot: u64) -> Result<HeaderResponse, Error> {
         let json = self.get_json(&format!("eth/v1/beacon/headers/{}", slot)).await?;
+        
+        // Check for 404 NOT_FOUND error
+        if let Some(code) = json.get("code").and_then(|c| c.as_i64()) {
+            if code == 404 {
+                return Err(Error::EmptySlotDetected(slot));
+            }
+        }
+        
         serde_json::from_value(json).map_err(Error::DeserializeError)
     }
 

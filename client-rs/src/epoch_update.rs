@@ -7,9 +7,18 @@ pub struct EpochUpdate {}
 impl EpochUpdate {
     /// Generates a proof for a specific epoch at the given slot
     /// This proof includes the header, signature point, aggregate public key, and non-signing validators
-    pub async fn generate_epoch_proof(client: &BeaconRpcClient, slot: u64) -> Result<EpochProofInputs, Error> {
-        // Fetch required data from the beacon chain
-        let header = client.get_header(slot).await?;
+    pub async fn generate_epoch_proof(client: &BeaconRpcClient, mut slot: u64) -> Result<EpochProofInputs, Error> {
+        // First attempt with original slot
+        let header = match client.get_header(slot).await {
+            Ok(header) => header,
+            Err(Error::EmptySlotDetected(_)) => {
+                slot += 1;
+                println!("Empty slot detected! Fetching slot: {}", slot);
+                client.get_header(slot).await?
+            }
+            Err(e) => return Err(e), // Propagate other errors immediately
+        };
+        
         let sync_agg = client.get_sync_aggregate(slot).await?;
         let validator_pubs = client.get_sync_committee_validator_pubs(slot).await?;
         

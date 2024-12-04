@@ -18,10 +18,12 @@ pub enum Error {
     InvalidProof,
     RpcError(reqwest::Error),
     DeserializeError(serde_json::Error),
+    IoError(std::io::Error),
     FetchSyncCommitteeError,
     FailedFetchingBeaconState,
     InvalidBLSPoint,
     MissingRpcUrl,
+    EmptySlotDetected(u64),
 }
 
 struct BankaiClient {
@@ -33,7 +35,18 @@ impl BankaiClient {
         Self { client: BeaconRpcClient::new(rpc_url) }
     }
 
-    pub async fn get_sync_committee_update(&self, slot: u64) -> Result<SyncCommitteeUpdateProof, Error> {
+    pub async fn get_sync_committee_update(&self, mut slot: u64) -> Result<SyncCommitteeUpdateProof, Error> {
+        // Before we start generating the proof, we ensure the slot was not missed
+        match self.client.get_header(slot).await {
+            Ok(header) => header,
+            Err(Error::EmptySlotDetected(_)) => {
+                slot += 1;
+                println!("Empty slot detected! Fetching slot: {}", slot);
+                self.client.get_header(slot).await?
+            }
+            Err(e) => return Err(e), // Propagate other errors immediately
+        };
+        
         let proof: SyncCommitteeUpdateProof =
             SyncCommitteeUpdate::generate_proof(&self.client, slot)
                 .await?;
@@ -54,11 +67,17 @@ enum Commands {
     CommitteeUpdate {
         #[arg(long,short)]
         slot: u64,
+        /// Export output to a JSON file
+        #[arg(long,short)]
+        export: Option<String>,
     },
     /// Generate an epoch update proof for a given slot
     EpochUpdate {
         #[arg(long,short)]
         slot: u64,
+        /// Export output to a JSON file
+        #[arg(long,short)]
+        export: Option<String>,
     },
 }
 
@@ -66,7 +85,7 @@ enum Commands {
 #[command(author, version, about, long_about = None)]
 struct Cli {
     /// Optional RPC URL (defaults to RPC_URL_BEACON environment variable)
-    #[arg(long)]
+    #[arg(long,short)]
     rpc_url: Option<String>,
 
     #[command(subcommand)]
@@ -83,19 +102,35 @@ async fn main() -> Result<(), Error> {
     let bankai = BankaiClient::new(rpc_url);
 
     match cli.command {
-        Commands::CommitteeUpdate { slot } => {
+        Commands::CommitteeUpdate { slot, export } => {
             println!("SyncCommittee command received with slot: {}", slot);
             let proof = bankai.get_sync_committee_update(slot).await?;
             let json = serde_json::to_string_pretty(&proof)
                 .map_err(Error::DeserializeError)?;
-            println!("{}", json);
+
+            if let Some(path) = export {
+                match std::fs::write(path.clone(), json) {
+                    Ok(_) => println!("Proof exported to {}", path),
+                    Err(e) => return Err(Error::IoError(e)),
+                }
+            } else {
+                println!("{}", json);
+            }
         }
-        Commands::EpochUpdate { slot } => {
+        Commands::EpochUpdate { slot, export } => {
             println!("Epoch command received with slot: {}", slot);
             let proof = bankai.get_epoch_proof(slot).await?;
             let json = serde_json::to_string_pretty(&proof)
                 .map_err(Error::DeserializeError)?;
-            println!("{}", json);
+
+            if let Some(path) = export {
+                match std::fs::write(path.clone(), json) {
+                    Ok(_) => println!("Proof exported to {}", path),
+                    Err(e) => return Err(Error::IoError(e)),
+                }
+            } else {
+                println!("{}", json);
+            }
         }
     }
 
