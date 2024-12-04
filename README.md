@@ -141,4 +141,4 @@ make run-committee
 ```
 
 ## Acknowledgments
-This project is built upon [Garaga](https://github.com/keep-starknet-strange/garaga). Special thanks to the Felt team for making this implementation possible.
+All of this wouldnt be possible without [Garaga](https://github.com/keep-starknet-strange/garaga). Amazing stuff! Thx for your support Felt!
