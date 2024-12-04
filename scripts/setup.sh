@@ -1,8 +1,3 @@
-echo "Installing and building JS packages..."
-cd client
-npm i && npm run build
-cd ..
-
 # Check if python3.10 is installed
 if ! command -v python3.10 >/dev/null; then
     echo "python3.10 is not installed. Please install Python 3.10 and try again."
