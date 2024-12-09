@@ -1,5 +1,3 @@
-use starknet::ContractAddress;
-
 #[derive(Drop, starknet::Store, Serde)]  // Added Serde trait
 pub struct EpochProof {
     header_root: u256,
@@ -71,22 +69,17 @@ pub mod BankaiContract {
         committee_hash: u256,
         committee_update_program_hash: felt252,
         epoch_update_program_hash: felt252,
-        init_slot: u64,
-        init_header_root: u256,
-        init_state_root: u256,
-        init_n_signers: u64,
     ) {
         self.owner.write(get_caller_address());
         self.latest_epoch.write(0);
+
+        // Write trusted initial committee
         self.initialization_committee.write(committee_id);
         self.committee.write(committee_id, committee_hash);
+
+        // Write the program hashes to the contract storage
         self.committee_update_program_hash.write(committee_update_program_hash);
         self.epoch_update_program_hash.write(epoch_update_program_hash);
-        self.epochs.write(init_slot, EpochProof {
-            header_root: init_header_root,
-            state_root: init_state_root,
-            n_signers: init_n_signers,
-        });
     }
 
     #[abi(embed_v0)]
@@ -159,6 +152,8 @@ pub mod BankaiContract {
                 header_root: header_root, state_root: state_root, n_signers: n_signers,
             };
             self.epochs.write(slot, epoch_proof);
+
+            self.latest_epoch.write(slot);
             // self.emit(Event::EpochUpdated(EpochUpdated {
         //     slot: slot,
         //     epoch_proof: epoch_proof
@@ -211,10 +206,6 @@ mod tests {
         committee_hash: u256,
         committee_update_program_hash: felt252,
         epoch_update_program_hash: felt252,
-        init_slot: u64,
-        init_header_root: u256,
-        init_state_root: u256,
-        init_n_signers: u64,
         owner: ContractAddress,
     }
     
@@ -241,10 +232,6 @@ mod tests {
             committee_hash: 0x111_u256,
             committee_update_program_hash: 0xdead_felt252,
             epoch_update_program_hash: 0xbeef_felt252,
-            init_slot: 8192,
-            init_header_root: 0xaaa_u256,
-            init_state_root: 0xaaa_u256,
-            init_n_signers: 512,
             owner: starknet::contract_address_const::<0x123>(),
         }
     }
@@ -258,12 +245,19 @@ mod tests {
                 n_signers: 512,
                 slot: 8192, // First term
             },
-            _ => EpochUpdateFixture {
+            1 => EpochUpdateFixture {
                 header_root: 0xccc_u256,
                 state_root: 0xccc_u256,
                 committee_hash: 0x222_u256, // Matches new committee hash from committee update fixture
                 n_signers: 384,
                 slot: 16384, // Second term
+            },
+            _ => EpochUpdateFixture {
+                header_root: 0xddd_u256,
+                state_root: 0xddd_u256,
+                committee_hash: 0x333_u256,
+                n_signers: 256,
+                slot: 24576, // Third term
             },
         }
     }
@@ -296,10 +290,10 @@ mod tests {
             fixture.committee_hash,
             fixture.committee_update_program_hash,
             fixture.epoch_update_program_hash,
-            fixture.init_slot,
-            fixture.init_header_root,
-            fixture.init_state_root,
-            fixture.init_n_signers,
+            // fixture.init_slot,
+            // fixture.init_header_root,
+            // fixture.init_state_root,
+            // fixture.init_n_signers,
         );
         state
     }
@@ -325,6 +319,7 @@ mod tests {
         set_caller_address(fixture.owner);
 
         let mut state = deploy(fixture.clone());
+        println!("deploy success");
 
         // First update should succeed
         state.verify_epoch_update(
@@ -341,12 +336,16 @@ mod tests {
         assert_eq!(stored_epoch.state_root, epoch_fixture.state_root);
         assert_eq!(stored_epoch.n_signers, epoch_fixture.n_signers);
 
+        println!("first epoch update success");
+
         let committee_update = get_committee_update_fixture(0);
         state.verify_committee_update(
             committee_update.state_root,
             committee_update.new_committee_hash,
             committee_update.slot,
         );
+
+        println!("committee update success");
 
         assert_eq!(state.get_committee_hash(committee_update.expected_committee_id), committee_update.new_committee_hash); 
 
@@ -358,6 +357,8 @@ mod tests {
             epoch_fixture.n_signers,
             epoch_fixture.slot,
         );
+
+        println!("second epoch update success");
 
         assert_eq!(state.get_committee_hash(committee_update.expected_committee_id), committee_update.new_committee_hash); 
     }
