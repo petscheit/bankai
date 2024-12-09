@@ -1,4 +1,4 @@
-#[derive(Drop, starknet::Store, Serde)]  // Added Serde trait
+#[derive(Drop, starknet::Store, Serde)] // Added Serde trait
 pub struct EpochProof {
     header_root: u256,
     state_root: u256,
@@ -97,7 +97,7 @@ pub mod BankaiContract {
         }
 
         fn get_epoch_update_program_hash(self: @ContractState) -> felt252 {
-            self.epoch_update_program_hash.read()   
+            self.epoch_update_program_hash.read()
         }
 
         fn get_epoch_proof(self: @ContractState, slot: u64) -> EpochProof {
@@ -105,10 +105,7 @@ pub mod BankaiContract {
         }
 
         fn verify_committee_update(
-            ref self: ContractState,
-            state_root: u256,
-            committee_hash: u256,
-            slot: u64,
+            ref self: ContractState, state_root: u256, committee_hash: u256, slot: u64,
         ) {
             let epoch_proof = self.epochs.read(slot);
             assert(state_root == epoch_proof.state_root, 'Invalid State Root!');
@@ -121,7 +118,7 @@ pub mod BankaiContract {
 
             // The new committee is always assigned at the start of the previous committee
             let new_committee_id = (slot / 0x2000) + 1;
-  
+
             self.committee.write(new_committee_id, committee_hash);
             self
                 .emit(
@@ -145,7 +142,9 @@ pub mod BankaiContract {
             let valid_committee_hash = self.committee.read(signing_committee_id);
             assert(committee_hash == valid_committee_hash, 'Invalid Committee Hash!');
 
-            let fact_hash = compute_epoch_proof_fact_hash(@self, header_root, state_root, committee_hash, n_signers, slot);
+            let fact_hash = compute_epoch_proof_fact_hash(
+                @self, header_root, state_root, committee_hash, n_signers, slot,
+            );
             assert(fact_hash == fact_hash, 'Invalid Fact Hash!');
 
             let epoch_proof = EpochProof {
@@ -177,7 +176,12 @@ pub mod BankaiContract {
     }
 
     fn compute_epoch_proof_fact_hash(
-       self: @ContractState, header_root: u256, state_root: u256, committee_hash: u256, n_signers: u64, slot: u64,
+        self: @ContractState,
+        header_root: u256,
+        state_root: u256,
+        committee_hash: u256,
+        n_signers: u64,
+        slot: u64,
     ) -> felt252 {
         let fact_hash = calculate_bootloaded_fact_hash(
             SHARP_BOOTLOADER_PROGRAM_HASH,
@@ -199,7 +203,7 @@ mod tests {
     use starknet::testing::{set_caller_address};
     use starknet::ContractAddress;
 
-        // Add this struct and function before your test functions
+    // Add this struct and function before your test functions
     #[derive(Drop, Clone)]
     struct TestFixture {
         committee_id: u64,
@@ -208,7 +212,7 @@ mod tests {
         epoch_update_program_hash: felt252,
         owner: ContractAddress,
     }
-    
+
     #[derive(Drop, Clone)]
     struct EpochUpdateFixture {
         header_root: u256,
@@ -243,46 +247,44 @@ mod tests {
                 state_root: 0xbbb_u256,
                 committee_hash: 0x111_u256, // Matches initial committee hash from setup_fixture
                 n_signers: 512,
-                slot: 8192, // First term
+                slot: 8192 // First term
             },
             1 => EpochUpdateFixture {
                 header_root: 0xccc_u256,
                 state_root: 0xccc_u256,
                 committee_hash: 0x222_u256, // Matches new committee hash from committee update fixture
                 n_signers: 384,
-                slot: 16384, // Second term
+                slot: 16384 // Second term
             },
             _ => EpochUpdateFixture {
                 header_root: 0xddd_u256,
                 state_root: 0xddd_u256,
                 committee_hash: 0x333_u256,
                 n_signers: 256,
-                slot: 24576, // Third term
+                slot: 24576 // Third term
             },
         }
     }
-   
+
     fn get_committee_update_fixture(index: u8) -> CommitteeUpdateFixture {
         match index {
             0 => CommitteeUpdateFixture {
                 slot: 8192, // First term
                 state_root: 0xbbb_u256,
                 new_committee_hash: 0x222_u256,
-                expected_committee_id: 2, // slot/0x2000 + 1
+                expected_committee_id: 2 // slot/0x2000 + 1
             },
             _ => CommitteeUpdateFixture {
                 slot: 16384, // Second term
                 state_root: 0xccc_u256,
                 new_committee_hash: 0x333_u256,
-                expected_committee_id: 3, // slot/0x2000 + 1
+                expected_committee_id: 3 // slot/0x2000 + 1
             },
         }
     }
 
     // Helper function to deploy the contract
-    fn deploy(
-        fixture: TestFixture,
-    ) -> BankaiContract::ContractState {
+    fn deploy(fixture: TestFixture) -> BankaiContract::ContractState {
         let mut state = BankaiContract::contract_state_for_testing();
         BankaiContract::constructor(
             ref state,
@@ -291,9 +293,9 @@ mod tests {
             fixture.committee_update_program_hash,
             fixture.epoch_update_program_hash,
             // fixture.init_slot,
-            // fixture.init_header_root,
-            // fixture.init_state_root,
-            // fixture.init_n_signers,
+        // fixture.init_header_root,
+        // fixture.init_state_root,
+        // fixture.init_n_signers,
         );
         state
     }
@@ -308,7 +310,9 @@ mod tests {
 
         assert_eq!(state.get_committee_hash(fixture.committee_id), fixture.committee_hash);
         assert_eq!(state.get_latest_epoch(), 0);
-        assert_eq!(state.get_committee_update_program_hash(), fixture.committee_update_program_hash);
+        assert_eq!(
+            state.get_committee_update_program_hash(), fixture.committee_update_program_hash,
+        );
         assert_eq!(state.get_epoch_update_program_hash(), fixture.epoch_update_program_hash);
     }
 
@@ -322,13 +326,14 @@ mod tests {
         println!("deploy success");
 
         // First update should succeed
-        state.verify_epoch_update(
-            epoch_fixture.header_root,
-            epoch_fixture.state_root,
-            epoch_fixture.committee_hash,
-            epoch_fixture.n_signers,
-            epoch_fixture.slot,
-        );
+        state
+            .verify_epoch_update(
+                epoch_fixture.header_root,
+                epoch_fixture.state_root,
+                epoch_fixture.committee_hash,
+                epoch_fixture.n_signers,
+                epoch_fixture.slot,
+            );
 
         // Verify the epoch was stored correctly
         let stored_epoch = state.get_epoch_proof(epoch_fixture.slot);
@@ -339,27 +344,35 @@ mod tests {
         println!("first epoch update success");
 
         let committee_update = get_committee_update_fixture(0);
-        state.verify_committee_update(
-            committee_update.state_root,
-            committee_update.new_committee_hash,
-            committee_update.slot,
-        );
+        state
+            .verify_committee_update(
+                committee_update.state_root,
+                committee_update.new_committee_hash,
+                committee_update.slot,
+            );
 
         println!("committee update success");
 
-        assert_eq!(state.get_committee_hash(committee_update.expected_committee_id), committee_update.new_committee_hash); 
+        assert_eq!(
+            state.get_committee_hash(committee_update.expected_committee_id),
+            committee_update.new_committee_hash,
+        );
 
         let epoch_fixture = get_epoch_update_fixture(1);
-        state.verify_epoch_update(
-            epoch_fixture.header_root,
-            epoch_fixture.state_root,
-            epoch_fixture.committee_hash,
-            epoch_fixture.n_signers,
-            epoch_fixture.slot,
-        );
+        state
+            .verify_epoch_update(
+                epoch_fixture.header_root,
+                epoch_fixture.state_root,
+                epoch_fixture.committee_hash,
+                epoch_fixture.n_signers,
+                epoch_fixture.slot,
+            );
 
         println!("second epoch update success");
 
-        assert_eq!(state.get_committee_hash(committee_update.expected_committee_id), committee_update.new_committee_hash); 
+        assert_eq!(
+            state.get_committee_hash(committee_update.expected_committee_id),
+            committee_update.new_committee_hash,
+        );
     }
 }
