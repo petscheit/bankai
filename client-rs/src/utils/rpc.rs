@@ -5,6 +5,7 @@ use serde_json::Value;
 use crate::Error;
 use itertools::Itertools;
 use crate::types::SyncCommitteeValidatorPubs;
+use alloy_primitives::FixedBytes;
 
 /// A client for interacting with the Ethereum Beacon Chain RPC endpoints.
 /// Provides methods to fetch headers, sync aggregates, and validator information.
@@ -49,7 +50,7 @@ impl BeaconRpcClient {
             }
         }
         
-        serde_json::from_value(json).map_err(Error::DeserializeError)
+        serde_json::from_value(json).map_err(|e| Error::DeserializeError(e.to_string()))
     }
 
     /// Fetches the sync aggregate from the block AFTER the specified slot.
@@ -58,7 +59,7 @@ impl BeaconRpcClient {
     pub async fn get_sync_aggregate(&self, slot: u64) -> Result<SyncAggregate, Error> {
         let json = self.get_json(&format!("eth/v2/beacon/blocks/{}", slot + 1)).await?;
         serde_json::from_value(json["data"]["message"]["body"]["sync_aggregate"].clone())
-            .map_err(Error::DeserializeError)
+            .map_err(|e| Error::DeserializeError(e.to_string()))
     }
 
     /// Retrieves the list of validator indices that are part of the sync committee
@@ -124,4 +125,43 @@ impl BeaconRpcClient {
         let pubkeys = self.fetch_validator_pubkeys(&indexes).await?;
         Ok(pubkeys.into())
     }
+
+    /// Fetches the block root (hashTreeRoot) for a given block identifier.
+    /// 
+    /// # Arguments
+    /// * `block_id` - Block identifier. Can be:
+    ///   - "head" (canonical head in node's view)
+    ///   - "genesis"
+    ///   - "finalized"
+    ///   - slot number as string
+    ///   - hex encoded blockRoot with 0x prefix
+    /// 
+    /// # Returns
+    /// The block root as a hex string with 0x prefix
+    pub async fn get_block_root(&self, slot: u64) -> Result<FixedBytes<32>, Error> {
+        let json = self.get_json(&format!("eth/v1/beacon/blocks/{}/root", slot)).await?;
+        
+        // Check for 404 NOT_FOUND error
+        if let Some(code) = json.get("code").and_then(|c| c.as_i64()) {
+            if code == 404 {
+                return Err(Error::BlockNotFound);
+            }
+        }
+
+        let hex_str = json["data"]["root"]
+            .as_str()
+            .ok_or(Error::BlockNotFound)?;
+
+        // Parse the hex string into FixedBytes<32>
+        let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
+        let bytes = hex::decode(hex_str)
+            .map_err(|e| Error::DeserializeError(e.to_string()))?;
+
+        if bytes.len() != 32 {
+            return Err(Error::DeserializeError("Invalid block root length".to_string()));
+        }
+
+        Ok(FixedBytes::from_slice(&bytes))
+    }
 }
+

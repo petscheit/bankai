@@ -2,9 +2,10 @@ use alloy_primitives::{FixedBytes, U64};
 use beacon_state_proof::state_proof_fetcher::{SyncCommitteeProof, TreeHash};
 use sha2::{Sha256, Digest};
 use serde::{Serialize, Deserialize};
-use crate::utils::merkle;
+use crate::utils::{hashing::get_committee_hash, merkle};
 use bls12_381::{G1Affine, G1Projective, G2Affine};
 use alloy_rpc_types_beacon::header::HeaderResponse;
+use starknet::core::types::Felt;
 
 /// Represents a proof for updating the sync committee, containing necessary verification data
 /// for validating sync committee transitions in the beacon chain.
@@ -96,6 +97,13 @@ pub struct SyncCommitteeValidatorPubs {
     pub aggregate_pub: G1Affine,
 }
 
+impl SyncCommitteeValidatorPubs {
+    // computes the committee hash we use thoughout the project to identify the committee
+    pub fn get_committee_hash(&self) -> FixedBytes<32> {
+        get_committee_hash(self.aggregate_pub)
+    }
+}
+
 impl From<Vec<String>> for SyncCommitteeValidatorPubs {
     /// Converts a vector of hex-encoded public key strings into `SyncCommitteeValidatorPubs`.
     ///
@@ -124,9 +132,9 @@ impl From<Vec<String>> for SyncCommitteeValidatorPubs {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BeaconHeader {
     /// Slot number of the block
-    pub slot: U64,
+    pub slot: u64,
     /// Index of the block proposer
-    pub proposer_index: U64,
+    pub proposer_index: u64,
     /// Root hash of the parent block
     pub parent_root: FixedBytes<32>,
     /// Root hash of the state
@@ -148,11 +156,34 @@ pub struct EpochProofInputs {
     pub non_signers: Vec<G1Affine>,
 }
 
+impl EpochProofInputs {
+    // ToDo: We should compute the header_root here!
+    // The issue is that we re-export HashTree from lighthouse -> beacon-state-proofs -> here
+    // This means I cant import TreeHashDerive from the crate, applying it to the BeaconHeader type
+    // Probably we should import the BeaconHeader type from lighthouse tbh, need to check how to approach this
+    pub fn to_calldata(&self, header_root: FixedBytes<32>) -> Vec<Felt> {
+        let (header_root_high, header_root_low) = header_root.as_slice().split_at(16);
+        let (state_root_high, state_root_low) = self.header.state_root.as_slice().split_at(16);
+        let binding = get_committee_hash(self.aggregate_pub);
+        let (committee_hash_high, committee_hash_low) = binding.as_slice().split_at(16);
+        vec![
+            Felt::from_bytes_be_slice(header_root_low),
+            Felt::from_bytes_be_slice(header_root_high),
+            Felt::from_bytes_be_slice(state_root_low),
+            Felt::from_bytes_be_slice(state_root_high),
+            Felt::from_bytes_be_slice(committee_hash_low),
+            Felt::from_bytes_be_slice(committee_hash_high),
+            Felt::from(512 - self.non_signers.len() as u64),
+            Felt::from(self.header.slot),
+        ]
+    }
+}
+
 impl From<HeaderResponse> for BeaconHeader {
     fn from(header: HeaderResponse) -> Self {
         Self { 
-            slot: U64::from(header.data.header.message.slot), 
-            proposer_index: U64::from(header.data.header.message.proposer_index), 
+            slot: u64::from(header.data.header.message.slot), 
+            proposer_index: u64::from(header.data.header.message.proposer_index), 
             parent_root: header.data.header.message.parent_root, 
             state_root: header.data.header.message.state_root,
             body_root: header.data.header.message.body_root 
@@ -217,5 +248,27 @@ impl Serialize for EpochProofInputs {
         state.serialize_field("non_signers", &non_signers)?;
         
         state.end()
+    }
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ContractInitializationData {
+    pub(crate) committee_id: u64,
+    pub(crate) committee_hash: FixedBytes<32>,
+    pub(crate) committee_update_program_hash: Felt,
+    pub(crate) epoch_update_program_hash: Felt,
+}
+
+impl ContractInitializationData {
+    pub fn to_calldata(&self) -> Vec<Felt> {
+        let (committee_high, committee_low) = self.committee_hash.as_slice().split_at(16);
+        vec![
+            Felt::from(self.committee_id),
+            Felt::from_bytes_be_slice(committee_low),
+            Felt::from_bytes_be_slice(committee_high),
+            self.committee_update_program_hash,
+            self.epoch_update_program_hash,
+        ]
     }
 }
