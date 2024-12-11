@@ -9,7 +9,7 @@ use alloy_rpc_types_beacon::{
 };
 use bls12_381::{G1Affine, G1Projective, G2Affine};
 use serde::{Deserialize, Serialize};
-use starknet::core::types::Felt;
+use starknet::{core::types::Felt, macros::selector};
 use tree_hash::TreeHash;
 use tree_hash_derive::TreeHash;
 
@@ -293,6 +293,6 @@ impl Submittable<EpochCircuitInputs> for ExpectedCircuitOutputs {
     }
 
     fn get_contract_selector(&self) -> Felt {
-        unimplemented!();
+        selector!("verify_epoch_update")
     }
 }

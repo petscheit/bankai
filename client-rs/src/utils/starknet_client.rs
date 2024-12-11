@@ -1,4 +1,3 @@
-use alloy_primitives::FixedBytes;
 use starknet::accounts::{Account, ConnectedAccount};
 use starknet::core::types::{Call, FunctionCall};
 use starknet::macros::selector;
@@ -20,7 +19,6 @@ use starknet::{
 use std::sync::Arc;
 
 use crate::contract_init::ContractInitializationData;
-use crate::epoch_update::EpochUpdate;
 use crate::traits::Submittable;
 use crate::BankaiConfig;
 pub struct StarknetClient {
@@ -94,18 +92,17 @@ impl StarknetClient {
         Ok(contract_address)
     }
 
-    pub async fn submit_epoch_update(
+    pub async fn submit_update<T>(
         &self,
-        epoch_update: EpochUpdate,
-        beacon_root: FixedBytes<32>,
+        update: impl Submittable<T>,
         config: &BankaiConfig,
     ) -> Result<(), StarknetError> {
         let result = self
             .account
             .execute_v1(vec![Call {
                 to: config.contract_address,
-                selector: selector!("verify_epoch_update"),
-                calldata: epoch_update.expected_circuit_outputs.to_calldata(),
+                selector: update.get_contract_selector(),
+                calldata: update.to_calldata(),
             }])
             .send()
             .await

@@ -1,6 +1,5 @@
 use crate::epoch_update::SyncCommitteeValidatorPubs;
 use crate::Error;
-use alloy_primitives::FixedBytes;
 use alloy_rpc_types_beacon::events::light_client_finality::SyncAggregate;
 use alloy_rpc_types_beacon::header::HeaderResponse;
 use itertools::Itertools;
@@ -61,10 +60,23 @@ impl BeaconRpcClient {
     /// Fetches the sync aggregate from the block AFTER the specified slot.
     /// Note: This intentionally fetches slot + 1 because sync aggregates reference
     /// the previous slot's header.
-    pub async fn get_sync_aggregate(&self, slot: u64) -> Result<SyncAggregate, Error> {
+    pub async fn get_sync_aggregate(&self, mut slot: u64) -> Result<SyncAggregate, Error> {
+        slot += 1; // signature is in the next slot
+        // Ensure the slot is not missed and increment in case it is
+        match self.get_header(slot).await {
+            Ok(header) => header,
+            Err(Error::EmptySlotDetected(_)) => {
+                slot += 1;
+                println!("Empty slot detected! Fetching slot: {}", slot);
+                self.get_header(slot).await?
+            }
+            Err(e) => return Err(e), // Propagate other errors immediately
+        };
+
         let json = self
-            .get_json(&format!("eth/v2/beacon/blocks/{}", slot + 1))
+            .get_json(&format!("eth/v2/beacon/blocks/{}", slot))
             .await?;
+        
         serde_json::from_value(json["data"]["message"]["body"]["sync_aggregate"].clone())
             .map_err(|e| Error::DeserializeError(e.to_string()))
     }
@@ -144,44 +156,5 @@ impl BeaconRpcClient {
         let indexes = self.fetch_sync_committee_indexes(slot).await?;
         let pubkeys = self.fetch_validator_pubkeys(&indexes).await?;
         Ok(pubkeys.into())
-    }
-
-    /// Fetches the block root (hashTreeRoot) for a given block identifier.
-    ///
-    /// # Arguments
-    /// * `block_id` - Block identifier. Can be:
-    ///   - "head" (canonical head in node's view)
-    ///   - "genesis"
-    ///   - "finalized"
-    ///   - slot number as string
-    ///   - hex encoded blockRoot with 0x prefix
-    ///
-    /// # Returns
-    /// The block root as a hex string with 0x prefix
-    pub async fn get_block_root(&self, slot: u64) -> Result<FixedBytes<32>, Error> {
-        let json = self
-            .get_json(&format!("eth/v1/beacon/blocks/{}/root", slot))
-            .await?;
-
-        // Check for 404 NOT_FOUND error
-        if let Some(code) = json.get("code").and_then(|c| c.as_i64()) {
-            if code == 404 {
-                return Err(Error::BlockNotFound);
-            }
-        }
-
-        let hex_str = json["data"]["root"].as_str().ok_or(Error::BlockNotFound)?;
-
-        // Parse the hex string into FixedBytes<32>
-        let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes = hex::decode(hex_str).map_err(|e| Error::DeserializeError(e.to_string()))?;
-
-        if bytes.len() != 32 {
-            return Err(Error::DeserializeError(
-                "Invalid block root length".to_string(),
-            ));
-        }
-
-        Ok(FixedBytes::from_slice(&bytes))
     }
 }

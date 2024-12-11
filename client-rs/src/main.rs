@@ -31,6 +31,7 @@ pub enum Error {
     InvalidBLSPoint,
     MissingRpcUrl,
     EmptySlotDetected(u64),
+    RequiresNewerEpoch(Felt),
 }
 
 impl From<StarknetError> for Error {
@@ -55,7 +56,7 @@ impl Default for BankaiConfig {
             )
             .unwrap(),
             contract_address: Felt::from_hex(
-                "0xf8c47855513a0ac18b1af7b0c61fb45239376b58f06c838f090ad13727220",
+                "0x20e2b7878473f235d41d74097bf4550715d37d1e591beb3762b09509e4942c4",
             )
             .unwrap(),
             committee_update_program_hash: Felt::from_hex(
@@ -152,10 +153,11 @@ enum Commands {
         #[arg(long, short)]
         slot: u64,
     },
-    SubmitEpochProof {
+    SubmitEpoch {
         #[arg(long, short)]
         slot: u64,
     },
+    SubmitNextEpoch,
     SubmitNextCommittee,
 }
 
@@ -239,71 +241,38 @@ async fn main() -> Result<(), Error> {
                 .await?;
             // bankai.starknet_client.get_committee_hash(slot, &bankai.config).await?;
         }
-        Commands::SubmitEpochProof { slot } => {
+        Commands::SubmitEpoch { slot } => {
             let proof = bankai.get_epoch_proof(slot).await?;
-            let header_root = bankai.client.get_block_root(slot).await?;
             bankai
                 .starknet_client
-                .submit_epoch_update(proof, header_root, &bankai.config)
+                .submit_update(proof.expected_circuit_outputs, &bankai.config)
                 .await?;
-            // bankai.starknet_client.get_latest_epoch(&bankai.config).await?;
+        }
+        Commands::SubmitNextEpoch => {
+            let latest_epoch = bankai.starknet_client.get_latest_epoch(&bankai.config).await?;
+            println!("Curr epoch: {}", latest_epoch);
+            // make sure next_epoch % 32 == 0
+            let next_epoch = (u64::try_from(latest_epoch).unwrap() / 32) * 32 + 32;
+            println!("Next epoch: {}", next_epoch);
+            let proof = bankai.get_epoch_proof(next_epoch).await?;
+            bankai.starknet_client.submit_update(proof.expected_circuit_outputs, &bankai.config).await?;
         }
         Commands::SubmitNextCommittee => {
             let latest_committee_id = bankai
                 .starknet_client
                 .get_latest_committee_id(&bankai.config)
                 .await?;
-            let next_committee_slot = (latest_committee_id) * Felt::from(0x2000);
-            // println!("Next committee slot: {}", next_committee_slot);
-            // let latest_epoch = bankai.starknet_client.get_latest_epoch(&bankai.config).await?;
-            // println!("Latest epoch: {}", latest_epoch);
-            // assert!(latest_epoch >= next_committee_slot, "Newer Epoch required for next committee update");
-            // let proof = bankai.get_sync_committee_update(latest_epoch.try_into().unwrap()).await?;
-            // println!("Proof: {:?}", proof);
-            // let mut bytes = [0u8; 48];
-            // bytes.copy_from_slice(proof.next_aggregate_sync_committee.as_slice());
-            // let committee_hash = utils::hashing::get_committee_hash(G1Affine::from_compressed(&bytes).unwrap());
-            // println!("committee_hash: {:?}", committee_hash);
-            // let header_root = bankai.client.get_block_root(next_committee_slot).await?;
-            // bankai.starknet_client.submit_committee_update(proof, header_root, &bankai.config).await?;
+            let lowest_committee_update_slot = (latest_committee_id) * Felt::from(0x2000);
+            println!("Min Slot Required: {}", lowest_committee_update_slot);
+            let latest_epoch = bankai.starknet_client.get_latest_epoch(&bankai.config).await?;
+            println!("Latest epoch: {}", latest_epoch);
+            if latest_epoch < lowest_committee_update_slot {
+                return Err(Error::RequiresNewerEpoch(latest_epoch));
+            }
+            let update = bankai.get_sync_committee_update(latest_epoch.try_into().unwrap()).await?;
+            bankai.starknet_client.submit_update(update.expected_circuit_outputs, &bankai.config).await?;
         }
     }
 
     Ok(())
 }
-
-// #[tokio::main]
-// async fn main() -> Result<(), Error> {
-//     let bankai = BankaiClient::new("https://side-radial-morning.ethereum-sepolia.quiknode.pro/006c5ea080a9f60afbb3cc1eb8cc7ab486c9d128".to_string());
-
-//     let num_samples = 47; // Change this to desired number of samples
-//     let mut rng = rand::thread_rng();
-//     let mut proofs = Vec::new();
-
-//     // Generate random slots between 5800064 and 6400932
-//     for _ in 0..num_samples {
-//         let random_slot = rng.gen_range(5000000..=6400932);
-//         match bankai.get_sync_committee_update(random_slot).await {
-//             Ok(proof) => {
-//                 let json = serde_json::to_string_pretty(&proof).unwrap();
-//                 let state_root = bankai.client.get_header(random_slot).await?.data.root.to_string();
-//                 let mut json_value: serde_json::Value = serde_json::from_str(&json).unwrap();
-//                 if let serde_json::Value::Object(ref mut map) = json_value {
-//                     map.insert("expected_state_root".to_string(), serde_json::Value::String(state_root));
-//                 }
-//                 let json = serde_json::to_string_pretty(&json_value).unwrap();
-//                 println!("Generated proof for slot {}", random_slot);
-//                 let filename = format!("output/committee_update_{}.json", random_slot);
-//                 let mut file = File::create(filename).unwrap();
-//                 file.write_all(json.as_bytes()).unwrap();
-//                 proofs.push(proof);
-//             },
-//             Err(e) => println!("Error generating proof for slot {}: {:?}", random_slot, e),
-//         }
-//     }
-
-//     println!("Generated {} fixtures", proofs.len());
-//     Ok(())
-// }
-
-// MISSED CHECKPOINT SLOT: 6400932

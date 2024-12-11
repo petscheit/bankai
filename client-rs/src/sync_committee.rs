@@ -4,13 +4,14 @@ use crate::{
     traits::Submittable,
     utils::{hashing::get_committee_hash, merkle},
 };
-use alloy_primitives::{FixedBytes, U64};
+use alloy_primitives::FixedBytes;
 use beacon_state_proof::state_proof_fetcher::StateProofFetcher;
 use beacon_state_proof::state_proof_fetcher::{SyncCommitteeProof, TreeHash};
 use bls12_381::G1Affine;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use starknet::core::types::Felt;
+use starknet::macros::selector;
 
 #[derive(Debug, Serialize)]
 pub struct SyncCommitteeUpdate {
@@ -43,7 +44,7 @@ impl SyncCommitteeUpdate {
 #[derive(Debug, Serialize)]
 pub struct CommitteeCircuitInputs {
     /// The beacon chain slot number for this proof
-    pub beacon_slot: U64,
+    pub beacon_slot: u64,
     /// Merkle branch proving inclusion of the next sync committee
     pub next_sync_committee_branch: Vec<FixedBytes<32>>,
     /// The aggregated public key of the next sync committee
@@ -83,7 +84,7 @@ pub struct ExpectedCircuitOutputs {
     /// The state root containing the new sync committee.
     pub state_root: FixedBytes<32>,
     /// The slot containing the state_root
-    pub slot: U64,
+    pub slot: u64,
     /// The hash of the new sync committee
     pub committee_hash: FixedBytes<32>,
 }
@@ -97,17 +98,25 @@ impl Submittable<CommitteeCircuitInputs> for ExpectedCircuitOutputs {
             get_committee_hash(G1Affine::from_compressed(&compressed_aggregate_pubkey).unwrap());
         Self {
             state_root: circuit_inputs.compute_state_root(),
-            slot: U64::from(circuit_inputs.beacon_slot),
+            slot: circuit_inputs.beacon_slot,
             committee_hash,
         }
     }
 
     fn to_calldata(&self) -> Vec<Felt> {
-        unimplemented!();
+        let (state_root_high, state_root_low) = self.state_root.as_slice().split_at(16);
+        let (committee_hash_high, committee_hash_low) = self.committee_hash.as_slice().split_at(16);    
+        vec![
+            Felt::from_bytes_be_slice(state_root_low),
+            Felt::from_bytes_be_slice(state_root_high),
+            Felt::from_bytes_be_slice(committee_hash_low),
+            Felt::from_bytes_be_slice(committee_hash_high),
+            Felt::from(self.slot),
+        ]
     }
 
     fn get_contract_selector(&self) -> Felt {
-        unimplemented!();
+        selector!("verify_committee_update")
     }
 }
 
@@ -125,7 +134,7 @@ impl From<SyncCommitteeProof> for CommitteeCircuitInputs {
         let committee_keys_root = &committee_proof.next_sync_committee.pubkeys.tree_hash_root();
 
         Self {
-            beacon_slot: U64::from(committee_proof.slot),
+            beacon_slot: committee_proof.slot,
             next_sync_committee_branch: committee_proof
                 .proof
                 .into_iter()
