@@ -1,6 +1,6 @@
 use alloy_primitives::FixedBytes;
-use sha2::{Sha256, Digest};
 use bls12_381::G1Affine;
+use sha2::{Digest, Sha256};
 
 pub fn get_committee_hash(point: G1Affine) -> FixedBytes<32> {
     let mut hasher = Sha256::new();

@@ -20,7 +20,7 @@ pub fn hash_merkle_path(
             data[0..32].copy_from_slice(sibling.as_slice());
             data[32..64].copy_from_slice(value.as_slice());
         }
-        value = FixedBytes::from_slice(&Sha256::digest(&data));
+        value = FixedBytes::from_slice(&Sha256::digest(data));
         g_index /= 2;
     }
     value
