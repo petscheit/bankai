@@ -23,7 +23,7 @@ func aggregate_signer_pubs{
     // Python hint to populate signers array and set n_signers
     %{
         from cairo.py.utils import generate_signers_array
-        signers = generate_signers_array(program_input["signers"])
+        signers = generate_signers_array(program_input["circuit_inputs"]["signers"])
 
         for i, signer in enumerate(signers):
             memory[ids.signers._reference_value + i * 8] = signer[0][0]
@@ -80,8 +80,8 @@ func fast_aggregate_signer_pubs{
     // Python hint to populate non_signers array, set committee_pub, and n_non_signers
     %{
         from cairo.py.utils import generate_signers_array
-        non_signers = generate_signers_array(program_input["non_signers"])
-        write_g1(ids.committee_pub, program_input["sync_committee_agg_pub"])
+        non_signers = generate_signers_array(program_input["circuit_inputs"]["non_signers"])
+        write_g1(ids.committee_pub, program_input["circuit_inputs"]["sync_committee_agg_pub"])
 
         for i, non_signer in enumerate(non_signers):
             memory[ids.non_signers._reference_value + i * 8] = non_signer[0][0]
@@ -139,8 +139,8 @@ func faster_fast_aggregate_signer_pubs{
     // Python hint to populate non_signers array, set committee_pub, and n_non_signers
     %{
         from cairo.py.utils import generate_signers_array
-        non_signers = generate_signers_array(program_input["non_signers"])
-        write_g1(ids.committee_pub, program_input["committee_pub"])
+        non_signers = generate_signers_array(program_input["circuit_inputs"]["non_signers"])
+        write_g1(ids.committee_pub, program_input["circuit_inputs"]["committee_pub"])
 
         for i, non_signer in enumerate(non_signers):
             memory[ids.non_signers._reference_value + i * 8] = non_signer[0][0]

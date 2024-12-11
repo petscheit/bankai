@@ -1,8 +1,8 @@
 #!/bin/bash
 
-INPUT_FILE="main_input.json"
+INPUT_FILE="epoch_input.json"
 PIE_FLAG=""
-PROGRAM="main"  # Default program
+PROGRAM="epoch_update"  # Default program
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -32,9 +32,7 @@ cairo-run --program=cairo/build/${PROGRAM}.json \
     --program_input="$INPUT_FILE" \
     --layout=all_cairo \
     --print_info \
-    $PIE_FLAG \
-    # --proof_mode
-    # --cairo_layout_params_file=dynamic_params.json \
+    $PIE_FLAG
 
 # End timing
 end_time=$(date +%s.%N)

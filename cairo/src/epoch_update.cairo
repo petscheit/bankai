@@ -32,39 +32,43 @@ func main{
     local slot: felt;
     %{
         from cairo.py.utils import write_g2, write_g1g2, write_g1, print_g2
-        write_g2(ids.sig_point, program_input["signature_point"])
-        ids.slot = int(program_input["header"]["slot"], 16)
+        write_g2(ids.sig_point, program_input["circuit_inputs"]["signature_point"])
+        ids.slot = program_input["circuit_inputs"]["header"]["slot"]
     %}
-    %{ print("Running Verification for Slot: ", ids.slot) %}
+    // %{ print("Running Verification for Slot: ", ids.slot) %}
 
     with pow2_array, sha256_ptr {
         let (header_root, state_root) = hash_header();
     }
-    %{ print("HeaderRoot: ", hex(ids.header_root.high * 2**128 + ids.header_root.low)) %}
+    // %{ print("HeaderRoot: ", hex(ids.header_root.high * 2**128 + ids.header_root.low)) %}
 
     with pow2_array, sha256_ptr {
         let signing_root = Domain.compute_signing_root(header_root, slot);
     }
-    %{ print("SigningRoot: ", hex(ids.signing_root.high * 2**128 + ids.signing_root.low)) %}
+    // %{ print("SigningRoot: ", hex(ids.signing_root.high * 2**128 + ids.signing_root.low)) %}
 
     with pow2_array, sha256_ptr {
         let (msg_point) = hash_to_curve(1, signing_root);
     }
 
-    %{ print_g2("MsgPoint", ids.msg_point) %}
+    // %{ print_g2("MsgPoint", ids.msg_point) %}
 
     with sha256_ptr, pow2_array {
         let (committee_hash, agg_key, n_non_signers) = faster_fast_aggregate_signer_pubs();
     }
     let n_signers = 512 - n_non_signers;
 
-    with_attr error_message("NOT_ENOUGH_SIGNERS") {
-        assert [range_check_ptr] = n_signers - 410;
-        tempvar range_check_ptr = range_check_ptr + 1;
-    }
-
     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
     verify_signature(agg_key, msg_point, sig_point);
+
+    %{
+        from cairo.py.utils import uint256_to_int
+        assert uint256_to_int(ids.header_root) == int(program_input["expected_circuit_outputs"]["header_root"], 16), "Header Root Mismatch"
+        assert uint256_to_int(ids.state_root) == int(program_input["expected_circuit_outputs"]["state_root"], 16), "State Root Mismatch"
+        assert uint256_to_int(ids.committee_hash) == int(program_input["expected_circuit_outputs"]["committee_hash"], 16), "Committee Hash Mismatch"
+        assert ids.n_signers == program_input["expected_circuit_outputs"]["n_signers"], "Number of Signers Mismatch"
+        assert ids.slot == program_input["expected_circuit_outputs"]["slot"], "Slot Mismatch"
+    %}
 
     assert [output_ptr] = header_root.low;
     assert [output_ptr + 1] = header_root.high;
@@ -94,19 +98,19 @@ func hash_header{
     local body_root: Uint256;
     %{  
         from cairo.py.utils import split_uint256
-        ids.slot.low = int(program_input["header"]["slot"], 16)
+        ids.slot.low = program_input["circuit_inputs"]["header"]["slot"]
         ids.slot.high = 0
 
-        ids.proposer_index.low = int(program_input["header"]["proposer_index"], 16)
+        ids.proposer_index.low = program_input["circuit_inputs"]["header"]["proposer_index"]
         ids.proposer_index.high = 0
 
-        parent_root = split_uint256(int(program_input["header"]["parent_root"], 16))
+        parent_root = split_uint256(int(program_input["circuit_inputs"]["header"]["parent_root"], 16))
         ids.parent_root.low, ids.parent_root.high = parent_root
 
-        state_root = split_uint256(int(program_input["header"]["state_root"], 16))
+        state_root = split_uint256(int(program_input["circuit_inputs"]["header"]["state_root"], 16))
         ids.state_root.low, ids.state_root.high = state_root
 
-        body_root = split_uint256(int(program_input["header"]["body_root"], 16))
+        body_root = split_uint256(int(program_input["circuit_inputs"]["header"]["body_root"], 16))
         ids.body_root.low, ids.body_root.high = body_root
     %}
 

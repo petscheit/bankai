@@ -77,3 +77,9 @@ def print_g2(msg, ptr):
     print_u384("x1", ptr.x1)
     print_u384("y0", ptr.y0)
     print_u384("y1", ptr.y1)
+
+def uint256_to_int(ptr):
+    return ptr.high * 2**128 + ptr.low
+
+def uint384_to_int(ptr):
+    return ptr.d3 * 2**288 + ptr.d2 * 2**192 + ptr.d1 * 2**96 + ptr.d0

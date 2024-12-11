@@ -18,6 +18,8 @@ pie.zip
 pie.encoded.txt
 
 client/epoch_data.json
+committee_input.json
+epoch_input.json
 nimbus-data
 
 **/*.pyc
