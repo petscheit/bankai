@@ -596,13 +596,13 @@ dependencies = [
  "arbitrary",
  "blst",
  "ethereum-types",
- "ethereum_hashing",
+ "ethereum_hashing 0.6.0",
  "ethereum_serde_utils 0.5.2",
  "ethereum_ssz",
  "hex",
  "rand",
  "serde",
- "tree_hash",
+ "tree_hash 0.6.0",
  "zeroize",
 ]
 
@@ -770,6 +770,7 @@ dependencies = [
  "sha2",
  "starknet",
  "tokio",
+ "tree_hash 0.8.0",
  "tree_hash_derive 0.8.0",
 ]
 
@@ -1196,7 +1197,7 @@ version = "0.2.0"
 source = "git+https://github.com/petscheit/lighthouse#963ce47972df0c4bcf153d876a54d4e2768e9463"
 dependencies = [
  "bls",
- "ethereum_hashing",
+ "ethereum_hashing 0.6.0",
  "hex",
  "lazy_static",
  "num-bigint",
@@ -1239,6 +1240,17 @@ checksum = "6ea7b408432c13f71af01197b1d3d0069c48a27bfcfbe72a81fc346e47f6defb"
 dependencies = [
  "cpufeatures",
  "lazy_static",
+ "ring",
+ "sha2",
+]
+
+[[package]]
+name = "ethereum_hashing"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c853bd72c9e5787f8aafc3df2907c2ed03cff3150c3acd94e2e53a98ab70a8ab"
+dependencies = [
+ "cpufeatures",
  "ring",
  "sha2",
 ]
@@ -2114,13 +2126,13 @@ dependencies = [
  "arbitrary",
  "c-kzg",
  "derivative",
- "ethereum_hashing",
+ "ethereum_hashing 0.6.0",
  "ethereum_serde_utils 0.5.2",
  "ethereum_ssz",
  "ethereum_ssz_derive",
  "hex",
  "serde",
- "tree_hash",
+ "tree_hash 0.6.0",
 ]
 
 [[package]]
@@ -2220,7 +2232,7 @@ version = "0.2.0"
 source = "git+https://github.com/petscheit/lighthouse#963ce47972df0c4bcf153d876a54d4e2768e9463"
 dependencies = [
  "ethereum-types",
- "ethereum_hashing",
+ "ethereum_hashing 0.6.0",
  "lazy_static",
  "safe_arith",
 ]
@@ -2257,7 +2269,7 @@ dependencies = [
  "arbitrary",
  "derivative",
  "ethereum-types",
- "ethereum_hashing",
+ "ethereum_hashing 0.6.0",
  "ethereum_ssz",
  "ethereum_ssz_derive",
  "itertools 0.10.5",
@@ -2265,7 +2277,7 @@ dependencies = [
  "rayon",
  "serde",
  "smallvec",
- "tree_hash",
+ "tree_hash 0.6.0",
  "triomphe",
  "typenum",
  "vec_map",
@@ -3384,7 +3396,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "smallvec",
- "tree_hash",
+ "tree_hash 0.6.0",
  "typenum",
 ]
 
@@ -3614,7 +3626,7 @@ version = "0.2.0"
 source = "git+https://github.com/petscheit/lighthouse#963ce47972df0c4bcf153d876a54d4e2768e9463"
 dependencies = [
  "ethereum-types",
- "ethereum_hashing",
+ "ethereum_hashing 0.6.0",
 ]
 
 [[package]]
@@ -3955,7 +3967,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "134d6b24a5b829f30b5ee7de05ba7384557f5f6b00e29409cdf2392f93201bfa"
 dependencies = [
  "ethereum-types",
- "ethereum_hashing",
+ "ethereum_hashing 0.6.0",
+ "smallvec",
+]
+
+[[package]]
+name = "tree_hash"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "373495c23db675a5192de8b610395e1bec324d596f9e6111192ce903dc11403a"
+dependencies = [
+ "alloy-primitives 0.8.15",
+ "ethereum_hashing 0.7.0",
  "smallvec",
 ]
 
@@ -4018,7 +4041,7 @@ dependencies = [
  "derivative",
  "eth2_interop_keypairs",
  "ethereum-types",
- "ethereum_hashing",
+ "ethereum_hashing 0.6.0",
  "ethereum_serde_utils 0.5.2",
  "ethereum_ssz",
  "ethereum_ssz_derive",
@@ -4050,7 +4073,7 @@ dependencies = [
  "swap_or_not_shuffle",
  "tempfile",
  "test_random_derive",
- "tree_hash",
+ "tree_hash 0.6.0",
  "tree_hash_derive 0.6.0",
 ]
 

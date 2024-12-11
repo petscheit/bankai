@@ -2,9 +2,9 @@ use reqwest::Client;
 use alloy_rpc_types_beacon::header::HeaderResponse;
 use alloy_rpc_types_beacon::events::light_client_finality::SyncAggregate;
 use serde_json::Value;
+use crate::epoch_update::SyncCommitteeValidatorPubs;
 use crate::Error;
 use itertools::Itertools;
-use crate::types::SyncCommitteeValidatorPubs;
 use alloy_primitives::FixedBytes;
 
 /// A client for interacting with the Ethereum Beacon Chain RPC endpoints.

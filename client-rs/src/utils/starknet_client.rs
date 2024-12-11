@@ -12,9 +12,9 @@ use starknet::{
 };
 
 use crate::contract_init::ContractInitializationData;
-use crate::types::EpochProofInputs;
+use crate::epoch_update::EpochUpdate;
 use crate::{BankaiConfig, Error};
-
+use crate::traits::Submittable;
 pub struct StarknetClient {
     account: Arc<SingleOwnerAccount<JsonRpcClient<HttpTransport>, LocalWallet>>,
     // provider: Arc<JsonRpcClient<HttpTransport>>,
@@ -72,14 +72,13 @@ impl StarknetClient {
         Ok(contract_address)
     }
 
-    pub async fn submit_epoch_update(&self, epoch_proof: EpochProofInputs, beacon_root: FixedBytes<32>, config: &BankaiConfig) -> Result<(), StarknetError> {
-        let epoch_proof_calldata = epoch_proof.to_calldata(beacon_root);
+    pub async fn submit_epoch_update(&self, epoch_update: EpochUpdate, beacon_root: FixedBytes<32>, config: &BankaiConfig) -> Result<(), StarknetError> {
         let result = self.account.execute_v1(
                 vec![
                     Call {
                         to: config.contract_address,
                         selector: selector!("verify_epoch_update"),
-                        calldata: epoch_proof_calldata,
+                        calldata: epoch_update.expected_circuit_outputs.to_calldata(),
                     }
                 ],
             )

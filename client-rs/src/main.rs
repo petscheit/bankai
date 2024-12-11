@@ -1,5 +1,5 @@
 mod sync_committee;
-mod types;
+mod traits;
 mod utils;
 mod epoch_update;
 mod contract_init;
@@ -9,7 +9,6 @@ use bls12_381::G1Affine;
 use epoch_update::EpochUpdate;
 use starknet::core::types::Felt;
 use sync_committee::SyncCommitteeUpdate;
-use types::EpochProofInputs;
 use utils::{rpc::BeaconRpcClient, starknet_client::{StarknetClient, StarknetError}};
 // use rand::Rng;
 // use std::fs::File;
@@ -88,8 +87,8 @@ impl BankaiClient {
         Ok(proof)
     }
 
-    pub async fn get_epoch_proof(&self, slot: u64) -> Result<EpochProofInputs, Error> {
-        let epoch_proof = EpochUpdate::generate_epoch_proof(&self.client, slot).await?;
+    pub async fn get_epoch_proof(&self, slot: u64) -> Result<EpochUpdate, Error> {
+        let epoch_proof = EpochUpdate::new(&self.client, slot).await?;
         Ok(epoch_proof)
     }
 

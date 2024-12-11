@@ -1,6 +1,7 @@
 use alloy_primitives::{FixedBytes, U64};
 use bls12_381::G1Affine;
-use crate::utils::{merkle, hashing::get_committee_hash};
+use starknet::core::types::Felt;
+use crate::{traits::Submittable, utils::{hashing::get_committee_hash, merkle}};
 use serde::Serialize;
 use beacon_state_proof::state_proof_fetcher::{SyncCommitteeProof, TreeHash};
 use sha2::{Sha256, Digest};
@@ -88,8 +89,8 @@ pub struct ExpectedCircuitOutputs {
     pub committee_hash: FixedBytes<32>,
 }
 
-impl ExpectedCircuitOutputs {
-    pub fn from_inputs(circuit_inputs: &CommitteeCircuitInputs) -> Self {
+impl Submittable<CommitteeCircuitInputs> for ExpectedCircuitOutputs {
+    fn from_inputs(circuit_inputs: &CommitteeCircuitInputs) -> Self {
         let mut compressed_aggregate_pubkey = [0u8; 48];
         compressed_aggregate_pubkey.copy_from_slice(&circuit_inputs.next_aggregate_sync_committee.as_slice());
         let committee_hash = get_committee_hash(G1Affine::from_compressed(&compressed_aggregate_pubkey).unwrap());
@@ -98,6 +99,14 @@ impl ExpectedCircuitOutputs {
             slot: U64::from(circuit_inputs.beacon_slot),
             committee_hash,
         }
+    }
+
+    fn to_calldata(&self) -> Vec<Felt> {
+        unimplemented!();
+    }
+
+    fn get_contract_selector(&self) -> Felt {
+        unimplemented!();
     }
 }
 
