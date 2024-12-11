@@ -1,13 +1,35 @@
-use crate::{types::ContractInitializationData, utils::rpc::BeaconRpcClient, BankaiConfig, Error};
+use serde::{Serialize, Deserialize};
+use alloy_primitives::FixedBytes;
+use crate::{utils::rpc::BeaconRpcClient, BankaiConfig, Error};
+use starknet::core::types::Felt;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ContractInitializationData {
+    pub(crate) committee_id: u64,
+    pub(crate) committee_hash: FixedBytes<32>,
+    pub(crate) committee_update_program_hash: Felt,
+    pub(crate) epoch_update_program_hash: Felt,
+}
 
 impl ContractInitializationData {
-    pub async fn generate_contract_initialization_data(client: &BeaconRpcClient, slot: u64, config: &BankaiConfig) -> Result<Self, Error> {
+    pub async fn new(client: &BeaconRpcClient, slot: u64, config: &BankaiConfig) -> Result<Self, Error> {
         let committee = client.get_sync_committee_validator_pubs(slot).await?;
         Ok(Self {
-            committee_id: (slot / 0x2000) as u64,
+            committee_id: (slot / 0x2000) as u64, // since this is the current committee, we dont increment the committee id
             committee_hash: committee.get_committee_hash(),
             committee_update_program_hash: config.committee_update_program_hash,
             epoch_update_program_hash: config.epoch_update_program_hash,
         })
+    }
+
+    pub fn to_calldata(&self) -> Vec<Felt> {
+        let (committee_high, committee_low) = self.committee_hash.as_slice().split_at(16);
+        vec![
+            Felt::from(self.committee_id),
+            Felt::from_bytes_be_slice(committee_low),
+            Felt::from_bytes_be_slice(committee_high),
+            self.committee_update_program_hash,
+            self.epoch_update_program_hash,
+        ]
     }
 }

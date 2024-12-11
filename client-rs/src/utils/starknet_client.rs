@@ -11,8 +11,9 @@ use starknet::{
     }, signers::{LocalWallet, SigningKey}
 };
 
+use crate::contract_init::ContractInitializationData;
 use crate::types::EpochProofInputs;
-use crate::{types::ContractInitializationData, BankaiConfig, Error};
+use crate::{BankaiConfig, Error};
 
 pub struct StarknetClient {
     account: Arc<SingleOwnerAccount<JsonRpcClient<HttpTransport>, LocalWallet>>,
@@ -117,7 +118,7 @@ impl StarknetClient {
         Ok(())
     }
 
-    pub async fn get_latest_epoch(&self, config: &BankaiConfig) -> Result<(), StarknetError> {
+    pub async fn get_latest_epoch(&self, config: &BankaiConfig) -> Result<Felt, StarknetError> {
         let latest_epoch = self.account.provider().call(
             FunctionCall {
                 contract_address: config.contract_address,
@@ -126,7 +127,19 @@ impl StarknetClient {
             },
             BlockId::Tag(BlockTag::Latest),
         ).await.map_err(|e| StarknetError::ProviderError(e))?;
-        println!("latest_epoch: {:?}", latest_epoch);
-        Ok(())
+        Ok(latest_epoch.first().unwrap().clone())
+    }
+
+    pub async fn get_latest_committee_id(&self, config: &BankaiConfig) -> Result<Felt, StarknetError> {
+        let latest_committee_id = self.account.provider().call(
+            FunctionCall {
+                contract_address: config.contract_address,
+                entry_point_selector: selector!("get_latest_committee_id"),
+                calldata: vec![],
+            },
+            BlockId::Tag(BlockTag::Latest),
+        ).await.map_err(|e| StarknetError::ProviderError(e))?;
+        println!("latest_committee_id: {:?}", latest_committee_id);
+        Ok(latest_committee_id.first().unwrap().clone())
     }
 }

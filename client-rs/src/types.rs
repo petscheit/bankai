@@ -1,92 +1,9 @@
-use alloy_primitives::{FixedBytes, U64};
-use beacon_state_proof::state_proof_fetcher::{SyncCommitteeProof, TreeHash};
-use sha2::{Sha256, Digest};
+use alloy_primitives::FixedBytes;
 use serde::{Serialize, Deserialize};
-use crate::utils::{hashing::get_committee_hash, merkle};
+use crate::utils::hashing::get_committee_hash;
 use bls12_381::{G1Affine, G1Projective, G2Affine};
 use alloy_rpc_types_beacon::header::HeaderResponse;
 use starknet::core::types::Felt;
-
-/// Represents a proof for updating the sync committee, containing necessary verification data
-/// for validating sync committee transitions in the beacon chain.
-#[derive(Debug)]
-pub struct SyncCommitteeUpdateProof {
-    /// The beacon chain slot number for this proof
-    pub beacon_slot: U64,
-    /// Merkle branch proving inclusion of the next sync committee
-    pub next_sync_committee_branch: Vec<FixedBytes<32>>,
-    /// The aggregated public key of the next sync committee
-    pub next_aggregate_sync_committee: FixedBytes<48>,
-    /// Merkle root of the committee's public keys
-    pub committee_keys_root: FixedBytes<32>,
-}
-
-impl SyncCommitteeUpdateProof {
-    /// Computes the state root by hashing the committee keys root and the aggregate pubkey.
-    ///
-    /// # Returns
-    /// 
-    /// * `Ok(FixedBytes<32>)` - The computed state root as a 32-byte hash.
-    /// * `Err(SyncCommitteeUpdateError)` - If an error occurs during computation.
-    pub fn compute_state_root(&self) -> FixedBytes<32> {
-        // Pad the 48-byte aggregate pubkey to 64 bytes for hashing
-        let mut padded_aggregate = vec![0u8; 64];
-        padded_aggregate[..48].copy_from_slice(&self.next_aggregate_sync_committee[..]);
-        let aggregate_root: FixedBytes<32> = FixedBytes::from_slice(&Sha256::digest(&padded_aggregate));
-
-        // Prepare leaf data by concatenating the committee keys root and aggregate root
-        let mut leaf_data = [0u8; 64];
-        leaf_data[0..32].copy_from_slice(self.committee_keys_root.as_slice());
-        leaf_data[32..64].copy_from_slice(aggregate_root.as_slice());
-        let leaf = FixedBytes::from_slice(&Sha256::digest(&leaf_data));
-
-        // Compute the state root using the Merkle path
-        let state_root = merkle::hash_merkle_path(self.next_sync_committee_branch.clone(), leaf, 55);
-        state_root
-    }
-}
-
-impl From<SyncCommitteeProof> for SyncCommitteeUpdateProof {
-    /// Converts a `SyncCommitteeProof` into a `SyncCommitteeUpdateProof`.
-    ///
-    /// # Arguments
-    ///
-    /// * `committee_proof` - The original sync committee proof to convert.
-    ///
-    /// # Returns
-    ///
-    /// A new `SyncCommitteeUpdateProof` instance.
-    fn from(committee_proof: SyncCommitteeProof) -> Self {
-        let committee_keys_root = &committee_proof.next_sync_committee.pubkeys.tree_hash_root();
-        Self {
-            beacon_slot: U64::from(committee_proof.slot),
-            next_sync_committee_branch: committee_proof.proof.into_iter()
-                .map(|bytes| FixedBytes::from_slice(&bytes.as_bytes()))
-                .collect(),
-            next_aggregate_sync_committee: FixedBytes::from_slice(&committee_proof.next_sync_committee.aggregate_pubkey.as_serialized()),
-            committee_keys_root: FixedBytes::from_slice(committee_keys_root.as_bytes()),
-        }
-    }
-}
-
-
-impl Serialize for SyncCommitteeUpdateProof {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        
-        let mut state = serializer.serialize_struct("SyncCommitteeUpdateProof", 4)?;
-        
-        state.serialize_field("beacon_slot", &self.beacon_slot)?;
-        state.serialize_field("next_sync_committee_branch", &self.next_sync_committee_branch)?;
-        state.serialize_field("next_aggregate_sync_committee", &hex::encode(self.next_aggregate_sync_committee))?;
-        state.serialize_field("committee_keys_root", &hex::encode(self.committee_keys_root))?;
-        
-        state.end()
-    }
-}
 
 /// Represents the public keys of sync committee validators and their aggregate
 #[derive(Debug, Clone)]
@@ -248,27 +165,5 @@ impl Serialize for EpochProofInputs {
         state.serialize_field("non_signers", &non_signers)?;
         
         state.end()
-    }
-}
-
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ContractInitializationData {
-    pub(crate) committee_id: u64,
-    pub(crate) committee_hash: FixedBytes<32>,
-    pub(crate) committee_update_program_hash: Felt,
-    pub(crate) epoch_update_program_hash: Felt,
-}
-
-impl ContractInitializationData {
-    pub fn to_calldata(&self) -> Vec<Felt> {
-        let (committee_high, committee_low) = self.committee_hash.as_slice().split_at(16);
-        vec![
-            Felt::from(self.committee_id),
-            Felt::from_bytes_be_slice(committee_low),
-            Felt::from_bytes_be_slice(committee_high),
-            self.committee_update_program_hash,
-            self.epoch_update_program_hash,
-        ]
     }
 }

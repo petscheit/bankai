@@ -4,10 +4,12 @@ mod utils;
 mod epoch_update;
 mod contract_init;
 
+use contract_init::ContractInitializationData;
+use bls12_381::G1Affine;
 use epoch_update::EpochUpdate;
 use starknet::core::types::Felt;
 use sync_committee::SyncCommitteeUpdate;
-use types::{ContractInitializationData, EpochProofInputs, SyncCommitteeUpdateProof};
+use types::EpochProofInputs;
 use utils::{rpc::BeaconRpcClient, starknet_client::{StarknetClient, StarknetError}};
 // use rand::Rng;
 // use std::fs::File;
@@ -47,8 +49,8 @@ struct BankaiConfig {
 impl Default for BankaiConfig {
     fn default() -> Self {
         Self { 
-            contract_class_hash: Felt::from_hex("0x2a807c09b1dda435fb465e6ed3cd0e8306dcd33d483648f4ec28d2aef8e87e6").unwrap(),
-            contract_address: Felt::from_hex("0x4ce20f52222447516e3a529a88493606e8d79b1764bf0eada272ace8b92cea3").unwrap(),
+            contract_class_hash: Felt::from_hex("0x05e54a08e87b40c3f3ec9fd9e10900e61a9d1a08f3b4d0d110b232c43a3661df").unwrap(),
+            contract_address: Felt::from_hex("0xf8c47855513a0ac18b1af7b0c61fb45239376b58f06c838f090ad13727220").unwrap(),
             committee_update_program_hash: Felt::from_hex("0x229e5ad2e3b8c6dd4d0319cdd957bbd7bdf2ea685e172b049c3e5f55b0352c1").unwrap(), 
             epoch_update_program_hash: Felt::from_hex("0x4b5e6a385a98eef562265f5c4769794cee3fecaaaefb47200d8d804c35c20d6").unwrap(),
             contract_path: "../contract/target/dev/bankai_BankaiContract.contract_class.json".to_string(),
@@ -67,7 +69,7 @@ impl BankaiClient {
         Self { client: BeaconRpcClient::new(rpc_url), starknet_client: StarknetClient::new("http://127.0.0.1:5050").await.unwrap(), config: BankaiConfig::default() }
     }
 
-    pub async fn get_sync_committee_update(&self, mut slot: u64) -> Result<SyncCommitteeUpdateProof, Error> {
+    pub async fn get_sync_committee_update(&self, mut slot: u64) -> Result<SyncCommitteeUpdate, Error> {
         // Before we start generating the proof, we ensure the slot was not missed
         match self.client.get_header(slot).await {
             Ok(header) => header,
@@ -79,8 +81,8 @@ impl BankaiClient {
             Err(e) => return Err(e), // Propagate other errors immediately
         };
         
-        let proof: SyncCommitteeUpdateProof =
-            SyncCommitteeUpdate::generate_proof(&self.client, slot)
+        let proof: SyncCommitteeUpdate =
+            SyncCommitteeUpdate::new(&self.client, slot)
                 .await?;
 
         Ok(proof)
@@ -92,8 +94,7 @@ impl BankaiClient {
     }
 
     pub async fn get_contract_initialization_data(&self, slot: u64, config: &BankaiConfig) -> Result<ContractInitializationData, Error> {
-        let contract_init = ContractInitializationData::generate_contract_initialization_data(&self.client, slot, config).await?;
-        println!("{:#?}", contract_init);
+        let contract_init = ContractInitializationData::new(&self.client, slot, config).await?;
         Ok(contract_init)
     }
     
@@ -133,6 +134,7 @@ enum Commands {
         #[arg(long,short)]
         slot: u64,
     },
+    SubmitNextCommittee
 }
 
 #[derive(Parser)]
@@ -207,10 +209,26 @@ async fn main() -> Result<(), Error> {
             // bankai.starknet_client.get_committee_hash(slot, &bankai.config).await?;
         }
         Commands::SubmitEpochProof { slot } => {
-            // let proof = bankai.get_epoch_proof(slot).await?;
-            // let header_root = bankai.client.get_block_root(slot).await?;
-            // bankai.starknet_client.submit_epoch_update(proof, header_root, &bankai.config).await?;
+            let proof = bankai.get_epoch_proof(slot).await?;
+            let header_root = bankai.client.get_block_root(slot).await?;
+            bankai.starknet_client.submit_epoch_update(proof, header_root, &bankai.config).await?;
             // bankai.starknet_client.get_latest_epoch(&bankai.config).await?;
+        }
+        Commands::SubmitNextCommittee => {
+            let latest_committee_id = bankai.starknet_client.get_latest_committee_id(&bankai.config).await?;
+            let next_committee_slot = (latest_committee_id) * Felt::from(0x2000);
+            // println!("Next committee slot: {}", next_committee_slot);
+            // let latest_epoch = bankai.starknet_client.get_latest_epoch(&bankai.config).await?;
+            // println!("Latest epoch: {}", latest_epoch);
+            // assert!(latest_epoch >= next_committee_slot, "Newer Epoch required for next committee update");
+            // let proof = bankai.get_sync_committee_update(latest_epoch.try_into().unwrap()).await?;
+            // println!("Proof: {:?}", proof);
+            // let mut bytes = [0u8; 48];
+            // bytes.copy_from_slice(proof.next_aggregate_sync_committee.as_slice());
+            // let committee_hash = utils::hashing::get_committee_hash(G1Affine::from_compressed(&bytes).unwrap());
+            // println!("committee_hash: {:?}", committee_hash); 
+            // let header_root = bankai.client.get_block_root(next_committee_slot).await?;
+            // bankai.starknet_client.submit_committee_update(proof, header_root, &bankai.config).await?;
         }
     }
 
