@@ -55,9 +55,18 @@ impl Provable for SyncCommitteeUpdate {
         let dir_path = format!("batches/committee/{}", self.circuit_inputs.beacon_slot);
         fs::create_dir_all(&dir_path).map_err(|e| Error::IoError(e))?;
 
-        let path = format!("{}/input_{}.json", dir_path, self.id());
+        let path = format!("{}/input_{}.json", dir_path, self.circuit_inputs.beacon_slot);
         fs::write(path.clone(), json).map_err(|e| Error::IoError(e))?;
         Ok(path)
+    }
+
+    fn from_json<T>(slot: u64) -> Result<T, Error> 
+    where 
+        T: serde::de::DeserializeOwned,
+    {
+        let path = format!("batches/committee/{}/input_{}.json", slot, slot);
+        let json: String = fs::read_to_string(path).map_err(|e| Error::IoError(e))?;
+        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
     }
 
     fn pie_path(&self) -> String {

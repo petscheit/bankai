@@ -1,4 +1,4 @@
-use std::fs;
+use std::{env, fs};
 
 use crate::traits::Provable;
 use crate::Error;
@@ -70,11 +70,63 @@ impl AtlanticClient {
             .to_string())
     }
 
+    pub async fn submit_wrapped_proof(&self, proof: StarkProof) -> Result<String, Error> {
+        println!("Uploading to Atlantic!");
+        // Serialize the proof to JSON string
+        let proof_json = serde_json::to_string(&proof)
+            .map_err(|e| Error::DeserializeError(e.to_string()))?;
+
+        // Create a Part from the JSON string
+        let proof_part = Part::text(proof_json)
+            .file_name("proof.json")
+            .mime_str("application/json")
+            .map_err(|e| Error::AtlanticError(e))?;
+        
+        let verifier = fs::read("cairo-verifier/program.json").map_err(|e| Error::IoError(e))?;
+        let verifier_part = Part::bytes(verifier)
+            .file_name("program.json") // Provide a filename
+            .mime_str("application/json") // Specify MIME type
+            .map_err(|e| Error::AtlanticError(e))?;
+
+        // Build the form
+        let form = Form::new()
+            .part("programFile", verifier_part)
+            .part("inputFile", proof_part)
+            .text("cairoVersion", "0")
+            .text("mockFactHash", "false");
+
+        // Send the request
+        let response = self
+            .client
+            .post(format!("{}/v1/l2/atlantic-query", self.endpoint))
+            .query(&[("apiKey", &self.api_key)])
+            .header("accept", "application/json")
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| Error::AtlanticError(e))?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await.map_err(|e| Error::AtlanticError(e))?;
+            return Err(Error::InvalidResponse(format!("Request failed: {}", error_text)));
+        }
+
+        // Parse the response
+        let response_data: serde_json::Value =
+            response.json().await.map_err(|e| Error::AtlanticError(e))?;
+            
+        Ok(response_data["atlanticQueryId"]
+            .as_str()
+            .ok_or_else(|| Error::InvalidResponse("Missing atlanticQueryId".into()))?
+            .to_string())
+    }
+
     pub async fn fetch_proof(&self, batch_id: &str) -> Result<StarkProof, Error> {
         let response = self
             .client
             .get(format!(
-                "https://atlantic-queries.s3.nl-ams.scw.cloud/sharp_queries/query_{}/proof.json",
+                "{}/query_{}/proof.json",
+                env::var("PROOF_REGISTRY").unwrap(),
                 batch_id
             ))
             .header("accept", "application/json")

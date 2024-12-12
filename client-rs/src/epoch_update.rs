@@ -53,6 +53,15 @@ impl Provable for EpochUpdate {
         Ok(path)
     }
 
+    fn from_json<T>(slot: u64) -> Result<T, Error> 
+    where 
+        T: serde::de::DeserializeOwned,
+    {
+        let path = format!("batches/epoch/{}/input_{}.json", slot, slot);
+        let json = fs::read_to_string(path).map_err(|e| Error::IoError(e))?;
+        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
+    }
+
     fn pie_path(&self) -> String {
         format!(
             "batches/epoch/{}/pie_{}.zip",

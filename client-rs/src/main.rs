@@ -10,6 +10,7 @@ use contract_init::ContractInitializationData;
 use epoch_update::EpochUpdate;
 use starknet::core::types::Felt;
 use sync_committee::SyncCommitteeUpdate;
+use traits::Provable;
 use utils::{atlantic_client::AtlanticClient, cairo_runner::CairoRunner};
 use utils::{
     rpc::BeaconRpcClient,
@@ -129,13 +130,13 @@ enum Commands {
     //     export: Option<String>,
     // },
     // /// Generate contract initialization data for a given slot
-    // ContractInit {
-    //     #[arg(long, short)]
-    //     slot: u64,
-    //     /// Export output to a JSON file
-    //     #[arg(long, short)]
-    //     export: Option<String>,
-    // },
+    ContractInit {
+        #[arg(long, short)]
+        slot: u64,
+        /// Export output to a JSON file
+        #[arg(long, short)]
+        export: Option<String>,
+    },
     // DeployContract {
     //     #[arg(long, short)]
     //     slot: u64,
@@ -145,11 +146,27 @@ enum Commands {
     //     slot: u64,
     // },
     // SubmitNextEpoch,
-    // SubmitNextCommittee,
+    ProveNextCommittee,
     ProveNextEpoch,
     CheckBatchStatus {
         #[arg(long, short)]
         batch_id: String,
+    },
+    SubmitWrappedProof {
+        #[arg(long, short)]
+        batch_id: String,
+    },
+    VerifyNextEpoch {
+        #[arg(long, short)]
+        batch_id: String,
+        #[arg(long, short)]
+        slot: u64,
+    },
+    VerifyNextCommittee {
+        #[arg(long, short)]
+        batch_id: String,
+        #[arg(long, short)]
+        slot: u64,
     },
 }
 
@@ -203,23 +220,23 @@ async fn main() -> Result<(), Error> {
         //         println!("{}", json);
         //     }
         // }
-        // Commands::ContractInit { slot, export } => {
-        //     println!("ContractInit command received with slot: {}", slot);
-        //     let contract_init = bankai
-        //         .get_contract_initialization_data(slot, &bankai.config)
-        //         .await?;
-        //     let json = serde_json::to_string_pretty(&contract_init)
-        //         .map_err(|e| Error::DeserializeError(e.to_string()))?;
+        Commands::ContractInit { slot, export } => {
+            println!("ContractInit command received with slot: {}", slot);
+            let contract_init = bankai
+                .get_contract_initialization_data(slot, &bankai.config)
+                .await?;
+            let json = serde_json::to_string_pretty(&contract_init)
+                .map_err(|e| Error::DeserializeError(e.to_string()))?;
 
-        //     if let Some(path) = export {
-        //         match std::fs::write(path.clone(), json) {
-        //             Ok(_) => println!("Contract initialization data exported to {}", path),
-        //             Err(e) => return Err(Error::IoError(e)),
-        //         }
-        //     } else {
-        //         println!("{}", json);
-        //     }
-        // }
+            if let Some(path) = export {
+                match std::fs::write(path.clone(), json) {
+                    Ok(_) => println!("Contract initialization data exported to {}", path),
+                    Err(e) => return Err(Error::IoError(e)),
+                }
+            } else {
+                println!("{}", json);
+            }
+        }
         // Commands::DeployContract { slot } => {
         //     let contract_init = bankai
         //         .get_contract_initialization_data(slot, &bankai.config)
@@ -250,27 +267,32 @@ async fn main() -> Result<(), Error> {
         //     CairoRunner::generate_pie(proof, &bankai.config)?;
         //     // bankai.starknet_client.submit_update(proof.expected_circuit_outputs, &bankai.config).await?;
         // }
-        // Commands::SubmitNextCommittee => {
-        //     let latest_committee_id = bankai
-        //         .starknet_client
-        //         .get_latest_committee_id(&bankai.config)
-        //         .await?;
-        //     let lowest_committee_update_slot = (latest_committee_id) * Felt::from(0x2000);
-        //     println!("Min Slot Required: {}", lowest_committee_update_slot);
-        //     let latest_epoch = bankai
-        //         .starknet_client
-        //         .get_latest_epoch(&bankai.config)
-        //         .await?;
-        //     println!("Latest epoch: {}", latest_epoch);
-        //     if latest_epoch < lowest_committee_update_slot {
-        //         return Err(Error::RequiresNewerEpoch(latest_epoch));
-        //     }
-        //     let update = bankai
-        //         .get_sync_committee_update(latest_epoch.try_into().unwrap())
-        //         .await?;
-        //     CairoRunner::generate_pie(update, &bankai.config)?;
-        //     // bankai.starknet_client.submit_update(update.expected_circuit_outputs, &bankai.config).await?;
-        // }
+        Commands::CheckBatchStatus { batch_id } => {
+            let status = bankai.atlantic_client.check_batch_status(batch_id.as_str()).await?;
+            println!("Batch Status: {}", status);
+        }
+        Commands::ProveNextCommittee => {
+            let latest_committee_id = bankai
+                .starknet_client
+                .get_latest_committee_id(&bankai.config)
+                .await?;
+            let lowest_committee_update_slot = (latest_committee_id) * Felt::from(0x2000);
+            println!("Min Slot Required: {}", lowest_committee_update_slot);
+            let latest_epoch = bankai
+                .starknet_client
+                .get_latest_epoch(&bankai.config)
+                .await?;
+            println!("Latest epoch: {}", latest_epoch);
+            if latest_epoch < lowest_committee_update_slot {
+                return Err(Error::RequiresNewerEpoch(latest_epoch));
+            }
+            let update = bankai
+                .get_sync_committee_update(latest_epoch.try_into().unwrap())
+                .await?;
+            CairoRunner::generate_pie(&update, &bankai.config)?;
+            let batch_id = bankai.atlantic_client.submit_batch(update).await?;
+            println!("Batch Submitted: {}", batch_id);
+        }
         Commands::ProveNextEpoch => {
             let latest_epoch = bankai
                 .starknet_client
@@ -285,9 +307,35 @@ async fn main() -> Result<(), Error> {
             let batch_id = bankai.atlantic_client.submit_batch(proof).await?;
             println!("Batch Submitted: {}", batch_id);
         }
-        Commands::CheckBatchStatus { batch_id } => {
+        Commands::VerifyNextEpoch { batch_id, slot } => {
             let status = bankai.atlantic_client.check_batch_status(batch_id.as_str()).await?;
-            println!("Batch Status: {}", status);
+            if status == "DONE" {
+                let update = EpochUpdate::from_json::<EpochUpdate>(slot)?;
+                bankai.starknet_client.submit_update(update.expected_circuit_outputs, &bankai.config).await?;
+                println!("Successfully submitted epoch update");
+            } else {
+                println!("Batch not completed yet. Status: {}", status);
+            }
+        }
+        Commands::VerifyNextCommittee { batch_id, slot } => {
+            let status = bankai.atlantic_client.check_batch_status(batch_id.as_str()).await?;
+            if status == "DONE" {
+                let update = SyncCommitteeUpdate::from_json::<SyncCommitteeUpdate>(slot)?;
+                bankai.starknet_client.submit_update(update.expected_circuit_outputs, &bankai.config).await?;
+                println!("Successfully submitted sync committee update");
+            } else {
+                println!("Batch not completed yet. Status: {}", status);
+            }
+        }
+        Commands::SubmitWrappedProof { batch_id } => {
+            let status = bankai.atlantic_client.check_batch_status(batch_id.as_str()).await?;
+            if status == "DONE" {
+                let proof = bankai.atlantic_client.fetch_proof(batch_id.as_str()).await?;
+                let batch_id = bankai.atlantic_client.submit_wrapped_proof(proof).await?;
+                println!("Batch Submitted: {}", batch_id);
+            } else {
+                println!("Batch not completed yet. Status: {}", status);
+            }
         }
     }
 
