@@ -6,6 +6,7 @@ mod utils;
 
 use contract_init::ContractInitializationData;
 use epoch_update::EpochUpdate;
+use utils::cairo_runner::{CairoRunner};
 use starknet::core::types::Felt;
 use sync_committee::SyncCommitteeUpdate;
 use utils::{
@@ -32,6 +33,7 @@ pub enum Error {
     MissingRpcUrl,
     EmptySlotDetected(u64),
     RequiresNewerEpoch(Felt),
+    CairoRunError(String),
 }
 
 impl From<StarknetError> for Error {
@@ -46,17 +48,19 @@ struct BankaiConfig {
     committee_update_program_hash: Felt,
     epoch_update_program_hash: Felt,
     contract_path: String,
+    epoch_circuit_path: String,
+    committee_circuit_path: String,
 }
 
 impl Default for BankaiConfig {
     fn default() -> Self {
         Self {
             contract_class_hash: Felt::from_hex(
-                "0x05e54a08e87b40c3f3ec9fd9e10900e61a9d1a08f3b4d0d110b232c43a3661df",
+                "0x052c05f5027ad8f963168ebdf9d1518c938648681e43edd00807c28a71ea0b6a",
             )
             .unwrap(),
             contract_address: Felt::from_hex(
-                "0x20e2b7878473f235d41d74097bf4550715d37d1e591beb3762b09509e4942c4",
+                "0x3c36fad01f7a9a8e893e7983a80bffb9ff81079b30f56703cff75a2347d619f",
             )
             .unwrap(),
             committee_update_program_hash: Felt::from_hex(
@@ -64,10 +68,14 @@ impl Default for BankaiConfig {
             )
             .unwrap(),
             epoch_update_program_hash: Felt::from_hex(
-                "0x4b5e6a385a98eef562265f5c4769794cee3fecaaaefb47200d8d804c35c20d6",
+                "0x61c9a8dc4629396452bffa605c59c947a4a344d85c6496f591787f2b6c422db",
             )
             .unwrap(),
-            contract_path: "../contract/target/dev/bankai_BankaiContract.contract_class.json"
+            contract_path: "../contract/target/release/bankai_BankaiContract.contract_class.json"
+                .to_string(),
+            epoch_circuit_path: "../cairo/build/epoch_update.json"
+                .to_string(),
+            committee_circuit_path: "../cairo/build/committee_update.json"
                 .to_string(),
         }
     }
@@ -83,7 +91,7 @@ impl BankaiClient {
     pub async fn new(rpc_url: String) -> Self {
         Self {
             client: BeaconRpcClient::new(rpc_url),
-            starknet_client: StarknetClient::new("http://127.0.0.1:5050").await.unwrap(),
+            starknet_client: StarknetClient::new("https://free-rpc.nethermind.io/sepolia-juno/v0_7").await.unwrap(),
             config: BankaiConfig::default(),
         }
     }
@@ -255,7 +263,8 @@ async fn main() -> Result<(), Error> {
             let next_epoch = (u64::try_from(latest_epoch).unwrap() / 32) * 32 + 32;
             println!("Next epoch: {}", next_epoch);
             let proof = bankai.get_epoch_proof(next_epoch).await?;
-            bankai.starknet_client.submit_update(proof.expected_circuit_outputs, &bankai.config).await?;
+            CairoRunner::generate_pie(proof, &bankai.config)?;
+            // bankai.starknet_client.submit_update(proof.expected_circuit_outputs, &bankai.config).await?;
         }
         Commands::SubmitNextCommittee => {
             let latest_committee_id = bankai
@@ -270,7 +279,8 @@ async fn main() -> Result<(), Error> {
                 return Err(Error::RequiresNewerEpoch(latest_epoch));
             }
             let update = bankai.get_sync_committee_update(latest_epoch.try_into().unwrap()).await?;
-            bankai.starknet_client.submit_update(update.expected_circuit_outputs, &bankai.config).await?;
+            CairoRunner::generate_pie(update, &bankai.config)?;
+            // bankai.starknet_client.submit_update(update.expected_circuit_outputs, &bankai.config).await?;
         }
     }
 

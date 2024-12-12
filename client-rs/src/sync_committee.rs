@@ -1,3 +1,6 @@
+use std::fs;
+
+use crate::traits::{ProofType, Provable};
 use crate::utils::rpc::BeaconRpcClient;
 use crate::Error;
 use crate::{
@@ -36,6 +39,34 @@ impl SyncCommitteeUpdate {
             circuit_inputs,
             expected_circuit_outputs,
         })
+    }
+}
+
+impl Provable for SyncCommitteeUpdate {
+    fn id(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"committee_update");
+        hasher.update(self.circuit_inputs.beacon_slot.to_be_bytes());
+        hex::encode(hasher.finalize().as_slice())
+    }
+
+    fn export(&self) -> Result<String, Error> {
+        let json = serde_json::to_string_pretty(&self).unwrap();
+        let dir_path = format!("batches/committee/{}", self.circuit_inputs.beacon_slot);
+        fs::create_dir_all(&dir_path).map_err(|e| Error::IoError(e))?;
+        
+        let path = format!("{}/input_{}.json", dir_path, self.id());
+        fs::write(path.clone(), json).map_err(|e| Error::IoError(e))?;
+        Ok(path)
+    }
+
+    fn pie_path(&self) -> String {
+        format!("batches/committee/{}/pie_{}.zip", self.circuit_inputs.beacon_slot, self.id())
+    }
+
+
+    fn proof_type(&self) -> ProofType {
+        ProofType::SyncCommittee
     }
 }
 
