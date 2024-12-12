@@ -5,11 +5,11 @@ pub struct EpochProof {
     n_signers: u64,
 }
 
-
 #[starknet::interface]
 pub trait IBankaiContract<TContractState> {
     fn get_committee_hash(self: @TContractState, committee_id: u64) -> u256;
     fn get_latest_epoch(self: @TContractState) -> u64;
+    fn get_latest_committee_id(self: @TContractState) -> u64;
     fn get_committee_update_program_hash(self: @TContractState) -> felt252;
     fn get_epoch_update_program_hash(self: @TContractState) -> felt252;
     fn get_epoch_proof(self: @TContractState, slot: u64) -> EpochProof;
@@ -26,6 +26,7 @@ pub trait IBankaiContract<TContractState> {
     );
 }
 
+pub mod utils;
 #[starknet::contract]
 pub mod BankaiContract {
     use super::EpochProof;
@@ -34,8 +35,8 @@ pub mod BankaiContract {
         StoragePointerWriteAccess,
     };
     use starknet::{ContractAddress, get_caller_address};
-    use integrity::{calculate_bootloaded_fact_hash, SHARP_BOOTLOADER_PROGRAM_HASH};
-
+    use integrity::{Integrity, IntegrityWithConfig, SHARP_BOOTLOADER_PROGRAM_HASH, VerifierConfiguration};
+    use crate::utils::{calculate_wrapped_bootloaded_fact_hash, WRAPPER_PROGRAM_HASH};
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
@@ -57,6 +58,7 @@ pub mod BankaiContract {
         epochs: Map::<u64, EpochProof>, // maps beacon slot to header root and state root
         owner: ContractAddress,
         latest_epoch: u64,
+        latest_committee_id: u64,
         initialization_committee: u64,
         committee_update_program_hash: felt252,
         epoch_update_program_hash: felt252,
@@ -75,6 +77,7 @@ pub mod BankaiContract {
 
         // Write trusted initial committee
         self.initialization_committee.write(committee_id);
+        self.latest_committee_id.write(committee_id);
         self.committee.write(committee_id, committee_hash);
 
         // Write the program hashes to the contract storage
@@ -90,6 +93,10 @@ pub mod BankaiContract {
 
         fn get_latest_epoch(self: @ContractState) -> u64 {
             self.latest_epoch.read()
+        }
+
+        fn get_latest_committee_id(self: @ContractState) -> u64 {
+            self.latest_committee_id.read()
         }
 
         fn get_committee_update_program_hash(self: @ContractState) -> felt252 {
@@ -111,15 +118,17 @@ pub mod BankaiContract {
             assert(state_root == epoch_proof.state_root, 'Invalid State Root!');
 
             // for now we dont ensure the fact hash is valid
-            let fact_hash = compute_wrapped_committee_proof_fact_hash(
+            let fact_hash = compute_committee_proof_fact_hash(
                 @self, state_root, committee_hash, slot,
             );
-            assert(fact_hash == fact_hash, 'Invalid Fact Hash!');
+            // println!("fact_hash: {:?}", fact_hash);
+            assert(is_valid_fact_hash(fact_hash), 'Invalid Fact Hash!');
 
             // The new committee is always assigned at the start of the previous committee
             let new_committee_id = (slot / 0x2000) + 1;
 
             self.committee.write(new_committee_id, committee_hash);
+            self.latest_committee_id.write(new_committee_id);
             self
                 .emit(
                     Event::CommitteeUpdated(
@@ -138,6 +147,7 @@ pub mod BankaiContract {
             n_signers: u64,
             slot: u64,
         ) {
+            // println!("verify_epoch_update");
             let signing_committee_id = (slot / 0x2000);
             let valid_committee_hash = self.committee.read(signing_committee_id);
             assert(committee_hash == valid_committee_hash, 'Invalid Committee Hash!');
@@ -145,7 +155,9 @@ pub mod BankaiContract {
             let fact_hash = compute_epoch_proof_fact_hash(
                 @self, header_root, state_root, committee_hash, n_signers, slot,
             );
-            assert(fact_hash == fact_hash, 'Invalid Fact Hash!');
+
+            // println!("fact_hash: {:?}", fact_hash);
+            assert(is_valid_fact_hash(fact_hash), 'Invalid Fact Hash!');
 
             let epoch_proof = EpochProof {
                 header_root: header_root, state_root: state_root, n_signers: n_signers,
@@ -160,10 +172,11 @@ pub mod BankaiContract {
         }
     }
 
-    fn compute_wrapped_committee_proof_fact_hash(
+    fn compute_committee_proof_fact_hash(
         self: @ContractState, state_root: u256, committee_hash: u256, slot: u64,
     ) -> felt252 {
-        let fact_hash = calculate_bootloaded_fact_hash(
+        let fact_hash = calculate_wrapped_bootloaded_fact_hash(
+            WRAPPER_PROGRAM_HASH,
             SHARP_BOOTLOADER_PROGRAM_HASH,
             self.committee_update_program_hash.read(),
             [
@@ -183,7 +196,8 @@ pub mod BankaiContract {
         n_signers: u64,
         slot: u64,
     ) -> felt252 {
-        let fact_hash = calculate_bootloaded_fact_hash(
+        let fact_hash = calculate_wrapped_bootloaded_fact_hash(
+            WRAPPER_PROGRAM_HASH,
             SHARP_BOOTLOADER_PROGRAM_HASH,
             self.epoch_update_program_hash.read(),
             [
@@ -194,6 +208,19 @@ pub mod BankaiContract {
                 .span(),
         );
         return fact_hash;
+    }
+
+    fn is_valid_fact_hash(fact_hash: felt252) -> bool {
+        let config = VerifierConfiguration {
+            layout: 'recursive_with_poseidon',
+            hasher: 'keccak_160_lsb',
+            stone_version: 'stone6',
+            memory_verification: 'relaxed',
+        };
+        let SECURITY_BITS = 96;
+
+        let integrity = Integrity::new().with_config(config, SECURITY_BITS);
+        integrity.is_fact_hash_valid(fact_hash)
     }
 }
 

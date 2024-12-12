@@ -33,8 +33,9 @@ else
     echo "starknet-devnet is already installed via asdf"
 fi
 
-# Install starkli
-cargo install --locked --git https://github.com/xJonathanLEI/starkli
+# Install sn foundry
+curl -L https://raw.githubusercontent.com/foundry-rs/starknet-foundry/master/scripts/install.sh | sh
+snfoundryup
 
 echo "Setting up starknet-devnet Account..."
 if [ ! -f "account.json" ]; then
