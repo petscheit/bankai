@@ -16,7 +16,7 @@ use starknet::{core::types::Felt, macros::selector};
 use tree_hash::TreeHash;
 use tree_hash_derive::TreeHash;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdate {
     pub circuit_inputs: EpochCircuitInputs,
     pub expected_circuit_outputs: ExpectedCircuitOutputs,
@@ -45,13 +45,19 @@ impl Provable for EpochUpdate {
         let json = serde_json::to_string_pretty(&self).unwrap();
         let dir_path = format!("batches/epoch/{}", self.circuit_inputs.header.slot);
         fs::create_dir_all(dir_path.clone()).map_err(|e| Error::IoError(e))?;
-        let path = format!("{}/input_{}.json", dir_path, self.circuit_inputs.header.slot);
+        let path = format!(
+            "{}/input_{}.json",
+            dir_path, self.circuit_inputs.header.slot
+        );
         fs::write(path.clone(), json).map_err(|e| Error::IoError(e))?;
         Ok(path)
     }
 
     fn pie_path(&self) -> String {
-        format!("batches/epoch/{}/pie_{}.zip", self.circuit_inputs.header.slot, self.circuit_inputs.header.slot)
+        format!(
+            "batches/epoch/{}/pie_{}.zip",
+            self.circuit_inputs.header.slot, self.circuit_inputs.header.slot
+        )
     }
 
     fn proof_type(&self) -> ProofType {
@@ -60,16 +66,17 @@ impl Provable for EpochUpdate {
 }
 
 /// Contains all necessary inputs for generating and verifying epoch proofs
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct EpochCircuitInputs {
     /// The beacon chain block header
     pub header: BeaconHeader,
     /// BLS signature point in G2
-    pub signature_point: G2Affine,
+    pub signature_point: G2Point,
     /// Aggregate public key of all validators
-    pub aggregate_pub: G1Affine,
+    #[serde(rename = "committee_pub")]
+    pub aggregate_pub: G1Point,
     /// Public keys of validators who didn't sign
-    pub non_signers: Vec<G1Affine>,
+    pub non_signers: Vec<G1Point>,
 }
 
 /// Represents a beacon chain block header
@@ -163,17 +170,17 @@ impl EpochCircuitInputs {
         Ok(EpochCircuitInputs {
             header: header.into(),
             signature_point,
-            aggregate_pub: validator_pubs.aggregate_pub,
-            non_signers,
+            aggregate_pub: G1Point(validator_pubs.aggregate_pub),
+            non_signers: non_signers.iter().map(|p| G1Point(*p)).collect(),
         })
     }
 
     /// Extracts and validates the BLS signature point from the sync aggregate
-    fn extract_signature_point(sync_agg: &SyncAggregate) -> Result<G2Affine, Error> {
+    fn extract_signature_point(sync_agg: &SyncAggregate) -> Result<G2Point, Error> {
         let mut bytes = [0u8; 96];
         bytes.copy_from_slice(&sync_agg.sync_committee_signature.0);
         match G2Affine::from_compressed(&bytes).into() {
-            Some(point) => Ok(point),
+            Some(point) => Ok(G2Point(point)),
             None => Err(Error::InvalidBLSPoint),
         }
     }
@@ -214,78 +221,145 @@ impl From<HeaderResponse> for BeaconHeader {
     }
 }
 
-// ToDo: I should wrap the G1Affine and g2Affine type to remove the monstrocity
-impl Serialize for EpochCircuitInputs {
+#[derive(Debug)]
+pub struct G1Point(G1Affine);
+#[derive(Debug)]
+pub struct G2Point(G2Affine);
+
+impl Serialize for G1Point {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("EpochProofInputs", 4)?;
-
-        state.serialize_field("header", &self.header)?;
-
-        let uncompressed = self.signature_point.to_uncompressed();
-
-        let mut x0 = [0u8; 48];
-        let mut x1 = [0u8; 48];
-        let mut y0 = [0u8; 48];
-        let mut y1 = [0u8; 48];
-
-        x1.copy_from_slice(&uncompressed.as_ref()[0..48]);
-        x0.copy_from_slice(&uncompressed.as_ref()[48..96]);
-        y1.copy_from_slice(&uncompressed.as_ref()[96..144]);
-        y0.copy_from_slice(&uncompressed.as_ref()[144..192]);
-
-        // Serialize G2Affine signature point directly
-        state.serialize_field(
-            "signature_point",
-            &serde_json::json!({
-                "x0": format!("0x{}", hex::encode(x0)),
-                "x1": format!("0x{}", hex::encode(x1)),
-                "y0": format!("0x{}", hex::encode(y0)),
-                "y1": format!("0x{}", hex::encode(y1))
-            }),
-        )?;
-        let uncompressed = self.aggregate_pub.to_uncompressed();
-
+        let uncompressed = self.0.to_uncompressed();
         let mut x_bytes = [0u8; 48];
         let mut y_bytes = [0u8; 48];
 
         x_bytes.copy_from_slice(&uncompressed.as_ref()[0..48]);
         y_bytes.copy_from_slice(&uncompressed.as_ref()[48..96]);
 
-        // Serialize G1Affine aggregate pub directly
-        state.serialize_field(
-            "committee_pub",
-            &serde_json::json!({
-                "x": format!("0x{}", hex::encode(x_bytes)),
-                "y": format!("0x{}", hex::encode(y_bytes))
-            }),
-        )?;
-
-        let non_signers = self
-            .non_signers
-            .iter()
-            .map(|p| {
-                let uncompressed = p.to_uncompressed();
-                let mut x_bytes = [0u8; 48];
-                let mut y_bytes = [0u8; 48];
-                x_bytes.copy_from_slice(&uncompressed.as_ref()[0..48]);
-                y_bytes.copy_from_slice(&uncompressed.as_ref()[48..96]);
-                serde_json::json!({
-                    "x": format!("0x{}", hex::encode(x_bytes)),
-                    "y": format!("0x{}", hex::encode(y_bytes))
-                })
-            })
-            .collect::<Vec<_>>();
-        state.serialize_field("non_signers", &non_signers)?;
-
-        state.end()
+        serde_json::json!({
+            "x": format!("0x{}", hex::encode(x_bytes)),
+            "y": format!("0x{}", hex::encode(y_bytes))
+        })
+        .serialize(serializer)
     }
 }
 
-#[derive(Debug, Serialize)]
+impl Serialize for G2Point {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let uncompressed = self.0.to_uncompressed();
+        let mut x0_bytes = [0u8; 48];
+        let mut x1_bytes = [0u8; 48];
+        let mut y0_bytes = [0u8; 48];
+        let mut y1_bytes = [0u8; 48];
+        x0_bytes.copy_from_slice(&uncompressed.as_ref()[48..96]);
+        x1_bytes.copy_from_slice(&uncompressed.as_ref()[0..48]);
+        y0_bytes.copy_from_slice(&uncompressed.as_ref()[144..192]);
+        y1_bytes.copy_from_slice(&uncompressed.as_ref()[96..144]);
+        serde_json::json!({
+            "x0": format!("0x{}", hex::encode(x0_bytes)),
+            "x1": format!("0x{}", hex::encode(x1_bytes)),
+            "y0": format!("0x{}", hex::encode(y0_bytes)),
+            "y1": format!("0x{}", hex::encode(y1_bytes))
+        })
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for G1Point {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        // Deserialize into a Value first
+        let value: serde_json::Value = serde_json::Value::deserialize(deserializer)?;
+
+        // Extract x and y coordinates
+        let x_str = value["x"]
+            .as_str()
+            .ok_or_else(|| serde::de::Error::custom("missing x coordinate"))?;
+        let y_str = value["y"]
+            .as_str()
+            .ok_or_else(|| serde::de::Error::custom("missing y coordinate"))?;
+
+        // Safely remove "0x" prefix if it exists
+        let x_hex = x_str.strip_prefix("0x").unwrap_or(x_str);
+        let y_hex = y_str.strip_prefix("0x").unwrap_or(y_str);
+
+        let x_bytes = hex::decode(x_hex)
+            .map_err(|e| serde::de::Error::custom(format!("invalid x hex: {}", e)))?;
+        let y_bytes = hex::decode(y_hex)
+            .map_err(|e| serde::de::Error::custom(format!("invalid y hex: {}", e)))?;
+
+        // Combine into uncompressed format
+        let mut uncompressed = [0u8; 96];
+        uncompressed[0..48].copy_from_slice(&x_bytes);
+        uncompressed[48..96].copy_from_slice(&y_bytes);
+
+        // Convert to G1Affine point
+        let point = G1Affine::from_uncompressed(&uncompressed).unwrap();
+
+        Ok(G1Point(point))
+    }
+}
+
+impl<'de> Deserialize<'de> for G2Point {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        // Deserialize into a Value first
+        let value: serde_json::Value = serde_json::Value::deserialize(deserializer)?;
+
+        // Extract coordinates
+        let x0_str = value["x0"]
+            .as_str()
+            .ok_or_else(|| serde::de::Error::custom("missing x0 coordinate"))?;
+        let x1_str = value["x1"]
+            .as_str()
+            .ok_or_else(|| serde::de::Error::custom("missing x1 coordinate"))?;
+        let y0_str = value["y0"]
+            .as_str()
+            .ok_or_else(|| serde::de::Error::custom("missing y0 coordinate"))?;
+        let y1_str = value["y1"]
+            .as_str()
+            .ok_or_else(|| serde::de::Error::custom("missing y1 coordinate"))?;
+
+        // Safely remove "0x" prefix if it exists
+        let x0_hex = x0_str.strip_prefix("0x").unwrap_or(x0_str);
+        let x1_hex = x1_str.strip_prefix("0x").unwrap_or(x1_str);
+        let y0_hex = y0_str.strip_prefix("0x").unwrap_or(y0_str);
+        let y1_hex = y1_str.strip_prefix("0x").unwrap_or(y1_str);
+
+        // Decode hex strings to bytes
+        let x0_bytes = hex::decode(x0_hex)
+            .map_err(|e| serde::de::Error::custom(format!("invalid x0 hex: {}", e)))?;
+        let x1_bytes = hex::decode(x1_hex)
+            .map_err(|e| serde::de::Error::custom(format!("invalid x1 hex: {}", e)))?;
+        let y0_bytes = hex::decode(y0_hex)
+            .map_err(|e| serde::de::Error::custom(format!("invalid y0 hex: {}", e)))?;
+        let y1_bytes = hex::decode(y1_hex)
+            .map_err(|e| serde::de::Error::custom(format!("invalid y1 hex: {}", e)))?;
+
+        // Combine into uncompressed format
+        let mut uncompressed = [0u8; 192];
+        uncompressed[0..48].copy_from_slice(&x1_bytes);
+        uncompressed[48..96].copy_from_slice(&x0_bytes);
+        uncompressed[96..144].copy_from_slice(&y1_bytes);
+        uncompressed[144..192].copy_from_slice(&y0_bytes);
+
+        // Convert to G2Affine point
+        let point = G2Affine::from_uncompressed(&uncompressed).unwrap();
+
+        Ok(G2Point(point))
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ExpectedCircuitOutputs {
     pub header_root: FixedBytes<32>,
     pub state_root: FixedBytes<32>,
@@ -299,7 +373,7 @@ impl Submittable<EpochCircuitInputs> for ExpectedCircuitOutputs {
         Self {
             header_root: circuit_inputs.header.tree_hash_root(),
             state_root: circuit_inputs.header.state_root,
-            committee_hash: get_committee_hash(circuit_inputs.aggregate_pub),
+            committee_hash: get_committee_hash(circuit_inputs.aggregate_pub.0),
             n_signers: 512 - circuit_inputs.non_signers.len() as u64,
             slot: circuit_inputs.header.slot,
         }

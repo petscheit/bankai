@@ -62,7 +62,7 @@ impl BeaconRpcClient {
     /// the previous slot's header.
     pub async fn get_sync_aggregate(&self, mut slot: u64) -> Result<SyncAggregate, Error> {
         slot += 1; // signature is in the next slot
-        // Ensure the slot is not missed and increment in case it is
+                   // Ensure the slot is not missed and increment in case it is
         match self.get_header(slot).await {
             Ok(header) => header,
             Err(Error::EmptySlotDetected(_)) => {
@@ -76,7 +76,7 @@ impl BeaconRpcClient {
         let json = self
             .get_json(&format!("eth/v2/beacon/blocks/{}", slot))
             .await?;
-        
+
         serde_json::from_value(json["data"]["message"]["body"]["sync_aggregate"].clone())
             .map_err(|e| Error::DeserializeError(e.to_string()))
     }

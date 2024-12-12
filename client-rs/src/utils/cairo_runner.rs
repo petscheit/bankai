@@ -1,25 +1,11 @@
-use crate::{traits::Provable, Error};
-use serde::Serialize;
 use crate::traits::ProofType;
 use crate::BankaiConfig;
-pub struct AtlanticClient {
-    endpoint: String,
-    api_key: String,
-    pub client: reqwest::Client,
-}
-
-impl AtlanticClient {
-    pub fn new(endpoint: String, api_key: String) -> Self {
-        Self { endpoint, api_key, client: reqwest::Client::new() }
-    }
-
-    
-}
+use crate::{traits::Provable, Error};
 
 pub struct CairoRunner();
 
 impl CairoRunner {
-   pub fn generate_pie(input: impl Provable, config: &BankaiConfig) -> Result<(), Error> {
+    pub fn generate_pie(input: &impl Provable, config: &BankaiConfig) -> Result<(), Error> {
         let input_path = input.export()?;
 
         let program_path = match input.proof_type() {
@@ -47,7 +33,7 @@ impl CairoRunner {
 
         if !output.status.success() {
             return Err(Error::CairoRunError(
-                String::from_utf8_lossy(&output.stderr).to_string()
+                String::from_utf8_lossy(&output.stderr).to_string(),
             ));
         } else {
             println!("Trace generated successfully in {:.2?}!", duration);

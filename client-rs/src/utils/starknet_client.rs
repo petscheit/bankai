@@ -33,16 +33,13 @@ pub enum StarknetError {
 }
 
 impl StarknetClient {
-    pub async fn new(rpc_url: &str) -> Result<Self, StarknetError> {
+    pub async fn new(rpc_url: &str, address: &str, priv_key: &str) -> Result<Self, StarknetError> {
         let provider = JsonRpcClient::new(HttpTransport::new(Url::parse(rpc_url).unwrap()));
 
         let signer = LocalWallet::from(SigningKey::from_secret_scalar(
-            Felt::from_hex("")
-                .unwrap(),
+            Felt::from_hex(priv_key).unwrap(),
         ));
-        let address =
-            Felt::from_hex("")
-                .unwrap();
+        let address = Felt::from_hex(address).unwrap();
         let mut account = SingleOwnerAccount::new(
             provider,
             signer,

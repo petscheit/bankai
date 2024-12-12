@@ -11,12 +11,12 @@ use alloy_primitives::FixedBytes;
 use beacon_state_proof::state_proof_fetcher::StateProofFetcher;
 use beacon_state_proof::state_proof_fetcher::{SyncCommitteeProof, TreeHash};
 use bls12_381::G1Affine;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use starknet::core::types::Felt;
 use starknet::macros::selector;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SyncCommitteeUpdate {
     /// The circuit inputs
     pub circuit_inputs: CommitteeCircuitInputs,
@@ -54,16 +54,19 @@ impl Provable for SyncCommitteeUpdate {
         let json = serde_json::to_string_pretty(&self).unwrap();
         let dir_path = format!("batches/committee/{}", self.circuit_inputs.beacon_slot);
         fs::create_dir_all(&dir_path).map_err(|e| Error::IoError(e))?;
-        
+
         let path = format!("{}/input_{}.json", dir_path, self.id());
         fs::write(path.clone(), json).map_err(|e| Error::IoError(e))?;
         Ok(path)
     }
 
     fn pie_path(&self) -> String {
-        format!("batches/committee/{}/pie_{}.zip", self.circuit_inputs.beacon_slot, self.id())
+        format!(
+            "batches/committee/{}/pie_{}.zip",
+            self.circuit_inputs.beacon_slot,
+            self.id()
+        )
     }
-
 
     fn proof_type(&self) -> ProofType {
         ProofType::SyncCommittee
@@ -72,7 +75,7 @@ impl Provable for SyncCommitteeUpdate {
 
 /// Represents a proof for updating the sync committee, containing necessary verification data
 /// for validating sync committee transitions in the beacon chain.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CommitteeCircuitInputs {
     /// The beacon chain slot number for this proof
     pub beacon_slot: u64,
@@ -110,7 +113,7 @@ impl CommitteeCircuitInputs {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ExpectedCircuitOutputs {
     /// The state root containing the new sync committee.
     pub state_root: FixedBytes<32>,
@@ -136,7 +139,7 @@ impl Submittable<CommitteeCircuitInputs> for ExpectedCircuitOutputs {
 
     fn to_calldata(&self) -> Vec<Felt> {
         let (state_root_high, state_root_low) = self.state_root.as_slice().split_at(16);
-        let (committee_hash_high, committee_hash_low) = self.committee_hash.as_slice().split_at(16);    
+        let (committee_hash_high, committee_hash_low) = self.committee_hash.as_slice().split_at(16);
         vec![
             Felt::from_bytes_be_slice(state_root_low),
             Felt::from_bytes_be_slice(state_root_high),
