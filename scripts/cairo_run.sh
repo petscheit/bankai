@@ -7,8 +7,13 @@ PROGRAM="epoch_update"  # Default program
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --pie)
-            PIE_FLAG="--cairo_pie_output=pie.zip"
+         --pie)
+            # Set PIE name based on program type
+            if [ "$PROGRAM" = "committee_update" ]; then
+                PIE_FLAG="--cairo_pie_output=committee_pie.zip"
+            else
+                PIE_FLAG="--cairo_pie_output=epoch_pie.zip"
+            fi
             shift
             ;;
         --committee)

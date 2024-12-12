@@ -3,7 +3,7 @@ use std::{env, fs};
 use crate::traits::Provable;
 use crate::Error;
 use reqwest::multipart::{Form, Part};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 pub struct AtlanticClient {
     endpoint: String,
     api_key: String,
@@ -28,11 +28,11 @@ impl AtlanticClient {
         let pie_path = batch.pie_path();
 
         // Read the file as bytes
-        let file_bytes = fs::read(&pie_path).map_err(|e| Error::IoError(e))?;
+        let file_bytes = fs::read(&pie_path).map_err(Error::IoError)?;
         let file_part = Part::bytes(file_bytes)
             .file_name(pie_path) // Provide a filename
             .mime_str("application/zip") // Specify MIME type
-            .map_err(|e| Error::AtlanticError(e))?;
+            .map_err(Error::AtlanticError)?;
 
         // Build the form
         let form = Form::new()
@@ -50,20 +50,22 @@ impl AtlanticClient {
             .multipart(form)
             .send()
             .await
-            .map_err(|e| Error::AtlanticError(e))?;
+            .map_err(Error::AtlanticError)?;
 
         if !response.status().is_success() {
             println!("Error status: {}", response.status());
-            let error_text = response.text().await.map_err(|e| Error::AtlanticError(e))?;
+            let error_text = response.text().await.map_err(Error::AtlanticError)?;
             println!("Error response: {}", error_text);
-            return Err(Error::InvalidResponse(format!("Request failed: {}", error_text)));
+            return Err(Error::InvalidResponse(format!(
+                "Request failed: {}",
+                error_text
+            )));
         }
 
         // Parse the response
         let response_data: serde_json::Value =
-            response.json().await.map_err(|e| Error::AtlanticError(e))?;
+            response.json().await.map_err(Error::AtlanticError)?;
 
-            
         Ok(response_data["atlanticQueryId"]
             .as_str()
             .ok_or_else(|| Error::InvalidResponse("Missing atlanticQueryId".into()))?
@@ -73,20 +75,20 @@ impl AtlanticClient {
     pub async fn submit_wrapped_proof(&self, proof: StarkProof) -> Result<String, Error> {
         println!("Uploading to Atlantic!");
         // Serialize the proof to JSON string
-        let proof_json = serde_json::to_string(&proof)
-            .map_err(|e| Error::DeserializeError(e.to_string()))?;
+        let proof_json =
+            serde_json::to_string(&proof).map_err(|e| Error::DeserializeError(e.to_string()))?;
 
         // Create a Part from the JSON string
         let proof_part = Part::text(proof_json)
             .file_name("proof.json")
             .mime_str("application/json")
-            .map_err(|e| Error::AtlanticError(e))?;
-        
-        let verifier = fs::read("cairo-verifier/program.json").map_err(|e| Error::IoError(e))?;
+            .map_err(Error::AtlanticError)?;
+
+        let verifier = fs::read("cairo-verifier/program.json").map_err(Error::IoError)?;
         let verifier_part = Part::bytes(verifier)
             .file_name("program.json") // Provide a filename
             .mime_str("application/json") // Specify MIME type
-            .map_err(|e| Error::AtlanticError(e))?;
+            .map_err(Error::AtlanticError)?;
 
         // Build the form
         let form = Form::new()
@@ -104,17 +106,20 @@ impl AtlanticClient {
             .multipart(form)
             .send()
             .await
-            .map_err(|e| Error::AtlanticError(e))?;
+            .map_err(Error::AtlanticError)?;
 
         if !response.status().is_success() {
-            let error_text = response.text().await.map_err(|e| Error::AtlanticError(e))?;
-            return Err(Error::InvalidResponse(format!("Request failed: {}", error_text)));
+            let error_text = response.text().await.map_err(Error::AtlanticError)?;
+            return Err(Error::InvalidResponse(format!(
+                "Request failed: {}",
+                error_text
+            )));
         }
 
         // Parse the response
         let response_data: serde_json::Value =
-            response.json().await.map_err(|e| Error::AtlanticError(e))?;
-            
+            response.json().await.map_err(Error::AtlanticError)?;
+
         Ok(response_data["atlanticQueryId"]
             .as_str()
             .ok_or_else(|| Error::InvalidResponse("Missing atlanticQueryId".into()))?
@@ -132,10 +137,10 @@ impl AtlanticClient {
             .header("accept", "application/json")
             .send()
             .await
-            .map_err(|e| Error::AtlanticError(e))?;
+            .map_err(Error::AtlanticError)?;
 
         let response_data: serde_json::Value =
-            response.json().await.map_err(|e| Error::AtlanticError(e))?;
+            response.json().await.map_err(Error::AtlanticError)?;
 
         Ok(StarkProof {
             proof: response_data,
@@ -150,10 +155,10 @@ impl AtlanticClient {
             .header("accept", "application/json")
             .send()
             .await
-            .map_err(|e| Error::AtlanticError(e))?;
+            .map_err(Error::AtlanticError)?;
 
-        let response_data: serde_json::Value = 
-            response.json().await.map_err(|e| Error::AtlanticError(e))?;
+        let response_data: serde_json::Value =
+            response.json().await.map_err(Error::AtlanticError)?;
 
         let status = response_data["atlanticQuery"]["status"]
             .as_str()

@@ -14,6 +14,7 @@ venv
 .DS_Store
 
 pie.zip
+*pie.zip
 *.log
 pie.encoded.txt
 
@@ -23,3 +24,7 @@ epoch_input.json
 nimbus-data
 
 **/*.pyc
+
+client-rs/batches
+
+**/.env*

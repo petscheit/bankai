@@ -268,7 +268,10 @@ async fn main() -> Result<(), Error> {
         //     // bankai.starknet_client.submit_update(proof.expected_circuit_outputs, &bankai.config).await?;
         // }
         Commands::CheckBatchStatus { batch_id } => {
-            let status = bankai.atlantic_client.check_batch_status(batch_id.as_str()).await?;
+            let status = bankai
+                .atlantic_client
+                .check_batch_status(batch_id.as_str())
+                .await?;
             println!("Batch Status: {}", status);
         }
         Commands::ProveNextCommittee => {
@@ -308,29 +311,47 @@ async fn main() -> Result<(), Error> {
             println!("Batch Submitted: {}", batch_id);
         }
         Commands::VerifyNextEpoch { batch_id, slot } => {
-            let status = bankai.atlantic_client.check_batch_status(batch_id.as_str()).await?;
+            let status = bankai
+                .atlantic_client
+                .check_batch_status(batch_id.as_str())
+                .await?;
             if status == "DONE" {
                 let update = EpochUpdate::from_json::<EpochUpdate>(slot)?;
-                bankai.starknet_client.submit_update(update.expected_circuit_outputs, &bankai.config).await?;
+                bankai
+                    .starknet_client
+                    .submit_update(update.expected_circuit_outputs, &bankai.config)
+                    .await?;
                 println!("Successfully submitted epoch update");
             } else {
                 println!("Batch not completed yet. Status: {}", status);
             }
         }
         Commands::VerifyNextCommittee { batch_id, slot } => {
-            let status = bankai.atlantic_client.check_batch_status(batch_id.as_str()).await?;
+            let status = bankai
+                .atlantic_client
+                .check_batch_status(batch_id.as_str())
+                .await?;
             if status == "DONE" {
                 let update = SyncCommitteeUpdate::from_json::<SyncCommitteeUpdate>(slot)?;
-                bankai.starknet_client.submit_update(update.expected_circuit_outputs, &bankai.config).await?;
+                bankai
+                    .starknet_client
+                    .submit_update(update.expected_circuit_outputs, &bankai.config)
+                    .await?;
                 println!("Successfully submitted sync committee update");
             } else {
                 println!("Batch not completed yet. Status: {}", status);
             }
         }
         Commands::SubmitWrappedProof { batch_id } => {
-            let status = bankai.atlantic_client.check_batch_status(batch_id.as_str()).await?;
+            let status = bankai
+                .atlantic_client
+                .check_batch_status(batch_id.as_str())
+                .await?;
             if status == "DONE" {
-                let proof = bankai.atlantic_client.fetch_proof(batch_id.as_str()).await?;
+                let proof = bankai
+                    .atlantic_client
+                    .fetch_proof(batch_id.as_str())
+                    .await?;
                 let batch_id = bankai.atlantic_client.submit_wrapped_proof(proof).await?;
                 println!("Batch Submitted: {}", batch_id);
             } else {

@@ -1,4 +1,4 @@
-use serde::{Serialize};
+use serde::Serialize;
 use starknet::core::types::Felt;
 
 use crate::Error;
@@ -18,7 +18,9 @@ pub enum ProofType {
 pub trait Provable: Serialize {
     fn id(&self) -> String;
     fn export(&self) -> Result<String, Error>;
-    fn from_json<T>(slot: u64) -> Result<T, Error> where T: serde::de::DeserializeOwned;
+    fn from_json<T>(slot: u64) -> Result<T, Error>
+    where
+        T: serde::de::DeserializeOwned;
     fn proof_type(&self) -> ProofType;
     fn pie_path(&self) -> String;
 }

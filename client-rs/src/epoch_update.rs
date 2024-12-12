@@ -44,21 +44,21 @@ impl Provable for EpochUpdate {
     fn export(&self) -> Result<String, Error> {
         let json = serde_json::to_string_pretty(&self).unwrap();
         let dir_path = format!("batches/epoch/{}", self.circuit_inputs.header.slot);
-        fs::create_dir_all(dir_path.clone()).map_err(|e| Error::IoError(e))?;
+        fs::create_dir_all(dir_path.clone()).map_err(Error::IoError)?;
         let path = format!(
             "{}/input_{}.json",
             dir_path, self.circuit_inputs.header.slot
         );
-        fs::write(path.clone(), json).map_err(|e| Error::IoError(e))?;
+        fs::write(path.clone(), json).map_err(Error::IoError)?;
         Ok(path)
     }
 
-    fn from_json<T>(slot: u64) -> Result<T, Error> 
-    where 
+    fn from_json<T>(slot: u64) -> Result<T, Error>
+    where
         T: serde::de::DeserializeOwned,
     {
         let path = format!("batches/epoch/{}/input_{}.json", slot, slot);
-        let json = fs::read_to_string(path).map_err(|e| Error::IoError(e))?;
+        let json = fs::read_to_string(path).map_err(Error::IoError)?;
         serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
     }
 

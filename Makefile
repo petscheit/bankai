@@ -24,9 +24,9 @@ test:
 	./cairo/tests/epoch.sh
 
 get-program-hash:
-	@make build-main
+	@make build-epoch
 	@make build-committee
 	@echo "EpochProgramHash:"
-	@cairo-hash-program --program cairo/build/main.json
+	@cairo-hash-program --program cairo/build/epoch_update.json
 	@echo "CommitteeProgramHash:"
 	@cairo-hash-program --program cairo/build/committee_update.json
