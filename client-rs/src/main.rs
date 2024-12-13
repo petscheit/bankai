@@ -113,23 +113,23 @@ impl BankaiClient {
 
 #[derive(Subcommand)]
 enum Commands {
-    // /// Generate a sync committee update proof for a given slot
-    // CommitteeUpdate {
-    //     #[arg(long, short)]
-    //     slot: u64,
-    //     /// Export output to a JSON file
-    //     #[arg(long, short)]
-    //     export: Option<String>,
-    // },
-    // /// Generate an epoch update proof for a given slot
-    // EpochUpdate {
-    //     #[arg(long, short)]
-    //     slot: u64,
-    //     /// Export output to a JSON file
-    //     #[arg(long, short)]
-    //     export: Option<String>,
-    // },
-    // /// Generate contract initialization data for a given slot
+    /// Generate a sync committee update proof for a given slot
+    CommitteeUpdate {
+        #[arg(long, short)]
+        slot: u64,
+        /// Export output to a JSON file
+        #[arg(long, short)]
+        export: Option<String>,
+    },
+    /// Generate an epoch update proof for a given slot
+    EpochUpdate {
+        #[arg(long, short)]
+        slot: u64,
+        /// Export output to a JSON file
+        #[arg(long, short)]
+        export: Option<String>,
+    },
+    /// Generate contract initialization data for a given slot
     ContractInit {
         #[arg(long, short)]
         slot: u64,
@@ -137,15 +137,10 @@ enum Commands {
         #[arg(long, short)]
         export: Option<String>,
     },
-    // DeployContract {
-    //     #[arg(long, short)]
-    //     slot: u64,
-    // },
-    // SubmitEpoch {
-    //     #[arg(long, short)]
-    //     slot: u64,
-    // },
-    // SubmitNextEpoch,
+    DeployContract {
+        #[arg(long, short)]
+        slot: u64,
+    },
     ProveNextCommittee,
     ProveNextEpoch,
     CheckBatchStatus {
@@ -156,13 +151,13 @@ enum Commands {
         #[arg(long, short)]
         batch_id: String,
     },
-    VerifyNextEpoch {
+    VerifyEpoch {
         #[arg(long, short)]
         batch_id: String,
         #[arg(long, short)]
         slot: u64,
     },
-    VerifyNextCommittee {
+    VerifyCommittee {
         #[arg(long, short)]
         batch_id: String,
         #[arg(long, short)]
@@ -190,36 +185,36 @@ async fn main() -> Result<(), Error> {
     let bankai = BankaiClient::new().await;
 
     match cli.command {
-        // Commands::CommitteeUpdate { slot, export } => {
-        //     println!("SyncCommittee command received with slot: {}", slot);
-        //     let proof = bankai.get_sync_committee_update(slot).await?;
-        //     let json = serde_json::to_string_pretty(&proof)
-        //         .map_err(|e| Error::DeserializeError(e.to_string()))?;
+        Commands::CommitteeUpdate { slot, export } => {
+            println!("SyncCommittee command received with slot: {}", slot);
+            let proof = bankai.get_sync_committee_update(slot).await?;
+            let json = serde_json::to_string_pretty(&proof)
+                .map_err(|e| Error::DeserializeError(e.to_string()))?;
 
-        //     if let Some(path) = export {
-        //         match std::fs::write(path.clone(), json) {
-        //             Ok(_) => println!("Proof exported to {}", path),
-        //             Err(e) => return Err(Error::IoError(e)),
-        //         }
-        //     } else {
-        //         println!("{}", json);
-        //     }
-        // }
-        // Commands::EpochUpdate { slot, export } => {
-        //     println!("Epoch command received with slot: {}", slot);
-        //     let proof = bankai.get_epoch_proof(slot).await?;
-        //     let json = serde_json::to_string_pretty(&proof)
-        //         .map_err(|e| Error::DeserializeError(e.to_string()))?;
+            if let Some(path) = export {
+                match std::fs::write(path.clone(), json) {
+                    Ok(_) => println!("Proof exported to {}", path),
+                    Err(e) => return Err(Error::IoError(e)),
+                }
+            } else {
+                println!("{}", json);
+            }
+        }
+        Commands::EpochUpdate { slot, export } => {
+            println!("Epoch command received with slot: {}", slot);
+            let proof = bankai.get_epoch_proof(slot).await?;
+            let json = serde_json::to_string_pretty(&proof)
+                .map_err(|e| Error::DeserializeError(e.to_string()))?;
 
-        //     if let Some(path) = export {
-        //         match std::fs::write(path.clone(), json) {
-        //             Ok(_) => println!("Proof exported to {}", path),
-        //             Err(e) => return Err(Error::IoError(e)),
-        //         }
-        //     } else {
-        //         println!("{}", json);
-        //     }
-        // }
+            if let Some(path) = export {
+                match std::fs::write(path.clone(), json) {
+                    Ok(_) => println!("Proof exported to {}", path),
+                    Err(e) => return Err(Error::IoError(e)),
+                }
+            } else {
+                println!("{}", json);
+            }
+        }
         Commands::ContractInit { slot, export } => {
             println!("ContractInit command received with slot: {}", slot);
             let contract_init = bankai
@@ -237,36 +232,15 @@ async fn main() -> Result<(), Error> {
                 println!("{}", json);
             }
         }
-        // Commands::DeployContract { slot } => {
-        //     let contract_init = bankai
-        //         .get_contract_initialization_data(slot, &bankai.config)
-        //         .await?;
-        //     bankai
-        //         .starknet_client
-        //         .deploy_contract(contract_init, &bankai.config)
-        //         .await?;
-        //     // bankai.starknet_client.get_committee_hash(slot, &bankai.config).await?;
-        // }
-        // Commands::SubmitEpoch { slot } => {
-        //     let proof = bankai.get_epoch_proof(slot).await?;
-        //     bankai
-        //         .starknet_client
-        //         .submit_update(proof.expected_circuit_outputs, &bankai.config)
-        //         .await?;
-        // }
-        // Commands::SubmitNextEpoch => {
-        //     let latest_epoch = bankai
-        //         .starknet_client
-        //         .get_latest_epoch(&bankai.config)
-        //         .await?;
-        //     println!("Curr epoch: {}", latest_epoch);
-        //     // make sure next_epoch % 32 == 0
-        //     let next_epoch = (u64::try_from(latest_epoch).unwrap() / 32) * 32 + 32;
-        //     println!("Next epoch: {}", next_epoch);
-        //     let proof = bankai.get_epoch_proof(next_epoch).await?;
-        //     CairoRunner::generate_pie(proof, &bankai.config)?;
-        //     // bankai.starknet_client.submit_update(proof.expected_circuit_outputs, &bankai.config).await?;
-        // }
+        Commands::DeployContract { slot } => {
+            let contract_init = bankai
+                .get_contract_initialization_data(slot, &bankai.config)
+                .await?;
+            bankai
+                .starknet_client
+                .deploy_contract(contract_init, &bankai.config)
+                .await?;
+        }
         Commands::CheckBatchStatus { batch_id } => {
             let status = bankai
                 .atlantic_client
@@ -310,7 +284,7 @@ async fn main() -> Result<(), Error> {
             let batch_id = bankai.atlantic_client.submit_batch(proof).await?;
             println!("Batch Submitted: {}", batch_id);
         }
-        Commands::VerifyNextEpoch { batch_id, slot } => {
+        Commands::VerifyEpoch { batch_id, slot } => {
             let status = bankai
                 .atlantic_client
                 .check_batch_status(batch_id.as_str())
@@ -326,7 +300,7 @@ async fn main() -> Result<(), Error> {
                 println!("Batch not completed yet. Status: {}", status);
             }
         }
-        Commands::VerifyNextCommittee { batch_id, slot } => {
+        Commands::VerifyCommittee { batch_id, slot } => {
             let status = bankai
                 .atlantic_client
                 .check_batch_status(batch_id.as_str())
