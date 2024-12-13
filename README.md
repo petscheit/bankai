@@ -1,40 +1,40 @@
-# Bankai - Cairo Ethereum Consensus Verification
+# Bankai - An Ethereum Light client, written in Cairo.
 
-A Cairo implementation for verifying Ethereum consensus via sync committee.
+This repository contains all the code for the Bankai Ethereum Light client. It consists of 3 main components: Cairo0 circuits for verifying epoch and sync committee updates, a Rust client for generating circuit inputs, the trace and submitting them to Starknet, and a Cairo1 contract (deployed on Starknet) for decommitting and storing verified beacon chain headers.
 
 ## Table of Contents
 - [Overview](#overview)
-- [Background](#background)
-  - [Block Verification Process](#block-verification-process)
-  - [Sync Committee Updates](#sync-committee-updates)
+  - [Epoch Update Operations](#epoch-update-operations)
+  - [Sync Committee Update Operations](#sync-committee-update-operations)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
 - [Usage](#usage)
   - [CLI Commands](#cli-commands)
   - [Running Cairo Programs](#running-cairo-programs)
-- [Examples](#examples)
 - [Acknowledgments](#acknowledgments)
-
+  
 ## Overview
-Bankai enables Ethereum consensus verification in Cairo by implementing sync committee verification logic. The project consists of two main components: block verification and sync committee updates.
 
-## Background
+To keep the light client in sync there are 2 main operations that need to be performed: Verifying new epoch/slots and updating the sync committee, keeping up with the validator set. 
 
-### Block Verification Process
-The verification of an Ethereum block requires the following steps:
+To perform these operations, we have two separate circuits available, that work together in keeping the light client in sync. The proofs of these circuits are proven and then verified using the [Integrity verifier](https://github.com/HerodotusDev/integrity), deployed on Starknet. The Bankai Cairo1 contract checks the proof was verified correctly and decommits the proof to its contract storage, making the verified data available to the Starknet network.
+
+
+## Epoch Update Operations
+The verification of an Beacon chain epoch requires the following steps:
 
 1. ✓ Compute block hash and signing root
-2. ✓ Convert message to G2 point (hash_to_curve)
+2. ✓ Convert message (signing root) to G2 point (hash_to_curve)
 3. ✓ Aggregate signer public keys
-4. ✓ Compute committee hash
-5. ✓ Validate signature
-6. ✓ Verify signer threshold
+4. ✓ Validate signature
+5. ✓ Compute committee hash
+6. ✓ Count number of signers
 7. ✓ Generate verification outputs
 
-Implementation details can be found in `main.cairo` (~200k steps).
+Implementation details can be found in `epoch_update.cairo` (~175k steps).
 
-### Sync Committee Updates
+## Sync Committee Update Operations
 To maintain continuous operation, the system validates sync committee updates through:
 
 1. ✓ Merkle path validation
@@ -55,89 +55,88 @@ Implementation details can be found in `committee_update.cairo` (~40k steps).
 ```bash
 # Install dependencies and setup environment
 make setup
-
-# Set your Beacon RPC URL
-export RPC_URL_BEACON=<YOUR_BEACON_RPC_URL>
-
-# Activate Python environment
-source .venv/bin/activate
 ```
 
-## Usage
+Addionally, an `.env` file is required. These are the variables that need to be set:
 
-### CLI Commands
+```
+STARKNET_ADDRESS=0x7b3d8f42e9a4c89e5b1f8d9f2e39c7d2b6e4a15c9d8f36e7a2b4c1d5e8f9a3b
+STARKNET_PRIVATE_KEY=0x4f8a9c2b5e7d6f3a1b8c4d5e6f7a2b3c4d5e6f7a8b9c1d2e3f4a5b6c7d8e9f
+STARKNET_RPC_URL=https://starknet-sepolia.infura.io/v3/your-api-key
+BEACON_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/your-api-key
+PROOF_REGISTRY=https://example-registry.s3.amazonaws.com/proofs/
+ATLANTIC_API_KEY=a1b2c3d4-e5f6-7890-abcd-ef1234567890
+```
 
-#### Generate Epoch Update Proof
+(The examples above are invalid, please use your own values)
+
+# Usage
+
+## CLI Commands
+
+The Bankai client provides the following command categories:
+
+### 1. Input Generation Commands
+Generate JSON inputs for circuits and debugging:
+
 ```bash
-cargo run -- epoch-update --slot <SLOT> [--export <OUTPUT_FILE>]
+# Initialize contract with starting slot
+cargo run -- contract-init --slot <SLOT> [--export <FILE>]
+
+# Generate epoch update inputs
+cargo run -- epoch-update --slot <SLOT> [--export <FILE>]
+
+# Generate sync committee update inputs
+cargo run -- committee-update --slot <SLOT> [--export <FILE>]
 ```
 
-#### Generate Committee Update Proof
+### 2. Proof Generation Commands
+Generate and manage proofs for the light client state:
+
 ```bash
-cargo run -- committee-update --slot <SLOT> [--export <OUTPUT_FILE>]
+# Generate proof for next epoch
+cargo run -- prove-next-epoch
+
+# Generate proof for next committee
+cargo run -- prove-next-committee
+
+# Wrap and resubmit proof (required for dynamic layouts)
+cargo run -- submit-wrapped-proof --batch-id <BATCH_ID>
+
+# Check proof generation status
+cargo run -- check-batch-status --batch-id <BATCH_ID>
 ```
 
-**CLI Options:**
-- `--rpc-url, -r`: Beacon Chain RPC URL (defaults to RPC_URL_BEACON env var)
-- `--slot, -s`: Target slot number
-- `--export, -e`: Output file path (optional)
+### 3. Contract Management Commands
+Deploy and interact with the Starknet contract:
 
-### Running Cairo Programs
-
-#### Epoch Update Verification
 ```bash
-# Copy CLI output to main_input.json, then:
-make build-main
-make run-main
+# Deploy Bankai contract
+cargo run -- deploy-contract --slot <SLOT>
+
+# Verify and decommit proofs
+cargo run -- verify-epoch --batch-id <BATCH_ID> --slot <SLOT>      # For epoch updates
+cargo run -- verify-committee --batch-id <BATCH_ID> --slot <SLOT>  # For committee updates
 ```
 
-#### Committee Update Verification
+> **Note**: All commands that generate proofs will automatically create input files, generate traces, and submit to Atlantic for proving. The returned batch ID can be used to track the proof status.
+
+## Running Cairo Programs
+
+The cairo circuits can also be run locally. For this, ensure to be in the python environment (`make venv`). Inputs for the circuits can be generated using the client.  
+
+### Epoch Update Verification
+```bash
+# Copy CLI output to epoch_input.json, then:
+make build-epoch
+make run-epoch
+```
+
+### Committee Update Verification
 ```bash
 # Copy CLI output to committee_input.json, then:
 make build-committee
 make run-committee
-```
-
-## Examples
-
-### Epoch Update Proof Output
-```json
-{
-    "header": {
-        "slot": "5169248",
-        "proposer_index": "191",
-        "parent_root": "0x5e40ffc16ab99419cd8f5c3c4394144811b3c27e6d2d6c4ddb8a1ff15ff54552",
-        "state_root": "0x5d7dfe0e508d03c8caf05fce7df40b4083f9ad72c8a2e6db5555748040a7efed",
-        "body_root": "0x1ee2c12b52d6ff28f8da7f604c7f7d54a06ff76d2803657cbb19cc3c9f87baf4"
-    },
-    "signature_point": {
-        "x0": "0x0ab7ccea53fe7f14c6873c54bde8c522640645a9da00bd90668617eb4ac0f7c631bdb854627353332cbe8a3bc8d2847a",
-        "x1": "0x021cf2a040faa3c9eb4f9f708946ad7553032edc8bc55ba3dd22cc2ac380c083dde25e6e66fef7f3efe016792d8f9ff7",
-        "y0": "0x18dce2581664c9e7ab5608bce9093057657705792557a443561e4d51eaaf2f8b4d061a8ed739375975da38bf5949fddf",
-        "y1": "0x00e22da68c5f8675fddf8ec9ddded7604e6be523af5753ac6edd7da08623b4a8b2d9bb1026d12262ce426367b36cea6a"
-    },
-    "sync_committee_agg_pub": {
-        "x": "0x155a4ea93d92fb321c0229ad33055a04903007e77ce41bbba1812f8464e73478d64d2c59296a22ce66607d8a7c8d06d0",
-        "y": "0x151ee28a26cd768a9900f142749ee84cda21ccde6672330a321266f66648e2d4068621a093ee8e45574280b0c76bbf9c"
-    },
-    "non_signers": []
-}
-```
-
-### Committee Update Proof Output
-```json
-{
-  "beacon_slot": "0x61ac23",
-  "next_sync_committee_branch": [
-    "0x19338363d25e56f44f7f86c05d3572ea3e8261908d4ae18180cd79cb81b223df",
-    "0xbafd8a06427c883bbfb30daf5982bc6be18b6ad2283330436c7282aac17b8f0c",
-    "0xa5bd9ea26eff6d9bb8bfd9b9263648356d9c9b22e5102426484e5fb9bba8cbc5",
-    "0x0a5cff8418c296764b19680920d2e22338ebb2bc4715a9705262fa78780b94e2",
-    "0x15137476162cdfade235b4aa9b289b1392f693fc1283ff31575ad2f93bd9fa46"
-  ],
-  "next_aggregate_sync_committee": "a0bacb01ef15aba46b6b067b6abf214343ae826ef7ea7efc8861e13c1c6c708266cfff55f7be6b520e58feebbea6061d",
-  "committee_keys_root": "9042f86bfc6e2826da86dcfa645530060cfc9347a1c733ca05350041d8993046"
-}
 ```
 
 ## Acknowledgments

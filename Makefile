@@ -1,6 +1,9 @@
 setup:
 	./scripts/setup.sh
 
+venv:
+	source venv/bin/activate
+
 build-epoch:
 	./scripts/cairo_compile.sh cairo/src/epoch_update.cairo
 
