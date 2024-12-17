@@ -15,7 +15,7 @@ run_tests() {
 
     # Attempt to run the compiled program and capture output
     local start_time=$(date +%s)
-    cairo-run --program="cairo/build/main.json" --program_input="$input_file" --layout=all_cairo >> "$temp_output" 2>&1
+    cairo-run --program="cairo/build/epoch_update.json" --program_input="$input_file" --layout=all_cairo >> "$temp_output" 2>&1
     local status=$?
     local end_time=$(date +%s)
     local duration=$((end_time - start_time))
@@ -35,7 +35,7 @@ export -f run_tests
 
 # Ensure the Cairo file is compiled before running parallel tests
 echo "Compiling Bankai Cairo file..."
-make build-main
+make build-epoch
 
 echo "Starting tests..."
 # Use find to locate all input.json files in hdp-test/fixtures directory and run them in parallel

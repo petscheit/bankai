@@ -9,25 +9,25 @@ from cairo.src.utils import pow2alloc128, felt_divmod
 
 namespace SSZ {
     func hash_pair_container{
-        range_check_ptr,
-        bitwise_ptr: BitwiseBuiltin*,
-        pow2_array: felt*,
-        sha256_ptr: felt*
+        range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*, sha256_ptr: felt*
     }(left: Uint256, right: Uint256) -> Uint256 {
         alloc_locals;
 
         let input = MerkleUtils.chunk_pair(left, right);
-        let (result_chunks) = SHA256.hash_64(input=input-16);
+        let (result_chunks) = SHA256.hash_64(input=input - 16);
         let result = MerkleUtils.chunks_to_uint256(output=result_chunks);
         return result;
     }
 
     func hash_header_root{
-        range_check_ptr,
-        bitwise_ptr: BitwiseBuiltin*,
-        pow2_array: felt*,
-        sha256_ptr: felt*
-    }(slot: Uint256, proposer_index: Uint256, parent_root: Uint256, state_root: Uint256, body_root: Uint256) -> Uint256 {
+        range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*, sha256_ptr: felt*
+    }(
+        slot: Uint256,
+        proposer_index: Uint256,
+        parent_root: Uint256,
+        state_root: Uint256,
+        body_root: Uint256,
+    ) -> Uint256 {
         alloc_locals;
         // For numbers, we need to reverse the endianness
         let (slot) = uint256_reverse_endian(num=slot);
@@ -54,10 +54,7 @@ namespace SSZ {
 
 namespace MerkleTree {
     func compute_root{
-        range_check_ptr,
-        bitwise_ptr: BitwiseBuiltin*,
-        pow2_array: felt*,
-        sha256_ptr: felt*
+        range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*, sha256_ptr: felt*
     }(leafs: Uint256*, leafs_len: felt) -> Uint256 {
         alloc_locals;
 
@@ -68,27 +65,25 @@ namespace MerkleTree {
         // chunk the leafs and write to leafs array
         let (chunked_leafs: felt*) = alloc();
         MerkleUtils.chunk_leafs{
-            range_check_ptr=range_check_ptr,
-            pow2_array=pow2_array,
-            output_ptr=chunked_leafs
+            range_check_ptr=range_check_ptr, pow2_array=pow2_array, output_ptr=chunked_leafs
         }(leafs=leafs, leafs_len=leafs_len, index=0);
 
         // move the pointer to the start of the chunked leafs
         let chunked_leafs = chunked_leafs - leafs_len * 8;
 
         let (tree: felt*) = alloc();
-        let tree_len = 2 * leafs_len - 1; // number nodes in the tree (not accounting for chunking)
+        let tree_len = 2 * leafs_len - 1;  // number nodes in the tree (not accounting for chunking)
 
         // copy the leafs to the end of the tree arra
         memcpy(dst=tree + (tree_len - leafs_len) * 8, src=chunked_leafs, len=leafs_len * 8);
 
         with sha256_ptr {
-            let tree = tree + tree_len * 8; // move the pointer to the end of the tree
+            let tree = tree + tree_len * 8;  // move the pointer to the end of the tree
             compute_merkle_root_inner{
                 range_check_ptr=range_check_ptr,
                 sha256_ptr=sha256_ptr,
                 pow2_array=pow2_array,
-                tree_ptr=tree
+                tree_ptr=tree,
             }(tree_range=tree_len - leafs_len - 1, index=0);
         }
 
@@ -98,7 +93,9 @@ namespace MerkleTree {
     }
 
     // Implements the merkle tree building logic. This follows the unordered StandardMerkleTree implementation of OpenZeppelin
-    func compute_merkle_root_inner{range_check_ptr, sha256_ptr: felt*, pow2_array: felt*, tree_ptr: felt*}(tree_range: felt, index: felt) {
+    func compute_merkle_root_inner{
+        range_check_ptr, sha256_ptr: felt*, pow2_array: felt*, tree_ptr: felt*
+    }(tree_range: felt, index: felt) {
         alloc_locals;
 
         if (tree_range + 1 == index) {
@@ -115,13 +112,10 @@ namespace MerkleTree {
     }
 
     func hash_merkle_path{
-        range_check_ptr,
-        bitwise_ptr: BitwiseBuiltin*,
-        pow2_array: felt*,
-        sha256_ptr: felt*
+        range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*, sha256_ptr: felt*
     }(path: felt**, path_len: felt, leaf: felt*, index: felt) -> Uint256 {
         alloc_locals;
-        
+
         // Base case - if no more siblings to process, return the current value
         if (path_len == 0) {
             let result = MerkleUtils.chunks_to_uint256(output=leaf);
@@ -140,23 +134,16 @@ namespace MerkleTree {
             memcpy(dst=[path] + 8, src=leaf, len=8);
             let (result_chunks) = SHA256.hash_64(input=[path]);
         }
-        
+
         // Recurse with remaining path
         return hash_merkle_path(
-            path=path + 1,
-            path_len=path_len - 1,
-            leaf=result_chunks,
-            index=new_index
+            path=path + 1, path_len=path_len - 1, leaf=result_chunks, index=new_index
         );
     }
 }
 
-
 namespace MerkleUtils {
-    func chunk_pair{
-        range_check_ptr,
-        pow2_array: felt*,
-    }(left: Uint256, right: Uint256) -> felt* {
+    func chunk_pair{range_check_ptr, pow2_array: felt*}(left: Uint256, right: Uint256) -> felt* {
         let (leafs: Uint256*) = alloc();
         assert leafs[0] = left;
         assert leafs[1] = right;
@@ -168,11 +155,9 @@ namespace MerkleUtils {
         return output_ptr;
     }
 
-    func chunk_leafs{
-        range_check_ptr,
-        pow2_array: felt*,
-        output_ptr: felt*
-    }(leafs: Uint256*, leafs_len: felt, index: felt) {
+    func chunk_leafs{range_check_ptr, pow2_array: felt*, output_ptr: felt*}(
+        leafs: Uint256*, leafs_len: felt, index: felt
+    ) {
         if (index == leafs_len) {
             return ();
         }
@@ -204,8 +189,10 @@ namespace MerkleUtils {
     }
 
     func chunks_to_uint256{pow2_array: felt*}(output: felt*) -> Uint256 {
-        let low = [output + 4] * pow2_array[96] + [output + 5] * pow2_array[64] + [output + 6] * pow2_array[32] + [output + 7];
-        let high = [output] * pow2_array[96] + [output + 1] * pow2_array[64] + [output + 2] * pow2_array[32] + [output + 3];
+        let low = [output + 4] * pow2_array[96] + [output + 5] * pow2_array[64] + [output + 6] *
+            pow2_array[32] + [output + 7];
+        let high = [output] * pow2_array[96] + [output + 1] * pow2_array[64] + [output + 2] *
+            pow2_array[32] + [output + 3];
         return (Uint256(low=low, high=high));
     }
 }
