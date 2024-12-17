@@ -10,7 +10,11 @@ from hash_to_curve import hash_to_curve
 from cairo.src.ssz import SSZ
 from cairo.src.constants import g1_negative
 from cairo.src.domain import Domain
-from cairo.src.signer import fast_aggregate_signer_pubs, aggregate_signer_pubs, faster_fast_aggregate_signer_pubs
+from cairo.src.signer import (
+    fast_aggregate_signer_pubs,
+    aggregate_signer_pubs,
+    faster_fast_aggregate_signer_pubs,
+)
 from cairo.src.utils import pow2alloc128
 from sha import SHA256
 
@@ -84,10 +88,7 @@ func main{
 }
 
 func hash_header{
-    range_check_ptr,
-    bitwise_ptr: BitwiseBuiltin*,
-    pow2_array: felt*,
-    sha256_ptr: felt*
+    range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*, sha256_ptr: felt*
 }() -> (header_root: Uint256, state_root: Uint256) {
     alloc_locals;
 
@@ -96,7 +97,7 @@ func hash_header{
     local parent_root: Uint256;
     local state_root: Uint256;
     local body_root: Uint256;
-    %{  
+    %{
         from cairo.py.utils import split_uint256
         ids.slot.low = program_input["circuit_inputs"]["header"]["slot"]
         ids.slot.high = 0
@@ -114,20 +115,25 @@ func hash_header{
         ids.body_root.low, ids.body_root.high = body_root
     %}
 
-    let header_root = SSZ.hash_header_root(slot, proposer_index, parent_root, state_root, body_root);
+    let header_root = SSZ.hash_header_root(
+        slot, proposer_index, parent_root, state_root, body_root
+    );
 
     return (header_root=header_root, state_root=state_root);
 }
 
 func verify_signature{
-    range_check_ptr, poseidon_ptr: PoseidonBuiltin*, range_check96_ptr: felt*, add_mod_ptr: ModBuiltin*, mul_mod_ptr: ModBuiltin*
+    range_check_ptr,
+    poseidon_ptr: PoseidonBuiltin*,
+    range_check96_ptr: felt*,
+    add_mod_ptr: ModBuiltin*,
+    mul_mod_ptr: ModBuiltin*,
 }(agg_pub: G1Point, msg_point: G2Point, sig_point: G2Point) {
-    
     let neg_g1: G1Point = g1_negative();
     let g1_sig_pair: G1G2Pair = G1G2Pair(P=neg_g1, Q=sig_point);
     let pk_msg_pair: G1G2Pair = G1G2Pair(P=agg_pub, Q=msg_point);
 
-    let (inputs: G1G2Pair*) = alloc();  
+    let (inputs: G1G2Pair*) = alloc();
     assert inputs[0] = g1_sig_pair;
     assert inputs[1] = pk_msg_pair;
 
@@ -136,5 +142,4 @@ func verify_signature{
     let (one) = one_E12D();
     assert res = one;
     return ();
-
 }

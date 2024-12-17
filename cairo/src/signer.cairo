@@ -45,20 +45,20 @@ func aggregate_signer_pubs{
 }
 
 // Recursive helper function for aggregating signer public keys
-func aggregate_signer_pubs_inner {
+func aggregate_signer_pubs_inner{
     range_check_ptr, range_check96_ptr: felt*, add_mod_ptr: ModBuiltin*, mul_mod_ptr: ModBuiltin*
 }(signers: G1Point*, n_signers: felt) -> (res: G1Point) {
     // Base case: if there's only one signer, verify it's on the curve and return it
     if (n_signers == 1) {
         let (on_curve) = is_on_curve_g1(1, [signers]);
         assert on_curve = 1;
-        return ([signers], );
+        return ([signers],);
     }
 
     // Verify that the current signer's public key is on the curve
     let (on_curve) = is_on_curve_g1(1, signers[0]);
     assert on_curve = 1;
-    
+
     // Recursively aggregate the remaining public keys
     let (res) = aggregate_signer_pubs_inner(signers + G1Point.SIZE, n_signers - 1);
     // Add the current public key to the aggregated result
@@ -108,26 +108,32 @@ func fast_aggregate_signer_pubs{
 func fast_aggregate_signer_pubs_inner{
     range_check_ptr, range_check96_ptr: felt*, add_mod_ptr: ModBuiltin*, mul_mod_ptr: ModBuiltin*
 }(agg_key: G1Point, non_signers: G1Point*, n_non_signers: felt) -> (res: G1Point) {
-     // Base case: if there are no non-signers, verify agg_key is on the curve and return it
-     if (n_non_signers == 0) {
+    // Base case: if there are no non-signers, verify agg_key is on the curve and return it
+    if (n_non_signers == 0) {
         let (on_curve) = is_on_curve_g1(1, agg_key);
         assert on_curve = 1;
-        return (agg_key, );
+        return (agg_key,);
     }
 
     // Verify that the current non-signer's public key is on the curve
     let (on_curve) = is_on_curve_g1(1, non_signers[0]);
     assert on_curve = 1;
-    
+
     // Recursively process the remaining non-signer keys
-    let (res) = fast_aggregate_signer_pubs_inner(agg_key, non_signers + G1Point.SIZE, n_non_signers - 1);
+    let (res) = fast_aggregate_signer_pubs_inner(
+        agg_key, non_signers + G1Point.SIZE, n_non_signers - 1
+    );
     // Subtract the current non-signer's public key from the aggregated result
-    return sub_ec_points(1, res, non_signers[0]); // try adding non signers and the subbing result
+    return sub_ec_points(1, res, non_signers[0]);  // try adding non signers and the subbing result
 }
 
-
 func faster_fast_aggregate_signer_pubs{
-    range_check_ptr, pow2_array: felt*, range_check96_ptr: felt*, add_mod_ptr: ModBuiltin*, mul_mod_ptr: ModBuiltin*, sha256_ptr: felt*
+    range_check_ptr,
+    pow2_array: felt*,
+    range_check96_ptr: felt*,
+    add_mod_ptr: ModBuiltin*,
+    mul_mod_ptr: ModBuiltin*,
+    sha256_ptr: felt*,
 }() -> (committee_hash: Uint256, agg_pub: G1Point, n_non_signers: felt) {
     alloc_locals;
 
@@ -155,10 +161,11 @@ func faster_fast_aggregate_signer_pubs{
         ids.n_non_signers = len(non_signers)
     %}
 
-
     // Call the recursive function to aggregate public keys
     if (n_non_signers != 0) {
-        let (agg_non_signer_pub) = faster_fast_aggregate_signer_pubs_inner(non_signers, n_non_signers);
+        let (agg_non_signer_pub) = faster_fast_aggregate_signer_pubs_inner(
+            non_signers, n_non_signers
+        );
         let (signer_key) = sub_ec_points(1, committee_pub, agg_non_signer_pub);
         let committee_hash = commit_committee_key(point=committee_pub);
         return (committee_hash=committee_hash, agg_pub=signer_key, n_non_signers=n_non_signers);
@@ -174,30 +181,30 @@ func faster_fast_aggregate_signer_pubs{
 func faster_fast_aggregate_signer_pubs_inner{
     range_check_ptr, range_check96_ptr: felt*, add_mod_ptr: ModBuiltin*, mul_mod_ptr: ModBuiltin*
 }(non_signers: G1Point*, n_non_signers: felt) -> (res: G1Point) {
-     // Base case: if there are no non-signers, verify agg_key is on the curve and return it
-     if (n_non_signers == 1) {
+    // Base case: if there are no non-signers, verify agg_key is on the curve and return it
+    if (n_non_signers == 1) {
         let (on_curve) = is_on_curve_g1(1, non_signers[0]);
         assert on_curve = 1;
-        return (non_signers[0], );
+        return (non_signers[0],);
     }
 
     // Verify that the current non-signer's public key is on the curve
     let (on_curve) = is_on_curve_g1(1, non_signers[0]);
     assert on_curve = 1;
-    
+
     // Recursively process the remaining non-signer keys
-    let (res) = faster_fast_aggregate_signer_pubs_inner(non_signers + G1Point.SIZE, n_non_signers - 1);
+    let (res) = faster_fast_aggregate_signer_pubs_inner(
+        non_signers + G1Point.SIZE, n_non_signers - 1
+    );
     // Subtract the current non-signer's public key from the aggregated result
-    return add_ec_points(1, res, non_signers[0]); // try adding non signers and the subbing result
+    return add_ec_points(1, res, non_signers[0]);  // try adding non signers and the subbing result
 }
 
 // This function generates the hash of an aggregate committee key.
 // This hash is stored in the cairo1 state, and is used to check if the correct committee was used
-func commit_committee_key{
-    range_check_ptr,
-    sha256_ptr: felt*,
-    pow2_array: felt*,
-}(point: G1Point) -> Uint256 {
+func commit_committee_key{range_check_ptr, sha256_ptr: felt*, pow2_array: felt*}(
+    point: G1Point
+) -> Uint256 {
     alloc_locals;
 
     let (x_chunks) = HashUtils.chunk_uint384(point.x);

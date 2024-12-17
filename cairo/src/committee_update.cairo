@@ -54,9 +54,10 @@ func main{
     with sha256_ptr, pow2_array {
         let leaf_hash = compute_leaf_hash(committee_keys_root, aggregate_committee_key);
         // The next sync committee is always at index 55
-        let state_root = MerkleTree.hash_merkle_path(path=path, path_len=path_len, leaf=leaf_hash, index=55);
+        let state_root = MerkleTree.hash_merkle_path(
+            path=path, path_len=path_len, leaf=leaf_hash, index=55
+        );
         let committee_hash = compute_committee_hash(aggregate_committee_key);
-
     }
     // %{ print_u256("Derived committee hash", ids.committee_hash) %}
 
@@ -81,11 +82,9 @@ func main{
 }
 
 // Compute the leaf hash for the Merkle tree
-func compute_leaf_hash{
-    range_check_ptr,
-    pow2_array: felt*,
-    sha256_ptr: felt*
-}(committee_keys_root: felt*, aggregate_committee_key: UInt384) -> felt* {
+func compute_leaf_hash{range_check_ptr, pow2_array: felt*, sha256_ptr: felt*}(
+    committee_keys_root: felt*, aggregate_committee_key: UInt384
+) -> felt* {
     alloc_locals;
     // Step 1: Create leaf hash -> h(sync_committee_root, aggregate_committee_key)
     let (aggregate_committee_key_chunks) = HashUtils.chunk_uint384(aggregate_committee_key);
@@ -109,7 +108,7 @@ func compute_committee_hash{
     pow2_array: felt*,
 }(compressed_g1: UInt384) -> Uint256 {
     alloc_locals;
-    
+
     // Decompress G1 point and perform sanity checks
     let (flags, x_point) = decompress_g1(compressed_g1);
     assert flags.compression_bit = 1;
@@ -126,33 +125,28 @@ func compute_committee_hash{
 // Structure to hold flags for compressed G1 points
 struct CompressedG1Flags {
     compression_bit: felt,  // Bit 383
-    infinity_bit: felt,     // Bit 382
-    sign_bit: felt,         // Bit 381
+    infinity_bit: felt,  // Bit 382
+    sign_bit: felt,  // Bit 381
 }
 
 // Decompress a G1 point from its compressed form
-func decompress_g1{
-    range_check_ptr,
-}(compressed_g1: UInt384) -> (CompressedG1Flags, UInt384) {
+func decompress_g1{range_check_ptr}(compressed_g1: UInt384) -> (CompressedG1Flags, UInt384) {
     alloc_locals;
 
     let limb = compressed_g1.d3;
 
     // Extract bit 383
     let (compression_bit, remainder) = felt_divmod(limb, 0x800000000000000000000000);
-    
+
     // Extract bit 382
     let (infinity_bit, remainder) = felt_divmod(remainder, 0x400000000000000000000000);
-    
+
     // Extract bit 381
     let (sign_bit, uncompressed_x_limb) = felt_divmod(remainder, 0x200000000000000000000000);
 
     // Construct the x coordinate of the point
     let x_point = UInt384(
-        d0=compressed_g1.d0,
-        d1=compressed_g1.d1,
-        d2=compressed_g1.d2,
-        d3=uncompressed_x_limb
+        d0=compressed_g1.d0, d1=compressed_g1.d1, d2=compressed_g1.d2, d3=uncompressed_x_limb
     );
 
     return (CompressedG1Flags(compression_bit, infinity_bit, sign_bit), x_point);

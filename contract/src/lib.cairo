@@ -35,7 +35,9 @@ pub mod BankaiContract {
         StoragePointerWriteAccess,
     };
     use starknet::{ContractAddress, get_caller_address};
-    use integrity::{Integrity, IntegrityWithConfig, SHARP_BOOTLOADER_PROGRAM_HASH, VerifierConfiguration};
+    use integrity::{
+        Integrity, IntegrityWithConfig, SHARP_BOOTLOADER_PROGRAM_HASH, VerifierConfiguration,
+    };
     use crate::utils::{calculate_wrapped_bootloaded_fact_hash, WRAPPER_PROGRAM_HASH};
     #[event]
     #[derive(Drop, starknet::Event)]

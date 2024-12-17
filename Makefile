@@ -26,6 +26,9 @@ test:
 	./cairo/tests/committee.sh
 	./cairo/tests/epoch.sh
 
+ci-local:
+	./scripts/ci_local.sh
+
 get-program-hash:
 	@make build-epoch
 	@make build-committee
