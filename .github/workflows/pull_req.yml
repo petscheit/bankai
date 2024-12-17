@@ -46,7 +46,6 @@ jobs:
       - name: Run clippy
         working-directory: ./client-rs
         run: cargo clippy -- -D warnings
-
       - name: Install Dependencies
         run: make setup
         
