@@ -34,10 +34,13 @@ impl AtlanticClient {
             .mime_str("application/zip") // Specify MIME type
             .map_err(Error::AtlanticError)?;
 
-        let external_id = format!("update_{}", match batch.proof_type() {
-            ProofType::Epoch => "epoch",
-            ProofType::SyncCommittee => "sync_committee",
-        });
+        let external_id = format!(
+            "update_{}",
+            match batch.proof_type() {
+                ProofType::Epoch => "epoch",
+                ProofType::SyncCommittee => "sync_committee",
+            }
+        );
         // Build the form
         let form = Form::new()
             .part("pieFile", file_part)
@@ -90,12 +93,14 @@ impl AtlanticClient {
 
         // Build the form
         let form = Form::new()
-            .text("programHash", env::var("PROOF_WRAPPER_PROGRAM_HASH").unwrap())
+            .text(
+                "programHash",
+                env::var("PROOF_WRAPPER_PROGRAM_HASH").unwrap(),
+            )
             .part("inputFile", proof_part)
             .text("cairoVersion", "0")
             .text("mockFactHash", "false")
             .text("externalId", "proof_wrapper");
-
 
         // Send the request
         let response = self
