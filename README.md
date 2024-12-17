@@ -20,6 +20,8 @@ To keep the light client in sync there are 2 main operations that need to be per
 
 To perform these operations, we have two separate circuits available, that work together in keeping the light client in sync. The proofs of these circuits are proven and then verified using the [Integrity verifier](https://github.com/HerodotusDev/integrity), deployed on Starknet. The Bankai Cairo1 contract checks the proof was verified correctly and decommits the proof to its contract storage, making the verified data available to the Starknet network.
 
+![Bankai Overview](.github/assets/overview.png)
+
 
 ## Epoch Update Operations
 The verification of an Beacon chain epoch requires the following steps:

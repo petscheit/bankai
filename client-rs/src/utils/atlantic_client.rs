@@ -1,6 +1,6 @@
 use std::{env, fs};
 
-use crate::traits::Provable;
+use crate::traits::{ProofType, Provable};
 use crate::Error;
 use reqwest::multipart::{Form, Part};
 use serde::{Deserialize, Serialize};
@@ -34,12 +34,16 @@ impl AtlanticClient {
             .mime_str("application/zip") // Specify MIME type
             .map_err(Error::AtlanticError)?;
 
+        let external_id = format!("update_{}", match batch.proof_type() {
+            ProofType::Epoch => "epoch",
+            ProofType::SyncCommittee => "sync_committee",
+        });
         // Build the form
         let form = Form::new()
             .part("pieFile", file_part)
             .text("layout", "auto")
             .text("prover", "starkware_sharp")
-            .text("externalId", "");
+            .text("externalId", external_id);
 
         // Send the request
         let response = self
@@ -73,7 +77,7 @@ impl AtlanticClient {
     }
 
     pub async fn submit_wrapped_proof(&self, proof: StarkProof) -> Result<String, Error> {
-        println!("Uploading to Atlantic!");
+        println!("Uploading to Atlantic...");
         // Serialize the proof to JSON string
         let proof_json =
             serde_json::to_string(&proof).map_err(|e| Error::DeserializeError(e.to_string()))?;
@@ -84,18 +88,14 @@ impl AtlanticClient {
             .mime_str("application/json")
             .map_err(Error::AtlanticError)?;
 
-        let verifier = fs::read("cairo-verifier/program.json").map_err(Error::IoError)?;
-        let verifier_part = Part::bytes(verifier)
-            .file_name("program.json") // Provide a filename
-            .mime_str("application/json") // Specify MIME type
-            .map_err(Error::AtlanticError)?;
-
         // Build the form
         let form = Form::new()
-            .part("programFile", verifier_part)
+            .text("programHash", env::var("PROOF_WRAPPER_PROGRAM_HASH").unwrap())
             .part("inputFile", proof_part)
             .text("cairoVersion", "0")
-            .text("mockFactHash", "false");
+            .text("mockFactHash", "false")
+            .text("externalId", "proof_wrapper");
+
 
         // Send the request
         let response = self
