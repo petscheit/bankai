@@ -22,8 +22,23 @@ To perform these operations, we have two separate circuits available, that work 
 
 ![Bankai Overview](.github/assets/overview.png)
 
+Overall, the steps for generating an update proof (epoch or sync committee) are pretty similiar:
 
-## Epoch Update Operations
+1. Check the latest light client state, deriving what inputs to generate
+2. Generate the inputs for the circuit. This involves querying the beacon chain for the relevant data. The circuit results are also computed
+3. Using the inputs and the relevant circuit, generate the trace
+4. Prove this trace using Atlantic in off-chain mode
+5. Retrieve the proof from Atlantic
+6. Submit the proof to atlantic, wrapping it to another layout. This step is required, as Integrity cant verify the proof using dynamic layout. The resulting (wrapped) proof uses the `recursive_with_poseidon` layout which can be verified by Integrity
+7. Atlantic now submits the proof to Starknet, where it is verified by the Integrity verifier.
+8. The proof is now decommited in the Bankai contract. This is achieved by constructing the expected fact hash, and checking if this fact hash is available in the Integrity fact registry. If this is the case, the verified state is written to the contract storage.
+
+
+## Cairo-Zero Circuits
+
+The two main circuits used for doing the mayority of cryptographic operations are implemented in Cairo-Zero. Using Cairo-Zero enables the utilization of hints, which greatly increaces flexibility and performance.
+
+### Epoch Update Operations
 The verification of an Beacon chain epoch requires the following steps:
 
 1. ✓ Compute block hash and signing root
@@ -36,7 +51,7 @@ The verification of an Beacon chain epoch requires the following steps:
 
 Implementation details can be found in `epoch_update.cairo` (~175k steps).
 
-## Sync Committee Update Operations
+### Sync Committee Update Operations
 To maintain continuous operation, the system validates sync committee updates through:
 
 1. ✓ Merkle path validation
@@ -68,6 +83,7 @@ STARKNET_RPC_URL=https://starknet-sepolia.infura.io/v3/your-api-key
 BEACON_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/your-api-key
 PROOF_REGISTRY=https://example-registry.s3.amazonaws.com/proofs/
 ATLANTIC_API_KEY=a1b2c3d4-e5f6-7890-abcd-ef1234567890
+PROOF_WRAPPER_PROGRAM_HASH=0x193641eb151b0f41674641089952e60bc3aded26e3cf42793655c562b8c3aa0
 ```
 
 (The examples above are invalid, please use your own values)
