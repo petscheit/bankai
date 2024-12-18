@@ -45,32 +45,6 @@ if ! python3.10 -m venv venv; then
     exit 1
 fi
 
-# Install Cairo tools before activating venv
-OS_TYPE=$(uname -s)
-echo "Detected OS: $OS_TYPE"  # Debug line
-echo "Installing Cairo tools..."
-case "$OS_TYPE" in
-    Linux*)
-        curl -L https://github.com/starkware-libs/cairo/releases/download/v2.4.0/cairo-2.4.0-x86_64-unknown-linux-musl.tar.gz -o cairo.tar.gz
-        tar -xzf cairo.tar.gz
-        sudo mv cairo/bin/* /usr/local/bin/
-        rm -rf cairo.tar.gz cairo
-        ;;
-    Darwin*)
-        if command -v brew >/dev/null; then
-            brew install cairo
-        else
-            echo "Homebrew is not installed. Please install Homebrew and try again."
-            exit 1
-        fi
-        ;;
-    *)
-        echo "Unsupported operating system for automatic Cairo installation."
-        echo "OS_TYPE=$OS_TYPE"  # Debug line
-        exit 1
-        ;;
-esac
-
 # Function to install GNU parallel
 install_parallel() {
     echo "Installing GNU parallel..."
