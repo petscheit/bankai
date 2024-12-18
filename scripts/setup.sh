@@ -46,16 +46,17 @@ if ! python3.10 -m venv venv; then
 fi
 
 # Install Cairo tools before activating venv
-echo "Detected OSTYPE: $OSTYPE"  # Debug line
+OS_TYPE=$(uname -s)
+echo "Detected OS: $OS_TYPE"  # Debug line
 echo "Installing Cairo tools..."
-case "$OSTYPE" in
-    linux-gnu*)
+case "$OS_TYPE" in
+    Linux*)
         curl -L https://github.com/starkware-libs/cairo/releases/download/v2.4.0/cairo-2.4.0-x86_64-unknown-linux-musl.tar.gz -o cairo.tar.gz
         tar -xzf cairo.tar.gz
         sudo mv cairo/bin/* /usr/local/bin/
         rm -rf cairo.tar.gz cairo
         ;;
-    darwin*)
+    Darwin*)
         if command -v brew >/dev/null; then
             brew install cairo
         else
@@ -65,7 +66,7 @@ case "$OSTYPE" in
         ;;
     *)
         echo "Unsupported operating system for automatic Cairo installation."
-        echo "OSTYPE=$OSTYPE"  # Debug line
+        echo "OS_TYPE=$OS_TYPE"  # Debug line
         exit 1
         ;;
 esac
