@@ -5,10 +5,13 @@ mod sync_committee;
 mod traits;
 mod utils;
 
+use clap::{Parser, Subcommand};
 use config::BankaiConfig;
 use contract_init::ContractInitializationData;
+use dotenv::from_filename;
 use epoch_update::EpochUpdate;
 use starknet::core::types::Felt;
+use std::env;
 use sync_committee::SyncCommitteeUpdate;
 use traits::Provable;
 use utils::{atlantic_client::AtlanticClient, cairo_runner::CairoRunner};
@@ -16,12 +19,6 @@ use utils::{
     rpc::BeaconRpcClient,
     starknet_client::{StarknetClient, StarknetError},
 };
-// use rand::Rng;
-// use std::fs::File;
-// use std::io::Write;
-use clap::{Parser, Subcommand};
-use dotenv::from_filename;
-use std::env;
 
 #[derive(Debug)]
 pub enum Error {

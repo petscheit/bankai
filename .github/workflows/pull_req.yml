@@ -50,12 +50,8 @@ jobs:
       - name: Install Dependencies
         run: make setup
         
-      - name: Activate virtual environment
-        run: source venv/bin/activate
-        
       - name: Check formatting
-        run: ./scripts/check_format.sh
+        run: source venv/bin/activate && ./scripts/check_format.sh
 
       - name: Run Cairo-Zero tests
-        run: make test
-      
+        run: source venv/bin/activate && make test
