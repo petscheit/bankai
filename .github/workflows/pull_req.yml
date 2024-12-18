@@ -56,6 +56,9 @@ jobs:
       - name: Check formatting
         run: source venv/bin/activate && ./scripts/check_format.sh
 
+      - name: Build Cairo-Zero
+        run: source venv/bin/activate && make build-epoch && make build-committee
+
       - name: Run Cairo-Zero tests
         run: source venv/bin/activate && make test
       
