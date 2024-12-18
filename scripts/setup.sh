@@ -46,6 +46,7 @@ if ! python3.10 -m venv venv; then
 fi
 
 # Install Cairo tools before activating venv
+echo "Detected OSTYPE: $OSTYPE"  # Debug line
 echo "Installing Cairo tools..."
 case "$OSTYPE" in
     linux-gnu*)
@@ -64,6 +65,7 @@ case "$OSTYPE" in
         ;;
     *)
         echo "Unsupported operating system for automatic Cairo installation."
+        echo "OSTYPE=$OSTYPE"  # Debug line
         exit 1
         ;;
 esac
