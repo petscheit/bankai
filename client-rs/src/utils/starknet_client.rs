@@ -109,50 +109,50 @@ impl StarknetClient {
         Ok(())
     }
 
-    pub async fn get_committee_hash(
-        &self,
-        slot: u64,
-        config: &BankaiConfig,
-    ) -> Result<(), StarknetError> {
-        let committee_id = slot / 0x2000_u64;
-        let committee_hash = self
-            .account
-            .provider()
-            .call(
-                FunctionCall {
-                    contract_address: config.contract_address,
-                    entry_point_selector: selector!("get_committee_hash"),
-                    calldata: vec![committee_id.into()],
-                },
-                BlockId::Tag(BlockTag::Latest),
-            )
-            .await
-            .map_err(StarknetError::ProviderError)?;
-        println!("committee_hash: {:?}", committee_hash);
-        Ok(())
-    }
+    // pub async fn get_committee_hash(
+    //     &self,
+    //     slot: u64,
+    //     config: &BankaiConfig,
+    // ) -> Result<(), StarknetError> {
+    //     let committee_id = slot / 0x2000_u64;
+    //     let committee_hash = self
+    //         .account
+    //         .provider()
+    //         .call(
+    //             FunctionCall {
+    //                 contract_address: config.contract_address,
+    //                 entry_point_selector: selector!("get_committee_hash"),
+    //                 calldata: vec![committee_id.into()],
+    //             },
+    //             BlockId::Tag(BlockTag::Latest),
+    //         )
+    //         .await
+    //         .map_err(StarknetError::ProviderError)?;
+    //     println!("committee_hash: {:?}", committee_hash);
+    //     Ok(())
+    // }
 
-    pub async fn get_epoch_proof(
-        &self,
-        slot: u64,
-        config: &BankaiConfig,
-    ) -> Result<(), StarknetError> {
-        let epoch_proof = self
-            .account
-            .provider()
-            .call(
-                FunctionCall {
-                    contract_address: config.contract_address,
-                    entry_point_selector: selector!("get_epoch_proof"),
-                    calldata: vec![slot.into()],
-                },
-                BlockId::Tag(BlockTag::Latest),
-            )
-            .await
-            .map_err(StarknetError::ProviderError)?;
-        println!("epoch_proof: {:?}", epoch_proof);
-        Ok(())
-    }
+    // pub async fn get_epoch_proof(
+    //     &self,
+    //     slot: u64,
+    //     config: &BankaiConfig,
+    // ) -> Result<(), StarknetError> {
+    //     let epoch_proof = self
+    //         .account
+    //         .provider()
+    //         .call(
+    //             FunctionCall {
+    //                 contract_address: config.contract_address,
+    //                 entry_point_selector: selector!("get_epoch_proof"),
+    //                 calldata: vec![slot.into()],
+    //             },
+    //             BlockId::Tag(BlockTag::Latest),
+    //         )
+    //         .await
+    //         .map_err(StarknetError::ProviderError)?;
+    //     println!("epoch_proof: {:?}", epoch_proof);
+    //     Ok(())
+    // }
 
     pub async fn get_latest_epoch(&self, config: &BankaiConfig) -> Result<Felt, StarknetError> {
         let latest_epoch = self

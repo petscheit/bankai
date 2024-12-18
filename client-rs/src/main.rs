@@ -16,9 +16,6 @@ use utils::{
     rpc::BeaconRpcClient,
     starknet_client::{StarknetClient, StarknetError},
 };
-// use rand::Rng;
-// use std::fs::File;
-// use std::io::Write;
 use clap::{Parser, Subcommand};
 use dotenv::from_filename;
 use std::env;
