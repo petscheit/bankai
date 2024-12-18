@@ -38,10 +38,72 @@ echo "Fetching Garaga-zero as submodule..."
 git submodule update --init
 mkdir -p cairo/build
 
+
 # Create virtual environment
 if ! python3.10 -m venv venv; then
     echo "Failed to create virtual environment with python3.10"
     exit 1
+fi
+
+# Install Cairo tools before activating venv
+echo "Installing Cairo tools..."
+case "$OSTYPE" in
+    linux-gnu*)
+        curl -L https://github.com/starkware-libs/cairo/releases/download/v2.4.0/cairo-2.4.0-x86_64-unknown-linux-musl.tar.gz -o cairo.tar.gz
+        tar -xzf cairo.tar.gz
+        sudo mv cairo/bin/* /usr/local/bin/
+        rm -rf cairo.tar.gz cairo
+        ;;
+    darwin*)
+        if command -v brew >/dev/null; then
+            brew install cairo
+        else
+            echo "Homebrew is not installed. Please install Homebrew and try again."
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Unsupported operating system for automatic Cairo installation."
+        exit 1
+        ;;
+esac
+
+# Function to install GNU parallel
+install_parallel() {
+    echo "Installing GNU parallel..."
+    case "$OSTYPE" in
+        linux-gnu*)
+            # Linux
+            if command -v apt-get >/dev/null; then
+                sudo apt-get update && sudo apt-get install -y parallel
+            elif command -v dnf >/dev/null; then
+                sudo dnf install -y parallel
+            else
+                echo "Unsupported Linux distribution for automatic parallel installation."
+                exit 1
+            fi
+            ;;
+        darwin*)
+            # macOS
+            if command -v brew >/dev/null; then
+                brew install parallel
+            else
+                echo "Homebrew is not installed. Please install Homebrew and try again."
+                exit 1
+            fi
+            ;;
+        *)
+            echo "Unsupported operating system for automatic parallel installation."
+            exit 1
+            ;;
+    esac
+}
+
+# Check if parallel is installed, if not, attempt to install it
+if ! command -v parallel >/dev/null; then
+    install_parallel
+else
+    echo "GNU parallel is already installed."
 fi
 
 echo 'export PYTHONPATH="$PWD:$PWD/cairo/packages/garaga_zero:$PYTHONPATH"' >> venv/bin/activate
