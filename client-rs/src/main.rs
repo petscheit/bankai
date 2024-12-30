@@ -4,14 +4,17 @@ mod epoch_update;
 mod sync_committee;
 mod traits;
 mod utils;
+mod execution_header;
 
 use config::BankaiConfig;
 use contract_init::ContractInitializationData;
 use epoch_update::EpochUpdate;
+use execution_header::ExecutionHeaderProof;
 use starknet::core::types::Felt;
 use sync_committee::SyncCommitteeUpdate;
 use traits::Provable;
 use utils::{atlantic_client::AtlanticClient, cairo_runner::CairoRunner};
+use beacon_state_proof::error::Error as BeaconStateProofError;
 use utils::{
     rpc::BeaconRpcClient,
     starknet_client::{StarknetClient, StarknetError},
@@ -30,6 +33,7 @@ pub enum Error {
     DeserializeError(String),
     IoError(std::io::Error),
     StarknetError(StarknetError),
+    BeaconStateProofError(BeaconStateProofError),
     BlockNotFound,
     FetchSyncCommitteeError,
     FailedFetchingBeaconState,
@@ -163,6 +167,10 @@ enum Commands {
         #[arg(long, short)]
         slot: u64,
     },
+    ExecutionHeader {
+        #[arg(long, short)]
+        block: u64,
+    },
 }
 
 #[derive(Parser)]
@@ -185,6 +193,9 @@ async fn main() -> Result<(), Error> {
     let bankai = BankaiClient::new().await;
 
     match cli.command {
+        Commands::ExecutionHeader { block } => {
+            ExecutionHeaderProof::fetch_proof(&bankai.client, block).await?;
+        }
         Commands::CommitteeUpdate { slot, export } => {
             println!("SyncCommittee command received with slot: {}", slot);
             let proof = bankai.get_sync_committee_update(slot).await?;

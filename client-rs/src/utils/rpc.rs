@@ -1,10 +1,15 @@
 use crate::epoch_update::SyncCommitteeValidatorPubs;
 use crate::Error;
+use alloy_primitives::bytes::Bytes;
 use alloy_rpc_types_beacon::events::light_client_finality::SyncAggregate;
 use alloy_rpc_types_beacon::header::HeaderResponse;
 use itertools::Itertools;
 use reqwest::Client;
+use serde::Deserialize;
 use serde_json::Value;
+use types::{AbstractExecPayload, BeaconBlockBody, ExecutionPayload, FullPayload};
+use types::eth_spec::MainnetEthSpec;
+
 
 /// A client for interacting with the Ethereum Beacon Chain RPC endpoints.
 /// Provides methods to fetch headers, sync aggregates, and validator information.
@@ -39,6 +44,19 @@ impl BeaconRpcClient {
             .map_err(Error::RpcError)
     }
 
+    async fn get_ssz_blob(&self, route: &str) -> Result<Bytes, Error> {
+        let url = format!("{}/{}", self.rpc_url, route);
+        self.provider
+            .get(url)
+            .header("Accept", "application/octet-stream")
+            .send()
+            .await
+            .map_err(Error::RpcError)?
+            .bytes()
+            .await
+            .map_err(Error::RpcError)
+    }
+
     /// Fetches the beacon chain header for a specific slot.
     /// This provides information about the block at the given slot number.
     /// Returns Error::BlockNotFound if no block exists at the specified slot.
@@ -62,7 +80,7 @@ impl BeaconRpcClient {
     /// the previous slot's header.
     pub async fn get_sync_aggregate(&self, mut slot: u64) -> Result<SyncAggregate, Error> {
         slot += 1; // signature is in the next slot
-                   // Ensure the slot is not missed and increment in case it is
+        // Ensure the slot is not missed and increment in case it is
         match self.get_header(slot).await {
             Ok(header) => header,
             Err(Error::EmptySlotDetected(_)) => {
@@ -137,6 +155,16 @@ impl BeaconRpcClient {
                     .ok_or(Error::FetchSyncCommitteeError)
             })
             .collect()
+    }
+
+    pub async fn get_block_body(&self, slot: u64) -> Result<BeaconBlockBody<MainnetEthSpec, FullPayload<MainnetEthSpec>>, Error> {
+        let json = self
+            .get_json(&format!("eth/v2/beacon/blocks/{}", slot))
+            .await?;
+
+        let block: BeaconBlockBody<MainnetEthSpec, FullPayload<MainnetEthSpec>> = serde_json::from_value(json["data"]["message"]["body"].clone()).unwrap();
+        
+        Ok(block)
     }
 
     /// Fetches the public keys of validators in the sync committee for a given slot.
