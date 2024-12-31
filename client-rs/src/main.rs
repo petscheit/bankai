@@ -44,6 +44,7 @@ pub enum Error {
     CairoRunError(String),
     AtlanticError(reqwest::Error),
     InvalidResponse(String),
+    InvalidMerkleTree
 }
 
 impl From<StarknetError> for Error {
