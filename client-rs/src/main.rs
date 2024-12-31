@@ -195,7 +195,10 @@ async fn main() -> Result<(), Error> {
 
     match cli.command {
         Commands::ExecutionHeader { block } => {
-            ExecutionHeaderProof::fetch_proof(&bankai.client, block).await?;
+            let proof = ExecutionHeaderProof::fetch_proof(&bankai.client, block).await?;
+            let json = serde_json::to_string_pretty(&proof)
+                .map_err(|e| Error::DeserializeError(e.to_string()))?;
+            println!("{}", json);
         }
         Commands::CommitteeUpdate { slot, export } => {
             println!("SyncCommittee command received with slot: {}", slot);
