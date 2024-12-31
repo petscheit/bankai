@@ -227,9 +227,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-trie"
-version = "0.7.7"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e428104b2445a4f929030891b3dbf8c94433a8349ba6480946bf6af7975c2f6"
+checksum = "6917c79e837aa7b77b7a6dae9f89cbe15313ac161c4d3cfaf8909ef21f3d22d8"
 dependencies = [
  "alloy-primitives 0.8.15",
  "alloy-rlp",
@@ -537,7 +537,7 @@ dependencies = [
  "reqwest 0.11.27",
  "serde",
  "tokio",
- "types",
+ "types 0.2.1 (git+https://github.com/petscheit/lighthouse)",
 ]
 
 [[package]]
@@ -591,7 +591,24 @@ dependencies = [
 [[package]]
 name = "bls"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#434782e5c3b0dd09bed26b0d51998781b6ba5a81"
+dependencies = [
+ "arbitrary",
+ "blst",
+ "ethereum-types",
+ "ethereum_hashing 0.6.0",
+ "ethereum_serde_utils 0.5.2",
+ "ethereum_ssz",
+ "hex",
+ "rand",
+ "serde",
+ "tree_hash 0.6.0",
+ "zeroize",
+]
+
+[[package]]
+name = "bls"
+version = "0.2.0"
+source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "arbitrary",
  "blst",
@@ -773,7 +790,7 @@ dependencies = [
  "tokio",
  "tree_hash 0.8.0",
  "tree_hash_derive 0.8.0",
- "types",
+ "types 0.2.1",
 ]
 
 [[package]]
@@ -785,7 +802,14 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 [[package]]
 name = "compare_fields"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#434782e5c3b0dd09bed26b0d51998781b6ba5a81"
+dependencies = [
+ "itertools 0.10.5",
+]
+
+[[package]]
+name = "compare_fields"
+version = "0.2.0"
+source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "itertools 0.10.5",
 ]
@@ -793,7 +817,15 @@ dependencies = [
 [[package]]
 name = "compare_fields_derive"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#434782e5c3b0dd09bed26b0d51998781b6ba5a81"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "compare_fields_derive"
+version = "0.2.0"
+source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -1202,9 +1234,22 @@ dependencies = [
 [[package]]
 name = "eth2_interop_keypairs"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#434782e5c3b0dd09bed26b0d51998781b6ba5a81"
 dependencies = [
- "bls",
+ "bls 0.2.0",
+ "ethereum_hashing 0.6.0",
+ "hex",
+ "lazy_static",
+ "num-bigint",
+ "serde",
+ "serde_yaml",
+]
+
+[[package]]
+name = "eth2_interop_keypairs"
+version = "0.2.0"
+source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
+dependencies = [
+ "bls 0.2.0 (git+https://github.com/petscheit/lighthouse)",
  "ethereum_hashing 0.6.0",
  "hex",
  "lazy_static",
@@ -2054,7 +2099,14 @@ dependencies = [
 [[package]]
 name = "int_to_bytes"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#434782e5c3b0dd09bed26b0d51998781b6ba5a81"
+dependencies = [
+ "bytes",
+]
+
+[[package]]
+name = "int_to_bytes"
+version = "0.2.0"
+source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "bytes",
 ]
@@ -2140,7 +2192,23 @@ dependencies = [
 [[package]]
 name = "kzg"
 version = "0.1.0"
-source = "git+https://github.com/petscheit/lighthouse#434782e5c3b0dd09bed26b0d51998781b6ba5a81"
+dependencies = [
+ "arbitrary",
+ "c-kzg",
+ "derivative",
+ "ethereum_hashing 0.6.0",
+ "ethereum_serde_utils 0.5.2",
+ "ethereum_ssz",
+ "ethereum_ssz_derive",
+ "hex",
+ "serde",
+ "tree_hash 0.6.0",
+]
+
+[[package]]
+name = "kzg"
+version = "0.1.0"
+source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "arbitrary",
  "c-kzg",
@@ -2248,12 +2316,22 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "merkle_proof"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#434782e5c3b0dd09bed26b0d51998781b6ba5a81"
 dependencies = [
  "ethereum-types",
  "ethereum_hashing 0.6.0",
  "lazy_static",
- "safe_arith",
+ "safe_arith 0.1.0",
+]
+
+[[package]]
+name = "merkle_proof"
+version = "0.2.0"
+source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
+dependencies = [
+ "ethereum-types",
+ "ethereum_hashing 0.6.0",
+ "lazy_static",
+ "safe_arith 0.1.0 (git+https://github.com/petscheit/lighthouse)",
 ]
 
 [[package]]
@@ -2402,9 +2480,9 @@ dependencies = [
 
 [[package]]
 name = "nybbles"
-version = "0.3.0"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55a62e678a89501192cc5ebf47dcbc656b608ae5e1c61c9251fe35230f119fe3"
+checksum = "a3409fc85ac27b27d971ea7cd1aabafd2eefa6de7e481c8d4f707225c117e81a"
 dependencies = [
  "const-hex",
  "serde",
@@ -3098,7 +3176,11 @@ checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 [[package]]
 name = "safe_arith"
 version = "0.1.0"
-source = "git+https://github.com/petscheit/lighthouse#434782e5c3b0dd09bed26b0d51998781b6ba5a81"
+
+[[package]]
+name = "safe_arith"
+version = "0.1.0"
+source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 
 [[package]]
 name = "salsa20"
@@ -3656,7 +3738,15 @@ dependencies = [
 [[package]]
 name = "swap_or_not_shuffle"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#434782e5c3b0dd09bed26b0d51998781b6ba5a81"
+dependencies = [
+ "ethereum-types",
+ "ethereum_hashing 0.6.0",
+]
+
+[[package]]
+name = "swap_or_not_shuffle"
+version = "0.2.0"
+source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "ethereum-types",
  "ethereum_hashing 0.6.0",
@@ -3774,7 +3864,15 @@ dependencies = [
 [[package]]
 name = "test_random_derive"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#434782e5c3b0dd09bed26b0d51998781b6ba5a81"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "test_random_derive"
+version = "0.2.0"
+source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -4084,29 +4182,28 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 [[package]]
 name = "types"
 version = "0.2.1"
-source = "git+https://github.com/petscheit/lighthouse#434782e5c3b0dd09bed26b0d51998781b6ba5a81"
 dependencies = [
  "alloy-primitives 0.7.7",
  "alloy-rlp",
  "arbitrary",
- "bls",
- "compare_fields",
- "compare_fields_derive",
+ "bls 0.2.0",
+ "compare_fields 0.2.0",
+ "compare_fields_derive 0.2.0",
  "derivative",
- "eth2_interop_keypairs",
+ "eth2_interop_keypairs 0.2.0",
  "ethereum-types",
  "ethereum_hashing 0.6.0",
  "ethereum_serde_utils 0.5.2",
  "ethereum_ssz",
  "ethereum_ssz_derive",
  "hex",
- "int_to_bytes",
+ "int_to_bytes 0.2.0",
  "itertools 0.10.5",
- "kzg",
+ "kzg 0.1.0",
  "lazy_static",
  "log",
  "maplit",
- "merkle_proof",
+ "merkle_proof 0.2.0",
  "metastruct",
  "milhouse",
  "parking_lot",
@@ -4116,7 +4213,7 @@ dependencies = [
  "regex",
  "rpds",
  "rusqlite",
- "safe_arith",
+ "safe_arith 0.1.0",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -4124,9 +4221,59 @@ dependencies = [
  "smallvec",
  "ssz_types",
  "superstruct",
- "swap_or_not_shuffle",
+ "swap_or_not_shuffle 0.2.0",
  "tempfile",
- "test_random_derive",
+ "test_random_derive 0.2.0",
+ "tree_hash 0.6.0",
+ "tree_hash_derive 0.6.0",
+]
+
+[[package]]
+name = "types"
+version = "0.2.1"
+source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
+dependencies = [
+ "alloy-primitives 0.7.7",
+ "alloy-rlp",
+ "arbitrary",
+ "bls 0.2.0 (git+https://github.com/petscheit/lighthouse)",
+ "compare_fields 0.2.0 (git+https://github.com/petscheit/lighthouse)",
+ "compare_fields_derive 0.2.0 (git+https://github.com/petscheit/lighthouse)",
+ "derivative",
+ "eth2_interop_keypairs 0.2.0 (git+https://github.com/petscheit/lighthouse)",
+ "ethereum-types",
+ "ethereum_hashing 0.6.0",
+ "ethereum_serde_utils 0.5.2",
+ "ethereum_ssz",
+ "ethereum_ssz_derive",
+ "hex",
+ "int_to_bytes 0.2.0 (git+https://github.com/petscheit/lighthouse)",
+ "itertools 0.10.5",
+ "kzg 0.1.0 (git+https://github.com/petscheit/lighthouse)",
+ "lazy_static",
+ "log",
+ "maplit",
+ "merkle_proof 0.2.0 (git+https://github.com/petscheit/lighthouse)",
+ "metastruct",
+ "milhouse",
+ "parking_lot",
+ "rand",
+ "rand_xorshift",
+ "rayon",
+ "regex",
+ "rpds",
+ "rusqlite",
+ "safe_arith 0.1.0 (git+https://github.com/petscheit/lighthouse)",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "slog",
+ "smallvec",
+ "ssz_types",
+ "superstruct",
+ "swap_or_not_shuffle 0.2.0 (git+https://github.com/petscheit/lighthouse)",
+ "tempfile",
+ "test_random_derive 0.2.0 (git+https://github.com/petscheit/lighthouse)",
  "tree_hash 0.6.0",
  "tree_hash_derive 0.6.0",
 ]

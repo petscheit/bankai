@@ -12,7 +12,7 @@ serde_derive = "1.0.215"
 serde_json = "1.0.133"
 tokio = { version = "1.0", features = ["full"] }
 beacon-state-proof = { git = "https://github.com/petscheit/beacon-state-proof" }
-types = { git = "https://github.com/petscheit/lighthouse", package = "types" }
+types = { path = "../../lighthouse/consensus/types", package = "types" }
 sha2 = "0.10.8"
 reqwest = { version = "0.12.9", features = ["json", "multipart"] }
 rand = "0.8.5"
