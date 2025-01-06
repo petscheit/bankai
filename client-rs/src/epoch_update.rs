@@ -1,9 +1,7 @@
 use std::fs;
 
 use crate::{
-    traits::{ProofType, Provable, Submittable},
-    utils::{hashing::get_committee_hash, rpc::BeaconRpcClient},
-    Error,
+    execution_header::ExecutionHeaderProof, traits::{ProofType, Provable, Submittable}, utils::{hashing::get_committee_hash, rpc::BeaconRpcClient}, Error
 };
 use alloy_primitives::FixedBytes;
 use alloy_rpc_types_beacon::{
@@ -86,6 +84,8 @@ pub struct EpochCircuitInputs {
     pub aggregate_pub: G1Point,
     /// Public keys of validators who didn't sign
     pub non_signers: Vec<G1Point>,
+    /// Proof of inclusion for the execution payload header
+    pub execution_header_proof: ExecutionHeaderProof,
 }
 
 /// Represents a beacon chain block header
@@ -181,6 +181,7 @@ impl EpochCircuitInputs {
             signature_point,
             aggregate_pub: G1Point(validator_pubs.aggregate_pub),
             non_signers: non_signers.iter().map(|p| G1Point(*p)).collect(),
+            execution_header_proof: ExecutionHeaderProof::fetch_proof(client, slot).await?,
         })
     }
 
@@ -370,37 +371,40 @@ impl<'de> Deserialize<'de> for G2Point {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExpectedCircuitOutputs {
-    pub header_root: FixedBytes<32>,
-    pub state_root: FixedBytes<32>,
+    pub beacon_header_root: FixedBytes<32>,
+    pub slot: u64,
     pub committee_hash: FixedBytes<32>,
     pub n_signers: u64,
-    pub slot: u64,
+    pub execution_header_hash: FixedBytes<32>,
+    pub execution_header_height: u64,
 }
 
 impl Submittable<EpochCircuitInputs> for ExpectedCircuitOutputs {
     fn from_inputs(circuit_inputs: &EpochCircuitInputs) -> Self {
         Self {
-            header_root: circuit_inputs.header.tree_hash_root(),
-            state_root: circuit_inputs.header.state_root,
+            beacon_header_root: circuit_inputs.header.tree_hash_root(),
+            slot: circuit_inputs.header.slot,
             committee_hash: get_committee_hash(circuit_inputs.aggregate_pub.0),
             n_signers: 512 - circuit_inputs.non_signers.len() as u64,
-            slot: circuit_inputs.header.slot,
+            execution_header_hash: circuit_inputs.execution_header_proof.leaf,
+            execution_header_height: circuit_inputs.execution_header_proof.execution_payload_header.block_number(),
         }
     }
 
     fn to_calldata(&self) -> Vec<Felt> {
-        let (header_root_high, header_root_low) = self.header_root.as_slice().split_at(16);
-        let (state_root_high, state_root_low) = self.state_root.as_slice().split_at(16);
+        let (header_root_high, header_root_low) = self.beacon_header_root.as_slice().split_at(16);
+        let (execution_header_hash_high, execution_header_hash_low) = self.execution_header_hash.as_slice().split_at(16);
         let (committee_hash_high, committee_hash_low) = self.committee_hash.as_slice().split_at(16);
         vec![
             Felt::from_bytes_be_slice(header_root_low),
             Felt::from_bytes_be_slice(header_root_high),
-            Felt::from_bytes_be_slice(state_root_low),
-            Felt::from_bytes_be_slice(state_root_high),
+            Felt::from(self.slot),
             Felt::from_bytes_be_slice(committee_hash_low),
             Felt::from_bytes_be_slice(committee_hash_high),
             Felt::from(self.n_signers),
-            Felt::from(self.slot),
+            Felt::from_bytes_be_slice(execution_header_hash_low),
+            Felt::from_bytes_be_slice(execution_header_hash_high),
+            Felt::from(self.execution_header_height),
         ]
     }
 

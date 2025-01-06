@@ -5,58 +5,77 @@ use beacon_state_proof::state_proof_fetcher::TreeHash;
 use crate::utils::merkle::{hash_merkle_path, generate_merkle_path};
 use types::{BeaconBlockBody, ExecPayload, ExecutionPayloadHeader, MainnetEthSpec};
 use serde::{Serialize, Deserialize};
+
+/// Index of the execution payload in the beacon block body merkle tree
 const EXECUTION_PAYLOAD_LEAF_INDEX: usize = 9;
 
+/// Represents a proof of inclusion for an execution payload header in a beacon block
+/// 
+/// This structure contains all necessary components to verify that an execution payload
+/// header is part of a specific beacon block through merkle proof verification.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExecutionHeaderProof {
+    /// Root hash of the beacon block body merkle tree
     pub root: FixedBytes<32>,
-    pub path: Vec<FixedBytes<32>>,
+    /// Merkle proof path containing the intermediate hashes
+    pub path: Vec<FixedBytes<32>>,    
+    /// Hash of the execution payload header (leaf node)
     pub leaf: FixedBytes<32>,
+    /// Position of the execution payload in the merkle tree. Should be 9.
     pub index: usize,
+    /// The actual execution payload header data
     pub execution_payload_header: ExecutionPayloadHeader<MainnetEthSpec>,
+    /// Slot number of the beacon block containing this payload
     pub slot: u64,
 }
 
 impl ExecutionHeaderProof {
+    /// Fetches and constructs a merkle proof for an execution payload header at a given slot
+    /// 
+    /// # Arguments
+    /// * `client` - Reference to the beacon node RPC client
+    /// * `slot` - The slot number to fetch the proof for
+    /// 
+    /// # Returns
+    /// * `Result<ExecutionHeaderProof, Error>` - The constructed proof or an error
+    /// ```
     pub async fn fetch_proof(client: &BeaconRpcClient, slot: u64) -> Result<ExecutionHeaderProof, Error> {
+        // Fetch the beacon block body for the specified slot
         let beacon_block_body: BeaconBlockBody<MainnetEthSpec> = client.get_block_body(slot).await?;
         let root = beacon_block_body.tree_hash_root();
 
-        let payload = beacon_block_body.execution_payload().unwrap().to_execution_payload_header();
-        println!("{:#?}", payload);
+        // Extract the execution payload header
+        let payload: ExecutionPayloadHeader<MainnetEthSpec> = beacon_block_body
+            .execution_payload()
+            .unwrap()
+            .to_execution_payload_header();
 
+        // Generate merkle proof components
         let body_ref = beacon_block_body.to_ref();
-        let leafs: Vec<FixedBytes<32>> = body_ref.body_merkle_leaves().into_iter().map(|leaf| FixedBytes::from_slice(leaf.as_bytes())).collect();
-        let path = generate_merkle_path(leafs.clone(), 9).unwrap();
-
-        // ToDo: Facepalm
-        // let other_path = beacon_block_body.block_body_merkle_proof(25).unwrap();
-        // println!("Other path: {:?}", other_path);
+        let leafs: Vec<FixedBytes<32>> = body_ref
+            .body_merkle_leaves()
+            .into_iter()
+            .map(|leaf| FixedBytes::from_slice(leaf.as_bytes()))
+            .collect();
         
-        let leaf = leafs[9];
+        let path = generate_merkle_path(leafs.clone(), EXECUTION_PAYLOAD_LEAF_INDEX)
+            .unwrap();
+        let leaf = leafs[EXECUTION_PAYLOAD_LEAF_INDEX];
         
-        let computed_root = hash_merkle_path(path.clone(), leaf.clone(), 9);        
+        // Verify the merkle proof
+        let computed_root = hash_merkle_path(path.clone(), leaf.clone(), EXECUTION_PAYLOAD_LEAF_INDEX as u64);        
         assert_eq!(computed_root.as_slice(), root.as_bytes());
 
+        // Construct and return the proof
         let proof = ExecutionHeaderProof {
             root: FixedBytes::from_slice(root.as_bytes()),
-            path: path,
-            leaf: leaf,
-
-            index: 9,
+            path,
+            leaf,
+            index: EXECUTION_PAYLOAD_LEAF_INDEX,
             execution_payload_header: payload,
             slot,
         };
 
         Ok(proof)
-        // Concatenate all leaves into a single bytes array
-        // let mut bytes = Vec::new();
-
-        // for leaf in leafs {
-        //     bytes.extend_from_slice(&leaf.as_bytes());
-        // }
-        // let tree_hash = tree_hash::merkle_root(&bytes, 0);
-        // println!("Tree hash: {:?}", tree_hash);
     }
-
 }

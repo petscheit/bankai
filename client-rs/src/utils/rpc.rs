@@ -1,13 +1,11 @@
 use crate::epoch_update::SyncCommitteeValidatorPubs;
 use crate::Error;
-use alloy_primitives::bytes::Bytes;
 use alloy_rpc_types_beacon::events::light_client_finality::SyncAggregate;
 use alloy_rpc_types_beacon::header::HeaderResponse;
 use itertools::Itertools;
 use reqwest::Client;
-use serde::Deserialize;
 use serde_json::Value;
-use types::{AbstractExecPayload, BeaconBlockBody, ExecutionPayload, FullPayload};
+use types::{BeaconBlockBody, FullPayload};
 use types::eth_spec::MainnetEthSpec;
 
 
@@ -44,18 +42,18 @@ impl BeaconRpcClient {
             .map_err(Error::RpcError)
     }
 
-    async fn get_ssz_blob(&self, route: &str) -> Result<Bytes, Error> {
-        let url = format!("{}/{}", self.rpc_url, route);
-        self.provider
-            .get(url)
-            .header("Accept", "application/octet-stream")
-            .send()
-            .await
-            .map_err(Error::RpcError)?
-            .bytes()
-            .await
-            .map_err(Error::RpcError)
-    }
+    // async fn get_ssz_blob(&self, route: &str) -> Result<Bytes, Error> {
+    //     let url = format!("{}/{}", self.rpc_url, route);
+    //     self.provider
+    //         .get(url)
+    //         .header("Accept", "application/octet-stream")
+    //         .send()
+    //         .await
+    //         .map_err(Error::RpcError)?
+    //         .bytes()
+    //         .await
+    //         .map_err(Error::RpcError)
+    // }
 
     /// Fetches the beacon chain header for a specific slot.
     /// This provides information about the block at the given slot number.
