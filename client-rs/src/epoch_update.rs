@@ -381,12 +381,13 @@ pub struct ExpectedCircuitOutputs {
 
 impl Submittable<EpochCircuitInputs> for ExpectedCircuitOutputs {
     fn from_inputs(circuit_inputs: &EpochCircuitInputs) -> Self {
+        let block_hash: FixedBytes<32> = FixedBytes::from_slice(circuit_inputs.execution_header_proof.execution_payload_header.block_hash().into_root().as_bytes());
         Self {
             beacon_header_root: circuit_inputs.header.tree_hash_root(),
             slot: circuit_inputs.header.slot,
             committee_hash: get_committee_hash(circuit_inputs.aggregate_pub.0),
             n_signers: 512 - circuit_inputs.non_signers.len() as u64,
-            execution_header_hash: circuit_inputs.execution_header_proof.leaf,
+            execution_header_hash: block_hash,
             execution_header_height: circuit_inputs.execution_header_proof.execution_payload_header.block_number(),
         }
     }

@@ -42,13 +42,9 @@ func main{
         write_g2(ids.sig_point, program_input["circuit_inputs"]["signature_point"])
         ids.slot = program_input["circuit_inputs"]["header"]["slot"]
 
-        path_chunks = []
-        for chunk in program_input["circuit_inputs"]["execution_header_proof"]["path"]:
-            path_chunks.append(hex_to_chunks_32(chunk))
-        ids.execution_path_len = len(path_chunks)
-        print("chunks", path_chunks)
-        print("len", ids.execution_path_len)
-        segments.write_arg(ids.execution_path, path_chunks)
+        execution_path = [hex_to_chunks_32(node) for node in program_input["circuit_inputs"]["execution_header_proof"]["path"]]
+        ids.execution_path_len = len(execution_path)
+        segments.write_arg(ids.execution_path, execution_path)
     %}
     // %{ print("Running Verification for Slot: ", ids.slot) %}
 
@@ -82,16 +78,22 @@ func main{
             path=execution_path, path_len=4, leaf=root_felts, index=9
         );
 
+        %{
+            print("execution header hash", hex(ids.execution_hash.low), hex(ids.execution_hash.high))
+        %}
+
         assert computed_body_root.low = body_root.low;
         assert computed_body_root.high = body_root.high;
     }
 
     %{
         from cairo.py.utils import uint256_to_int
-        assert uint256_to_int(ids.header_root) == int(program_input["expected_circuit_outputs"]["header_root"], 16), "Header Root Mismatch"
+        assert uint256_to_int(ids.header_root) == int(program_input["expected_circuit_outputs"]["beacon_header_root"], 16), "Header Root Mismatch"
         assert uint256_to_int(ids.committee_hash) == int(program_input["expected_circuit_outputs"]["committee_hash"], 16), "Committee Hash Mismatch"
         assert ids.n_signers == program_input["expected_circuit_outputs"]["n_signers"], "Number of Signers Mismatch"
         assert ids.slot == program_input["expected_circuit_outputs"]["slot"], "Slot Mismatch"
+        assert uint256_to_int(ids.execution_hash) == int(program_input["expected_circuit_outputs"]["execution_header_hash"], 16), "Execution Header Hash Mismatch"
+        assert ids.execution_height == program_input["expected_circuit_outputs"]["execution_header_height"], "Execution Header Height Mismatch"
     %}
 
     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);

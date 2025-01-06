@@ -110,7 +110,6 @@ namespace SSZ {
 
         let leafs = cast(leaf_segments, Uint256*);
         let root = MerkleTree.compute_root(leafs=leafs, leafs_len=32);
-        %{ print("Execution header root: ", hex(ids.root.low), hex(ids.root.high)) %}
 
         let (header_height) = uint256_reverse_endian(leafs[6]);
 
@@ -256,6 +255,7 @@ namespace MerkleUtils {
 
     func chunk_uint256{range_check_ptr, pow2_array: felt*}(value: Uint256) -> felt* {
         let (output_ptr: felt*) = alloc();
+        // Process left-high
         let (q0, r0) = felt_divmod(value.high, pow2_array[32]);
         let (q1, r1) = felt_divmod(q0, pow2_array[32]);
         let (q2, r2) = felt_divmod(q1, pow2_array[32]);
@@ -264,6 +264,16 @@ namespace MerkleUtils {
         assert [output_ptr + 1] = r2;
         assert [output_ptr + 2] = r1;
         assert [output_ptr + 3] = r0;
+
+        // Proccess left-low
+        let (q4, r4) = felt_divmod(value.low, pow2_array[32]);
+        let (q5, r5) = felt_divmod(q4, pow2_array[32]);
+        let (q6, r6) = felt_divmod(q5, pow2_array[32]);
+        let (q7, r7) = felt_divmod(q6, pow2_array[32]);
+        assert [output_ptr + 4] = r7;
+        assert [output_ptr + 5] = r6;
+        assert [output_ptr + 6] = r5;
+        assert [output_ptr + 7] = r4;
 
         return output_ptr;
     }
