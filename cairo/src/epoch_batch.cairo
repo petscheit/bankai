@@ -8,6 +8,8 @@ from starkware.cairo.common.builtin_poseidon.poseidon import (
     poseidon_hash_many,
 )
 from cairo.src.epoch_update import run_epoch_update
+from starkware.cairo.common.memcpy import memcpy
+from starkware.cairo.common.memset import memset
 from cairo.src.merkle import PoseidonMerkleTree
 from cairo.src.utils import pow2alloc128
 from sha import SHA256
@@ -39,20 +41,40 @@ func main{
     
     with pow2_array, sha256_ptr {
         let (epoch_outputs: felt*) = alloc();
-        run_epoch_batches{
+        let (latest_batch_output: felt*) = run_epoch_batches{
             output_ptr=epoch_outputs,
         }(0, batch_len, committee_hash);
-        
+
+        // ToDo: ensure this can stay unvalidated
+        local next_power_of_2: felt; // Unvalidated hint.
+        %{
+            # Find next power of 2
+            def next_power_of_2(n):
+                power = 1
+                while power < n:
+                    power *= 2
+                return power
+                
+            ids.next_power_of_2 = next_power_of_2(ids.batch_len)
+
+            print("next power of 2", ids.next_power_of_2)
+        %}
+
+        // Pad the epoch outputs with zeros to the next power of 2
+        memset(dst=epoch_outputs + batch_len, value=0, n=next_power_of_2 - batch_len);
+
         // now we compute a merkle root of the epoch outputs
-        let epoch_root = PoseidonMerkleTree.compute_root(epoch_outputs, batch_len);
-        %{ print("computed batch root", hex(ids.epoch_root)) %}
+        let epoch_root = PoseidonMerkleTree.compute_root(epoch_outputs, next_power_of_2);
     }
+    %{ print("computed batch root", hex(ids.epoch_root)) %}
 
     assert [output_ptr] = epoch_root;
     assert [output_ptr + 1] = committee_hash.low;
     assert [output_ptr + 2] = committee_hash.high;
 
-    tempvar output_ptr = output_ptr + 3;
+    // Copy the latest batch output to the output_ptr
+    memcpy(dst=output_ptr + 3, src=latest_batch_output, len=11);
+    tempvar output_ptr = output_ptr + 14;
 
     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
     return ();
@@ -68,12 +90,8 @@ func run_epoch_batches{
     mul_mod_ptr: ModBuiltin*,
     pow2_array: felt*,
     sha256_ptr: felt*,
-}(index: felt, batch_len: felt, committee_hash: Uint256) {
+}(index: felt, batch_len: felt, committee_hash: Uint256) -> (latest_batch_output: felt*) {
     alloc_locals;
-
-    if(index == batch_len) {
-        return ();
-    }
 
     %{ vm_enter_scope({'program_input': program_input["epochs"][ids.index]}) %}
     
@@ -95,6 +113,12 @@ func run_epoch_batches{
     let epoch_output_hash = compute_batch_hash(epoch_output);
     assert [output_ptr + index] = epoch_output_hash;
 
+    // If we have reached the last batch, return the ouput
+    if(index + 1 == batch_len) {
+        return (latest_batch_output=epoch_output);
+    }
+
+    // Otherwise, run the next batch
     return run_epoch_batches(index=index + 1, batch_len=batch_len, committee_hash=committee_hash);
 }
 
