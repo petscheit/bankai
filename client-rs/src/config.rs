@@ -1,6 +1,6 @@
 use starknet::core::types::Felt;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BankaiConfig {
     pub contract_class_hash: Felt,
     pub contract_address: Felt,

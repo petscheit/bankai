@@ -4,6 +4,10 @@ use crate::traits::{ProofType, Provable};
 use crate::Error;
 use reqwest::multipart::{Form, Part};
 use serde::{Deserialize, Serialize};
+use tokio::time::{sleep, Duration};
+use tracing::{debug, error, info, trace};
+
+#[derive(Debug)]
 pub struct AtlanticClient {
     endpoint: String,
     api_key: String,
@@ -60,9 +64,9 @@ impl AtlanticClient {
             .map_err(Error::AtlanticError)?;
 
         if !response.status().is_success() {
-            println!("Error status: {}", response.status());
+            error!("Error status: {}", response.status());
             let error_text = response.text().await.map_err(Error::AtlanticError)?;
-            println!("Error response: {}", error_text);
+            error!("Error response: {}", error_text);
             return Err(Error::InvalidResponse(format!(
                 "Request failed: {}",
                 error_text
@@ -80,7 +84,7 @@ impl AtlanticClient {
     }
 
     pub async fn submit_wrapped_proof(&self, proof: StarkProof) -> Result<String, Error> {
-        println!("Uploading to Atlantic...");
+        info!("Uploading to Atlantic...");
         // Serialize the proof to JSON string
         let proof_json =
             serde_json::to_string(&proof).map_err(|e| Error::DeserializeError(e.to_string()))?;
@@ -170,5 +174,41 @@ impl AtlanticClient {
             .ok_or_else(|| Error::InvalidResponse("Missing status field".into()))?;
 
         Ok(status.to_string())
+    }
+
+    pub async fn poll_batch_status_until_done(
+        &self,
+        batch_id: &str,
+        sleep_duration: Duration,
+        max_retries: usize,
+    ) -> Result<bool, Error> {
+        for attempt in 1..=max_retries {
+            debug!("Pooling Atlantic for update... {}", batch_id);
+            let status = self.check_batch_status(batch_id).await?;
+
+            if status == "DONE" {
+                return Ok(true);
+            }
+
+            if status == "FAILED" {
+                return Err(Error::InvalidResponse(format!(
+                    "Atlantic processing failed for query {}",
+                    batch_id
+                )));
+            }
+
+            trace!(
+                "Batch not completed yet. Status: {}. Pooling attempt {}/{}",
+                status,
+                attempt,
+                max_retries
+            );
+            sleep(sleep_duration).await;
+        }
+
+        return Err(Error::InvalidResponse(format!(
+            "Pooling timeout for batch {}",
+            batch_id
+        )));
     }
 }

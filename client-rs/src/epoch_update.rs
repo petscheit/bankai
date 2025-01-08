@@ -17,6 +17,13 @@ use tree_hash::TreeHash;
 use tree_hash_derive::TreeHash;
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct EpochProof {
+    pub header_root: FixedBytes<32>,
+    pub state_root: FixedBytes<32>,
+    pub n_signers: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdate {
     pub circuit_inputs: EpochCircuitInputs,
     pub expected_circuit_outputs: ExpectedCircuitOutputs,

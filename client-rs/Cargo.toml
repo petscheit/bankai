@@ -3,6 +3,15 @@ name = "client-rs"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "daemon"  # Binary name (used with `cargo run --bin bin1`)
+path = "src/main.rs"  # Path to the source file for this binary
+
+[[bin]]
+name = "cli"
+path = "src/cli.rs"
+
+
 [dependencies]
 alloy-primitives = "0.8.13"
 ethereum_serde_utils = "0.7.0"
@@ -13,7 +22,7 @@ serde_json = "1.0.133"
 tokio = { version = "1.0", features = ["full"] }
 beacon-state-proof = { git = "https://github.com/petscheit/beacon-state-proof" }
 sha2 = "0.10.8"
-reqwest = { version = "0.12.9", features = ["json", "multipart"] }
+reqwest = { version = "0.12.9", features = ["json", "multipart", "stream"] }
 rand = "0.8.5"
 alloy-rpc-types-beacon = "0.7.2"
 itertools = "0.13.0"
@@ -23,3 +32,20 @@ starknet = "0.12.0"
 tree_hash_derive = "0.8.0"
 tree_hash = "0.8.0"
 dotenv = "0.15"
+tokio-postgres = { version = "0.7.12", features = [
+    "with-uuid-1" ] }
+axum = "0.7.9"
+thiserror = "2.0.9"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
+tokio-stream = "0.1.17"
+futures = "0.3"
+uuid = { version = "1.11.0", features = [
+    "v4",                
+    "fast-rng",       
+    "macro-diagnostics"
+] }
+postgres-types = { version = "0.2.8", features = ["derive"] }
+num_cpus = "1.16.0"
+
+

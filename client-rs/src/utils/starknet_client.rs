@@ -21,6 +21,8 @@ use std::sync::Arc;
 use crate::contract_init::ContractInitializationData;
 use crate::traits::Submittable;
 use crate::BankaiConfig;
+
+#[derive(Debug)]
 pub struct StarknetClient {
     account: Arc<SingleOwnerAccount<JsonRpcClient<HttpTransport>, LocalWallet>>,
     // provider: Arc<JsonRpcClient<HttpTransport>>,
@@ -93,7 +95,7 @@ impl StarknetClient {
         &self,
         update: impl Submittable<T>,
         config: &BankaiConfig,
-    ) -> Result<(), StarknetError> {
+    ) -> Result<Felt, StarknetError> {
         let result = self
             .account
             .execute_v1(vec![Call {
@@ -106,7 +108,9 @@ impl StarknetClient {
             .map_err(|e| StarknetError::AccountError(e.to_string()))?;
 
         println!("tx_hash: {:?}", result.transaction_hash);
-        Ok(())
+
+        // Return the transaction hash
+        Ok(result.transaction_hash)
     }
 
     pub async fn get_committee_hash(

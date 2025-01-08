@@ -8,6 +8,7 @@ use serde_json::Value;
 
 /// A client for interacting with the Ethereum Beacon Chain RPC endpoints.
 /// Provides methods to fetch headers, sync aggregates, and validator information.
+#[derive(Debug)]
 pub(crate) struct BeaconRpcClient {
     provider: Client,
     pub rpc_url: String,
