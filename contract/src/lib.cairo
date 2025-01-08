@@ -1,8 +1,15 @@
-#[derive(Drop, starknet::Store, Serde)] // Added Serde trait
+#[derive(Drop, starknet::Store, Serde)]
 pub struct EpochProof {
+    // Hash of the beacon header (root since ssz)
     header_root: u256,
-    state_root: u256,
+    // state root at the mapped slot
+    beacon_state_root: u256,
+    // Number of signers (out of 512)
     n_signers: u64,
+    // Hash of the execution header
+    execution_hash: u256,
+    // Height of the execution header
+    execution_height: u64,
 }
 
 #[starknet::interface]
@@ -14,15 +21,17 @@ pub trait IBankaiContract<TContractState> {
     fn get_epoch_update_program_hash(self: @TContractState) -> felt252;
     fn get_epoch_proof(self: @TContractState, slot: u64) -> EpochProof;
     fn verify_committee_update(
-        ref self: TContractState, state_root: u256, committee_hash: u256, slot: u64,
+        ref self: TContractState, beacon_state_root: u256, committee_hash: u256, slot: u64,
     );
     fn verify_epoch_update(
         ref self: TContractState,
         header_root: u256,
-        state_root: u256,
+        beacon_state_root: u256,
+        slot: u64,
         committee_hash: u256,
         n_signers: u64,
-        slot: u64,
+        execution_hash: u256,
+        execution_height: u64,
     );
 }
 
@@ -43,13 +52,25 @@ pub mod BankaiContract {
     #[derive(Drop, starknet::Event)]
     pub enum Event {
         CommitteeUpdated: CommitteeUpdated,
-        // EpochUpdated: EpochUpdated,
+        EpochUpdated: EpochUpdated,
     }
 
     #[derive(Drop, starknet::Event)]
     pub struct CommitteeUpdated {
         committee_id: u64,
         committee_hash: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct EpochUpdated {
+        // Hash of the beacon header (root since ssz)
+        beacon_root: u256,
+        // Slot of the beacon header
+        slot: u64,
+        // Hash of the execution header
+        execution_hash: u256,
+        // Height of the execution header
+        execution_height: u64,
     }
 
     #[storage]
@@ -114,14 +135,14 @@ pub mod BankaiContract {
         }
 
         fn verify_committee_update(
-            ref self: ContractState, state_root: u256, committee_hash: u256, slot: u64,
+            ref self: ContractState, beacon_state_root: u256, committee_hash: u256, slot: u64,
         ) {
             let epoch_proof = self.epochs.read(slot);
-            assert(state_root == epoch_proof.state_root, 'Invalid State Root!');
+            assert(beacon_state_root == epoch_proof.beacon_state_root, 'Invalid State Root!');
 
             // for now we dont ensure the fact hash is valid
             let fact_hash = compute_committee_proof_fact_hash(
-                @self, state_root, committee_hash, slot,
+                @self, beacon_state_root, committee_hash, slot,
             );
             // println!("fact_hash: {:?}", fact_hash);
             assert(is_valid_fact_hash(fact_hash), 'Invalid Fact Hash!');
@@ -144,10 +165,12 @@ pub mod BankaiContract {
         fn verify_epoch_update(
             ref self: ContractState,
             header_root: u256,
-            state_root: u256,
+            beacon_state_root: u256,
+            slot: u64,
             committee_hash: u256,
             n_signers: u64,
-            slot: u64,
+            execution_hash: u256,
+            execution_height: u64,
         ) {
             // println!("verify_epoch_update");
             let signing_committee_id = (slot / 0x2000);
@@ -155,34 +178,32 @@ pub mod BankaiContract {
             assert(committee_hash == valid_committee_hash, 'Invalid Committee Hash!');
 
             let fact_hash = compute_epoch_proof_fact_hash(
-                @self, header_root, state_root, committee_hash, n_signers, slot,
+                @self, header_root, beacon_state_root, slot, committee_hash, n_signers, execution_hash, execution_height,
             );
 
-            // println!("fact_hash: {:?}", fact_hash);
             assert(is_valid_fact_hash(fact_hash), 'Invalid Fact Hash!');
 
             let epoch_proof = EpochProof {
-                header_root: header_root, state_root: state_root, n_signers: n_signers,
+                header_root: header_root, beacon_state_root: beacon_state_root, n_signers: n_signers, execution_hash: execution_hash, execution_height: execution_height,
             };
             self.epochs.write(slot, epoch_proof);
 
             self.latest_epoch.write(slot);
-            // self.emit(Event::EpochUpdated(EpochUpdated {
-        //     slot: slot,
-        //     epoch_proof: epoch_proof
-        // }));
+            self.emit(Event::EpochUpdated(EpochUpdated {
+                beacon_root: header_root, slot: slot, execution_hash: execution_hash, execution_height: execution_height,
+            }));
         }
     }
 
     fn compute_committee_proof_fact_hash(
-        self: @ContractState, state_root: u256, committee_hash: u256, slot: u64,
+        self: @ContractState, beacon_state_root: u256, committee_hash: u256, slot: u64,
     ) -> felt252 {
         let fact_hash = calculate_wrapped_bootloaded_fact_hash(
             WRAPPER_PROGRAM_HASH,
             SHARP_BOOTLOADER_PROGRAM_HASH,
             self.committee_update_program_hash.read(),
             [
-                state_root.low.into(), state_root.high.into(), committee_hash.low.into(),
+                beacon_state_root.low.into(), beacon_state_root.high.into(), committee_hash.low.into(),
                 committee_hash.high.into(), slot.into(),
             ]
                 .span(),
@@ -194,9 +215,11 @@ pub mod BankaiContract {
         self: @ContractState,
         header_root: u256,
         state_root: u256,
+        slot: u64,
         committee_hash: u256,
         n_signers: u64,
-        slot: u64,
+        execution_hash: u256,
+        execution_height: u64,
     ) -> felt252 {
         let fact_hash = calculate_wrapped_bootloaded_fact_hash(
             WRAPPER_PROGRAM_HASH,
@@ -204,8 +227,9 @@ pub mod BankaiContract {
             self.epoch_update_program_hash.read(),
             [
                 header_root.low.into(), header_root.high.into(), state_root.low.into(),
-                state_root.high.into(), committee_hash.low.into(), committee_hash.high.into(),
-                n_signers.into(), slot.into(),
+                state_root.high.into(), slot.into(), committee_hash.low.into(),
+                committee_hash.high.into(), n_signers.into(), execution_hash.low.into(),
+                execution_hash.high.into(), execution_height.into(),
             ]
                 .span(),
         );

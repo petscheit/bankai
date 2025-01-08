@@ -16,11 +16,11 @@ impl Default for BankaiConfig {
     fn default() -> Self {
         Self {
             contract_class_hash: Felt::from_hex(
-                "0x052c05f5027ad8f963168ebdf9d1518c938648681e43edd00807c28a71ea0b6a",
+                "0x7b2245b6c3f824ec63b28cdcc0405890811f605eafbfb136cb1bea4cffdab9d",
             )
             .unwrap(),
             contract_address: Felt::from_hex(
-                "0x3c36fad01f7a9a8e893e7983a80bffb9ff81079b30f56703cff75a2347d619f",
+                "0x5b16f63a4165bad1a247df2d27d8068aed713da76833811580f92ca357bcf0c",
             )
             .unwrap(),
             committee_update_program_hash: Felt::from_hex(
@@ -28,7 +28,7 @@ impl Default for BankaiConfig {
             )
             .unwrap(),
             epoch_update_program_hash: Felt::from_hex(
-                "0x61c9a8dc4629396452bffa605c59c947a4a344d85c6496f591787f2b6c422db",
+                "0x79bbdf50c8e723c29a8f560b2be88e39749c5f7f5f6cc691f3ed1bbfe137a80",
             )
             .unwrap(),
             contract_path: "../contract/target/release/bankai_BankaiContract.contract_class.json"

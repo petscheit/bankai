@@ -372,6 +372,7 @@ impl<'de> Deserialize<'de> for G2Point {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExpectedCircuitOutputs {
     pub beacon_header_root: FixedBytes<32>,
+    pub beacon_state_root: FixedBytes<32>,
     pub slot: u64,
     pub committee_hash: FixedBytes<32>,
     pub n_signers: u64,
@@ -384,6 +385,7 @@ impl Submittable<EpochCircuitInputs> for ExpectedCircuitOutputs {
         let block_hash: FixedBytes<32> = FixedBytes::from_slice(circuit_inputs.execution_header_proof.execution_payload_header.block_hash().into_root().as_bytes());
         Self {
             beacon_header_root: circuit_inputs.header.tree_hash_root(),
+            beacon_state_root: circuit_inputs.header.state_root,
             slot: circuit_inputs.header.slot,
             committee_hash: get_committee_hash(circuit_inputs.aggregate_pub.0),
             n_signers: 512 - circuit_inputs.non_signers.len() as u64,
@@ -394,11 +396,14 @@ impl Submittable<EpochCircuitInputs> for ExpectedCircuitOutputs {
 
     fn to_calldata(&self) -> Vec<Felt> {
         let (header_root_high, header_root_low) = self.beacon_header_root.as_slice().split_at(16);
+        let (beacon_state_root_high, beacon_state_root_low) = self.beacon_state_root.as_slice().split_at(16);
         let (execution_header_hash_high, execution_header_hash_low) = self.execution_header_hash.as_slice().split_at(16);
         let (committee_hash_high, committee_hash_low) = self.committee_hash.as_slice().split_at(16);
         vec![
             Felt::from_bytes_be_slice(header_root_low),
             Felt::from_bytes_be_slice(header_root_high),
+            Felt::from_bytes_be_slice(beacon_state_root_low),
+            Felt::from_bytes_be_slice(beacon_state_root_high),
             Felt::from(self.slot),
             Felt::from_bytes_be_slice(committee_hash_low),
             Felt::from_bytes_be_slice(committee_hash_high),
