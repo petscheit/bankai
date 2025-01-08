@@ -150,6 +150,7 @@ enum Commands {
     },
     ProveNextCommittee,
     ProveNextEpoch,
+    ProveNextEpochBatch,
     CheckBatchStatus {
         #[arg(long, short)]
         batch_id: String,
@@ -174,7 +175,6 @@ enum Commands {
         #[arg(long, short)]
         block: u64,
     },
-    Test {}
 }
 
 #[derive(Parser)]
@@ -197,12 +197,6 @@ async fn main() -> Result<(), Error> {
     let bankai = BankaiClient::new().await;
 
     match cli.command {
-        Commands::Test {} => {
-            let batch = EpochUpdateBatch::new(&bankai).await?;
-            let json = serde_json::to_string_pretty(&batch)
-                .map_err(|e| Error::DeserializeError(e.to_string()))?;
-            println!("{}", json);
-        }
         Commands::ExecutionHeader { block } => {
             let proof = ExecutionHeaderProof::fetch_proof(&bankai.client, block).await?;
             let json = serde_json::to_string_pretty(&proof)
@@ -304,6 +298,12 @@ async fn main() -> Result<(), Error> {
             let next_epoch = (u64::try_from(latest_epoch).unwrap() / 32) * 32 + 32;
             println!("Fetching Inputs for Epoch: {}", next_epoch);
             let proof = bankai.get_epoch_proof(next_epoch).await?;
+            CairoRunner::generate_pie(&proof, &bankai.config)?;
+            let batch_id = bankai.atlantic_client.submit_batch(proof).await?;
+            println!("Batch Submitted: {}", batch_id);
+        }
+        Commands::ProveNextEpochBatch => {
+            let proof = EpochUpdateBatch::new(&bankai).await?;
             CairoRunner::generate_pie(&proof, &bankai.config)?;
             let batch_id = bankai.atlantic_client.submit_batch(proof).await?;
             println!("Batch Submitted: {}", batch_id);

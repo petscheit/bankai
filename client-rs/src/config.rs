@@ -6,8 +6,10 @@ pub struct BankaiConfig {
     pub contract_address: Felt,
     pub committee_update_program_hash: Felt,
     pub epoch_update_program_hash: Felt,
+    pub epoch_batch_update_program_hash: Felt,
     pub contract_path: String,
     pub epoch_circuit_path: String,
+    pub epoch_batch_circuit_path: String,
     pub committee_circuit_path: String,
     pub atlantic_endpoint: String,
 }
@@ -28,12 +30,17 @@ impl Default for BankaiConfig {
             )
             .unwrap(),
             epoch_update_program_hash: Felt::from_hex(
-                "0x79bbdf50c8e723c29a8f560b2be88e39749c5f7f5f6cc691f3ed1bbfe137a80",
+                "0x5daec246cf8296195084c05ca21ee0f77452c39e635232565557a9f3ce9f596",
+            )
+            .unwrap(),
+            epoch_batch_update_program_hash: Felt::from_hex(
+                "0x7a366dc7388a22d4539f5863f6470b847d13ec308a741ac7b26a7d6a5a093d5",
             )
             .unwrap(),
             contract_path: "../contract/target/release/bankai_BankaiContract.contract_class.json"
                 .to_string(),
             epoch_circuit_path: "../cairo/build/epoch_update.json".to_string(),
+            epoch_batch_circuit_path: "../cairo/build/epoch_batch.json".to_string(),
             committee_circuit_path: "../cairo/build/committee_update.json".to_string(),
             atlantic_endpoint: "https://atlantic.api.herodotus.cloud".to_string(),
         }

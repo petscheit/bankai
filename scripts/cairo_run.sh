@@ -1,8 +1,8 @@
 #!/bin/bash
 
-INPUT_FILE="epoch_batch_input.json"
+INPUT_FILE="epoch_input.json"
 PIE_FLAG=""
-PROGRAM="epoch_batch"  # Default program
+PROGRAM="epoch_update"  # Default program
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -11,6 +11,8 @@ while [[ $# -gt 0 ]]; do
             # Set PIE name based on program type
             if [ "$PROGRAM" = "committee_update" ]; then
                 PIE_FLAG="--cairo_pie_output=committee_pie.zip"
+            elif [ "$PROGRAM" = "epoch_batch" ]; then
+                PIE_FLAG="--cairo_pie_output=epoch_batch_pie.zip"
             else
                 PIE_FLAG="--cairo_pie_output=epoch_pie.zip"
             fi
@@ -19,6 +21,11 @@ while [[ $# -gt 0 ]]; do
         --committee)
             PROGRAM="committee_update"
             INPUT_FILE="committee_input.json"  # Default committee input file
+            shift
+            ;;
+        --epoch-batch)
+            PROGRAM="epoch_batch"
+            INPUT_FILE="epoch_batch_input.json"  # Default epoch batch input file
             shift
             ;;
         *)

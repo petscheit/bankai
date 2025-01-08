@@ -2,9 +2,12 @@ use alloy_primitives::FixedBytes;
 use serde::{Serialize, Deserialize};
 use starknet_crypto::Felt;
 use crate::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs};
-use crate::traits::Submittable;
+use crate::traits::{Provable, Submittable};
 use crate::utils::merkle::PoseidonMerkle::{compute_root, compute_paths, hash_path};
 use crate::{BankaiClient, Error};
+use std::fs;
+use sha2::{Sha256, Digest};
+use hex;
 
 const MAX_BATCH_SIZE: u64 = 160;
 const TARGET_BATCH_SIZE: u64 = 32;
@@ -57,7 +60,6 @@ impl EpochUpdateBatch {
             current_slot += 32;
         }
 
-        println!("Epochs: {:?}", epochs);
         println!("Epochs length: {}", epochs.len());
 
         let committee_hash = epochs[0].expected_circuit_outputs.committee_hash;
@@ -98,5 +100,49 @@ impl EpochUpdateBatch {
 
 
         Ok(batch)
+    }
+}
+
+impl Provable for EpochUpdateBatch {
+    fn id(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"epoch_update_batch");
+        hasher.update(self.expected_circuit_outputs.batch_root.to_bytes_be());
+        hex::encode(hasher.finalize().as_slice())
+    }
+    
+    fn export(&self) -> Result<String, Error> {
+        let json = serde_json::to_string_pretty(&self).unwrap();
+        let first_slot = self.circuit_inputs.epochs.first().unwrap().circuit_inputs.header.slot;
+        let last_slot = self.circuit_inputs.epochs.last().unwrap().circuit_inputs.header.slot;
+        let dir_path = format!("batches/epoch_batch/{}_to_{}", first_slot, last_slot);
+        fs::create_dir_all(dir_path.clone()).map_err(Error::IoError)?;
+        let path = format!(
+            "{}/input_batch_{}_to_{}.json",
+            dir_path, first_slot, last_slot
+        );
+        fs::write(path.clone(), json).map_err(Error::IoError)?;
+        Ok(path)
+    }
+    
+    fn from_json<T>(slot: u64) -> Result<T, Error>
+    where
+        T: serde::de::DeserializeOwned {
+        let path = format!("batches/epoch_batch/{}/input_batch_{}.json", slot, slot);
+        let json = fs::read_to_string(path).map_err(Error::IoError)?;
+        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
+    }
+    
+    fn proof_type(&self) -> crate::traits::ProofType {
+        crate::traits::ProofType::EpochBatch
+    }
+    
+    fn pie_path(&self) -> String {
+        let first_slot = self.circuit_inputs.epochs.first().unwrap().circuit_inputs.header.slot;
+        let last_slot = self.circuit_inputs.epochs.last().unwrap().circuit_inputs.header.slot;
+        format!(
+            "batches/epoch_batch/{}_to_{}/pie_batch_{}_to_{}.zip",
+            first_slot, last_slot, first_slot, last_slot
+        )
     }
 }
