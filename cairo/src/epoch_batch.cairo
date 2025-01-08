@@ -30,8 +30,8 @@ func main{
     %{ 
         from cairo.py.utils import int_to_uint256
 
-        ids.batch_len = len(program_input["epochs"]) 
-        low, high = int_to_uint256(int(program_input["committee_hash"], 16))
+        ids.batch_len = len(program_input["circuit_inputs"]["epochs"]) 
+        low, high = int_to_uint256(int(program_input["circuit_inputs"]["committee_hash"], 16))
         ids.committee_hash.low = low
         ids.committee_hash.high = high
     %}
@@ -64,11 +64,19 @@ func main{
         memset(dst=epoch_outputs + batch_len, value=0, n=next_power_of_2 - batch_len);
 
         // now we compute a merkle root of the epoch outputs
-        let epoch_root = PoseidonMerkleTree.compute_root(epoch_outputs, next_power_of_2);
+        let batch_root = PoseidonMerkleTree.compute_root(epoch_outputs, next_power_of_2);
     }
-    %{ print("computed batch root", hex(ids.epoch_root)) %}
+    %{ print("computed batch root", hex(ids.batch_root)) %}
 
-    assert [output_ptr] = epoch_root;
+    %{
+        from cairo.py.utils import uint256_to_int
+
+        assert uint256_to_int(ids.committee_hash) == int(program_input["expected_circuit_outputs"]["committee_hash"], 16), "Committee Hash Mismatch"
+        assert ids.batch_root == int(program_input["expected_circuit_outputs"]["batch_root"], 16), "Batch Root Mismatch"
+    
+    %}
+
+    assert [output_ptr] = batch_root;
     assert [output_ptr + 1] = committee_hash.low;
     assert [output_ptr + 2] = committee_hash.high;
 
@@ -93,7 +101,7 @@ func run_epoch_batches{
 }(index: felt, batch_len: felt, committee_hash: Uint256) -> (latest_batch_output: felt*) {
     alloc_locals;
 
-    %{ vm_enter_scope({'program_input': program_input["epochs"][ids.index]}) %}
+    %{ vm_enter_scope({'program_input': program_input["circuit_inputs"]["epochs"][ids.index]}) %}
     
     // Create a new output_ptr per batch
     let (epoch_output: felt*) = alloc();

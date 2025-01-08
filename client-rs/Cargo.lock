@@ -787,6 +787,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "starknet",
+ "starknet-crypto",
  "tokio",
  "tree_hash 0.8.0",
  "tree_hash_derive 0.8.0",

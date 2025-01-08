@@ -2,7 +2,7 @@ use crate::Error;
 use crate::utils::rpc::BeaconRpcClient;
 use alloy_primitives::FixedBytes;
 use beacon_state_proof::state_proof_fetcher::TreeHash;
-use crate::utils::merkle::{hash_merkle_path, generate_merkle_path};
+use crate::utils::merkle::Sha256Merkle::{hash_path, generate_path};
 use types::{BeaconBlockBody, ExecPayload, ExecutionPayloadHeader, MainnetEthSpec};
 use serde::{Serialize, Deserialize};
 
@@ -58,12 +58,12 @@ impl ExecutionHeaderProof {
             .map(|leaf| FixedBytes::from_slice(leaf.as_bytes()))
             .collect();
         
-        let path = generate_merkle_path(leafs.clone(), EXECUTION_PAYLOAD_LEAF_INDEX)
+        let path = generate_path(leafs.clone(), EXECUTION_PAYLOAD_LEAF_INDEX)
             .unwrap();
         let leaf = leafs[EXECUTION_PAYLOAD_LEAF_INDEX];
         
         // Verify the merkle proof
-        let computed_root = hash_merkle_path(path.clone(), leaf.clone(), EXECUTION_PAYLOAD_LEAF_INDEX as u64);        
+        let computed_root = hash_path(path.clone(), leaf.clone(), EXECUTION_PAYLOAD_LEAF_INDEX as u64);        
         assert_eq!(computed_root.as_slice(), root.as_bytes());
 
         // Construct and return the proof

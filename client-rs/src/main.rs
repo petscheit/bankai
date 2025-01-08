@@ -5,9 +5,11 @@ mod sync_committee;
 mod traits;
 mod utils;
 mod execution_header;
+pub mod epoch_batch;
 
 use config::BankaiConfig;
 use contract_init::ContractInitializationData;
+use epoch_batch::EpochUpdateBatch;
 use epoch_update::EpochUpdate;
 use execution_header::ExecutionHeaderProof;
 use starknet::core::types::Felt;
@@ -172,6 +174,7 @@ enum Commands {
         #[arg(long, short)]
         block: u64,
     },
+    Test {}
 }
 
 #[derive(Parser)]
@@ -194,6 +197,12 @@ async fn main() -> Result<(), Error> {
     let bankai = BankaiClient::new().await;
 
     match cli.command {
+        Commands::Test {} => {
+            let batch = EpochUpdateBatch::new(&bankai).await?;
+            let json = serde_json::to_string_pretty(&batch)
+                .map_err(|e| Error::DeserializeError(e.to_string()))?;
+            println!("{}", json);
+        }
         Commands::ExecutionHeader { block } => {
             let proof = ExecutionHeaderProof::fetch_proof(&bankai.client, block).await?;
             let json = serde_json::to_string_pretty(&proof)
@@ -272,7 +281,7 @@ async fn main() -> Result<(), Error> {
             println!("Min Slot Required: {}", lowest_committee_update_slot);
             let latest_epoch = bankai
                 .starknet_client
-                .get_latest_epoch(&bankai.config)
+                .get_latest_epoch_slot(&bankai.config)
                 .await?;
             println!("Latest epoch: {}", latest_epoch);
             if latest_epoch < lowest_committee_update_slot {
@@ -288,7 +297,7 @@ async fn main() -> Result<(), Error> {
         Commands::ProveNextEpoch => {
             let latest_epoch = bankai
                 .starknet_client
-                .get_latest_epoch(&bankai.config)
+                .get_latest_epoch_slot(&bankai.config)
                 .await?;
             println!("Latest Epoch: {}", latest_epoch);
             // make sure next_epoch % 32 == 0

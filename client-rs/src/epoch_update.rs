@@ -13,17 +13,19 @@ use sha2::{Digest, Sha256};
 use starknet::{core::types::Felt, macros::selector};
 use tree_hash::TreeHash;
 use tree_hash_derive::TreeHash;
+use starknet_crypto::poseidon_hash_many;
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdate {
     pub circuit_inputs: EpochCircuitInputs,
-    pub expected_circuit_outputs: ExpectedCircuitOutputs,
+    pub expected_circuit_outputs: ExpectedEpochUpdateOutputs,
 }
 
 impl EpochUpdate {
     pub async fn new(client: &BeaconRpcClient, slot: u64) -> Result<Self, Error> {
         let circuit_inputs = EpochCircuitInputs::generate_epoch_proof(client, slot).await?;
-        let expected_circuit_outputs = ExpectedCircuitOutputs::from_inputs(&circuit_inputs);
+        let expected_circuit_outputs = ExpectedEpochUpdateOutputs::from_inputs(&circuit_inputs);
         Ok(Self {
             circuit_inputs,
             expected_circuit_outputs,
@@ -369,8 +371,8 @@ impl<'de> Deserialize<'de> for G2Point {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ExpectedCircuitOutputs {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ExpectedEpochUpdateOutputs {
     pub beacon_header_root: FixedBytes<32>,
     pub beacon_state_root: FixedBytes<32>,
     pub slot: u64,
@@ -380,7 +382,14 @@ pub struct ExpectedCircuitOutputs {
     pub execution_header_height: u64,
 }
 
-impl Submittable<EpochCircuitInputs> for ExpectedCircuitOutputs {
+impl ExpectedEpochUpdateOutputs {
+    pub fn hash(&self) -> Felt {
+        let felts = self.to_calldata();
+        poseidon_hash_many(&felts)
+    }
+}
+
+impl Submittable<EpochCircuitInputs> for ExpectedEpochUpdateOutputs {
     fn from_inputs(circuit_inputs: &EpochCircuitInputs) -> Self {
         let block_hash: FixedBytes<32> = FixedBytes::from_slice(circuit_inputs.execution_header_proof.execution_payload_header.block_hash().into_root().as_bytes());
         Self {
