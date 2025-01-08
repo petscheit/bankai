@@ -7,10 +7,11 @@ from starkware.cairo.common.builtin_poseidon.poseidon import (
     poseidon_hash,
     poseidon_hash_many,
 )
-from cairo.src.epoch_update import run_epoch_update
 from starkware.cairo.common.memcpy import memcpy
 from starkware.cairo.common.memset import memset
 from cairo.src.merkle import PoseidonMerkleTree
+from cairo.src.verify_epoch import run_epoch_update
+
 from cairo.src.utils import pow2alloc128
 from sha import SHA256
 
