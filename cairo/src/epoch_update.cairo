@@ -1,4 +1,4 @@
-%builtins output range_check bitwise poseidon range_check96 add_mod mul_mod
+// %builtins output range_check bitwise poseidon range_check96 add_mod mul_mod
 
 from starkware.cairo.common.cairo_builtins import PoseidonBuiltin, ModBuiltin, BitwiseBuiltin
 from starkware.cairo.common.registers import get_fp_and_pc
@@ -27,10 +27,30 @@ func main{
     add_mod_ptr: ModBuiltin*,
     mul_mod_ptr: ModBuiltin*,
 }() {
-    alloc_locals;
-
     let (pow2_array) = pow2alloc128();
     let (sha256_ptr, sha256_ptr_start) = SHA256.init();
+
+    with pow2_array, sha256_ptr {
+        run_epoch_update(); 
+    }
+
+    SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
+
+    return ();
+}
+
+func run_epoch_update{
+    output_ptr: felt*,
+    range_check_ptr,
+    bitwise_ptr: BitwiseBuiltin*,
+    poseidon_ptr: PoseidonBuiltin*,
+    range_check96_ptr: felt*,
+    add_mod_ptr: ModBuiltin*,
+    mul_mod_ptr: ModBuiltin*,
+    pow2_array: felt*,
+    sha256_ptr: felt*,
+}() {
+    alloc_locals;
 
     local sig_point: G2Point;
     local slot: felt;
@@ -48,47 +68,43 @@ func main{
     %}
     // %{ print("Running Verification for Slot: ", ids.slot) %}
 
-    with pow2_array, sha256_ptr {
-        let (header_root, body_root) = hash_header();
-    }
+    let (header_root, body_root, state_root) = hash_header();
+    
     // %{ print("HeaderRoot: ", hex(ids.header_root.high * 2**128 + ids.header_root.low)) %}
 
-    with pow2_array, sha256_ptr {
-        let signing_root = Domain.compute_signing_root(header_root, slot);
-    }
+    let signing_root = Domain.compute_signing_root(header_root, slot);
+
     // %{ print("SigningRoot: ", hex(ids.signing_root.high * 2**128 + ids.signing_root.low)) %}
 
-    with pow2_array, sha256_ptr {
-        let (msg_point) = hash_to_curve(1, signing_root);
-    }
+    let (msg_point) = hash_to_curve(1, signing_root);
+    
 
     // %{ print_g2("MsgPoint", ids.msg_point) %}
 
-    with sha256_ptr, pow2_array {
-        let (committee_hash, agg_key, n_non_signers) = faster_fast_aggregate_signer_pubs();
-    }
+    let (committee_hash, agg_key, n_non_signers) = faster_fast_aggregate_signer_pubs();
+    
     let n_signers = 512 - n_non_signers;
     verify_signature(agg_key, msg_point, sig_point);
 
     // Verify Execution Header
-    with sha256_ptr, pow2_array, range_check_ptr {
-        let (execution_root, execution_hash, execution_height) = SSZ.hash_execution_payload_header_root();
-        let root_felts = MerkleUtils.chunk_uint256(execution_root);
-        let computed_body_root = MerkleTree.hash_merkle_path(
-            path=execution_path, path_len=4, leaf=root_felts, index=9
-        );
+    let (execution_root, execution_hash, execution_height) = SSZ.hash_execution_payload_header_root();
+    let root_felts = MerkleUtils.chunk_uint256(execution_root);
+    let computed_body_root = MerkleTree.hash_merkle_path(
+        path=execution_path, path_len=4, leaf=root_felts, index=9
+    );
 
-        %{
-            print("execution header hash", hex(ids.execution_hash.low), hex(ids.execution_hash.high))
-        %}
+    %{
+        print("execution header hash", hex(ids.execution_hash.low), hex(ids.execution_hash.high))
+    %}
 
-        assert computed_body_root.low = body_root.low;
-        assert computed_body_root.high = body_root.high;
-    }
+    assert computed_body_root.low = body_root.low;
+    assert computed_body_root.high = body_root.high;
+
 
     %{
         from cairo.py.utils import uint256_to_int
         assert uint256_to_int(ids.header_root) == int(program_input["expected_circuit_outputs"]["beacon_header_root"], 16), "Header Root Mismatch"
+        assert uint256_to_int(ids.state_root) == int(program_input["expected_circuit_outputs"]["beacon_state_root"], 16), "State Root Mismatch"
         assert uint256_to_int(ids.committee_hash) == int(program_input["expected_circuit_outputs"]["committee_hash"], 16), "Committee Hash Mismatch"
         assert ids.n_signers == program_input["expected_circuit_outputs"]["n_signers"], "Number of Signers Mismatch"
         assert ids.slot == program_input["expected_circuit_outputs"]["slot"], "Slot Mismatch"
@@ -96,24 +112,25 @@ func main{
         assert ids.execution_height == program_input["expected_circuit_outputs"]["execution_header_height"], "Execution Header Height Mismatch"
     %}
 
-    SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
     assert [output_ptr] = header_root.low;
     assert [output_ptr + 1] = header_root.high;
-    assert [output_ptr + 2] = slot;
-    assert [output_ptr + 3] = committee_hash.low;
-    assert [output_ptr + 4] = committee_hash.high;
-    assert [output_ptr + 5] = n_signers;
-    assert [output_ptr + 6] = execution_hash.low;
-    assert [output_ptr + 7] = execution_hash.high;
-    assert [output_ptr + 8] = execution_height;
-    let output_ptr = output_ptr + 9;
+    assert [output_ptr + 2] = state_root.low;
+    assert [output_ptr + 3] = state_root.high;
+    assert [output_ptr + 4] = slot;
+    assert [output_ptr + 5] = committee_hash.low;
+    assert [output_ptr + 6] = committee_hash.high;
+    assert [output_ptr + 7] = n_signers;
+    assert [output_ptr + 8] = execution_hash.low;
+    assert [output_ptr + 9] = execution_hash.high;
+    assert [output_ptr + 10] = execution_height;
+    let output_ptr = output_ptr + 11;
 
     return ();
 }
 
 func hash_header{
     range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*, sha256_ptr: felt*
-}() -> (header_root: Uint256, body_root: Uint256) {
+}() -> (header_root: Uint256, body_root: Uint256, state_root: Uint256) {
     alloc_locals;
 
     local slot: Uint256;
@@ -143,7 +160,7 @@ func hash_header{
         slot, proposer_index, parent_root, state_root, body_root
     );
 
-    return (header_root=header_root, body_root=body_root);
+    return (header_root=header_root, body_root=body_root, state_root=state_root);
 }
 
 func verify_signature{

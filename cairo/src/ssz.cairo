@@ -8,6 +8,10 @@ from starkware.cairo.common.builtin_keccak.keccak import keccak_uint256s_bigend
 from starkware.cairo.common.memcpy import memcpy
 from starkware.cairo.common.memset import memset
 from starkware.cairo.common.alloc import alloc
+from starkware.cairo.common.builtin_poseidon.poseidon import (
+    poseidon_hash,
+    poseidon_hash_many,
+)
 from sha import SHA256
 from cairo.src.utils import pow2alloc128, felt_divmod
 
@@ -117,6 +121,8 @@ namespace SSZ {
     }
 }
 
+
+
 namespace MerkleTree {
     func compute_root{
         range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*, sha256_ptr: felt*
@@ -139,7 +145,7 @@ namespace MerkleTree {
         let (tree: felt*) = alloc();
         let tree_len = 2 * leafs_len - 1;  // number nodes in the tree (not accounting for chunking)
 
-        // copy the leafs to the end of the tree arra
+        // copy the leafs to the end of the tree array
         memcpy(dst=tree + (tree_len - leafs_len) * 8, src=chunked_leafs, len=leafs_len * 8);
 
         with sha256_ptr {
@@ -153,7 +159,6 @@ namespace MerkleTree {
         }
 
         let result = MerkleUtils.chunks_to_uint256(output=tree - 8);
-
         return result;
     }
 

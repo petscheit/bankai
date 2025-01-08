@@ -1,8 +1,8 @@
 #!/bin/bash
 
-INPUT_FILE="epoch_input.json"
+INPUT_FILE="epoch_batch_input.json"
 PIE_FLAG=""
-PROGRAM="epoch_update"  # Default program
+PROGRAM="epoch_batch"  # Default program
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do

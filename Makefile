@@ -5,7 +5,7 @@ venv:
 	source venv/bin/activate
 
 build-epoch:
-	./scripts/cairo_compile.sh cairo/src/epoch_update.cairo
+	./scripts/cairo_compile.sh cairo/src/epoch_batch.cairo
 
 build-committee:
 	./scripts/cairo_compile.sh cairo/src/committee_update.cairo
