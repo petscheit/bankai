@@ -72,18 +72,16 @@ func main{
     %{
         from cairo.py.utils import uint256_to_int
 
-        assert uint256_to_int(ids.committee_hash) == int(program_input["expected_circuit_outputs"]["committee_hash"], 16), "Committee Hash Mismatch"
+        assert uint256_to_int(ids.committee_hash) == int(program_input["expected_circuit_outputs"]["latest_batch_output"]["committee_hash"], 16), "Committee Hash Mismatch"
         assert ids.batch_root == int(program_input["expected_circuit_outputs"]["batch_root"], 16), "Batch Root Mismatch"
     
     %}
 
     assert [output_ptr] = batch_root;
-    assert [output_ptr + 1] = committee_hash.low;
-    assert [output_ptr + 2] = committee_hash.high;
 
     // Copy the latest batch output to the output_ptr
-    memcpy(dst=output_ptr + 3, src=latest_batch_output, len=11);
-    tempvar output_ptr = output_ptr + 14;
+    memcpy(dst=output_ptr + 1, src=latest_batch_output, len=11);
+    tempvar output_ptr = output_ptr + 12;
 
     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
     return ();
@@ -116,6 +114,8 @@ func run_epoch_batches{
 
     // Ensure we only process batches using the predetermined committee hash
     // This is important to ensure we dont batch epochs that use an unknown committee
+    // ToDo: it can be argued that this is underconstrained. We never enforce the order of the slots. 
+    // Personally, I think in the context of the sync committee this is fine.
     assert committee_hash.low = epoch_output[5];
     assert committee_hash.high = epoch_output[6];
 

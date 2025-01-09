@@ -236,9 +236,9 @@ impl From<HeaderResponse> for BeaconHeader {
 }
 
 #[derive(Debug)]
-pub struct G1Point(G1Affine);
+pub struct G1Point(pub G1Affine);
 #[derive(Debug)]
-pub struct G2Point(G2Affine);
+pub struct G2Point(pub G2Affine);
 
 impl Serialize for G1Point {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

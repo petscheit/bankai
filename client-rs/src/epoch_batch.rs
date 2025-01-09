@@ -1,11 +1,13 @@
 use crate::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs};
-use crate::traits::Provable;
+use crate::traits::{Provable, Submittable};
+use crate::utils::hashing::get_committee_hash;
 use crate::utils::merkle::poseidon::{compute_paths, compute_root, hash_path};
 use crate::{BankaiClient, Error};
 use alloy_primitives::FixedBytes;
 use hex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use starknet::macros::selector;
 use starknet_crypto::Felt;
 use std::fs;
 
@@ -15,7 +17,7 @@ const SLOTS_PER_EPOCH: u64 = 32;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdateBatch {
     pub circuit_inputs: EpochUpdateBatchInputs,
-    pub expected_circuit_outputs: ExpectedEpochUpdateBatchOutputs,
+    pub expected_circuit_outputs: ExpectedEpochBatchOutputs,
     pub merkle_paths: Vec<Vec<Felt>>,
 }
 
@@ -26,9 +28,8 @@ pub struct EpochUpdateBatchInputs {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ExpectedEpochUpdateBatchOutputs {
+pub struct ExpectedEpochBatchOutputs {
     pub batch_root: Felt,
-    pub committee_hash: FixedBytes<32>,
     pub latest_batch_output: ExpectedEpochUpdateOutputs,
 }
 
@@ -61,43 +62,37 @@ impl EpochUpdateBatch {
             current_slot += 32;
         }
 
-        let committee_hash = epochs[0].expected_circuit_outputs.committee_hash;
-        println!("Committee hash: {:?}", committee_hash);
+        let circuit_inputs = EpochUpdateBatchInputs {
+            committee_hash: get_committee_hash(epochs[0].circuit_inputs.aggregate_pub.0),
+            epochs,
+        };
 
-        let epoch_hashes = epochs
+        let expected_circuit_outputs = ExpectedEpochBatchOutputs::from_inputs(&circuit_inputs);
+
+        let epoch_hashes = circuit_inputs.epochs
             .iter()
             .map(|epoch| epoch.expected_circuit_outputs.hash())
             .collect::<Vec<Felt>>();
-
-        let batch_root = compute_root(epoch_hashes.clone());
-        println!("Batch root: {:?}", batch_root);
 
         let (root, paths) = compute_paths(epoch_hashes.clone());
 
         // Verify each path matches the root
         for (index, path) in paths.iter().enumerate() {
+            // println!("Index: {:?}", index);
             let computed_root = hash_path(epoch_hashes[index], path, index);
             if computed_root != root {
                 panic!("Path {} does not match root", index);
             }
         }
 
-        let last_epoch_output = epochs.last().unwrap().expected_circuit_outputs.clone();
-
         let batch = EpochUpdateBatch {
-            circuit_inputs: EpochUpdateBatchInputs {
-                committee_hash,
-                epochs,
-            },
-            expected_circuit_outputs: ExpectedEpochUpdateBatchOutputs {
-                batch_root,
-                committee_hash,
-                latest_batch_output: last_epoch_output,
-            },
+            circuit_inputs: circuit_inputs,
+            expected_circuit_outputs,
             merkle_paths: paths,
         };
 
         Ok(batch)
+         
     }
 }
 
@@ -141,8 +136,17 @@ impl Provable for EpochUpdateBatch {
     where
         T: serde::de::DeserializeOwned,
     {
-        let path = format!("batches/epoch_batch/{}/input_batch_{}.json", slot, slot);
-        let json = fs::read_to_string(path).map_err(Error::IoError)?;
+        // Pattern match for files like: batches/epoch_batch/6709248_to_6710272/input_batch_6709248_to_6710272.json
+        let path = format!("batches/epoch_batch/*_to_{}/input_batch_*_to_{}.json", slot, slot);
+        let glob_pattern = glob::glob(&path).map_err(|e| Error::IoError(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        
+        // Take the first matching file
+        let path = glob_pattern
+            .take(1)
+            .next()
+            .ok_or_else(|| Error::IoError(std::io::Error::new(std::io::ErrorKind::NotFound, "No matching file found")))?;
+
+        let json = fs::read_to_string(path.unwrap()).map_err(Error::IoError)?;
         serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
     }
 
@@ -171,5 +175,50 @@ impl Provable for EpochUpdateBatch {
             "batches/epoch_batch/{}_to_{}/pie_batch_{}_to_{}.zip",
             first_slot, last_slot, first_slot, last_slot
         )
+    }
+}
+
+impl Submittable<EpochUpdateBatchInputs> for ExpectedEpochBatchOutputs {
+    fn get_contract_selector(&self) -> Felt {
+        selector!("verify_epoch_batch")
+    }
+
+    fn to_calldata(&self) -> Vec<Felt> {
+        let (header_root_high, header_root_low) = self.latest_batch_output.beacon_header_root.as_slice().split_at(16);
+        let (beacon_state_root_high, beacon_state_root_low) =
+            self.latest_batch_output.beacon_state_root.as_slice().split_at(16);
+        let (execution_header_hash_high, execution_header_hash_low) =
+            self.latest_batch_output.execution_header_hash.as_slice().split_at(16);
+        let (committee_hash_high, committee_hash_low) = self.latest_batch_output.committee_hash.as_slice().split_at(16);
+        vec![
+            self.batch_root,
+            Felt::from_bytes_be_slice(header_root_low),
+            Felt::from_bytes_be_slice(header_root_high),
+            Felt::from_bytes_be_slice(beacon_state_root_low),
+            Felt::from_bytes_be_slice(beacon_state_root_high),
+            Felt::from(self.latest_batch_output.slot),
+            Felt::from_bytes_be_slice(committee_hash_low),
+            Felt::from_bytes_be_slice(committee_hash_high),
+            Felt::from(self.latest_batch_output.n_signers),
+            Felt::from_bytes_be_slice(execution_header_hash_low),
+            Felt::from_bytes_be_slice(execution_header_hash_high),
+            Felt::from(self.latest_batch_output.execution_header_height),
+        ]
+    }
+
+    fn from_inputs(circuit_inputs: &EpochUpdateBatchInputs) -> Self {
+        let epoch_hashes = circuit_inputs.epochs
+            .iter()
+            .map(|epoch| epoch.expected_circuit_outputs.hash())
+            .collect::<Vec<Felt>>();
+
+        let batch_root = compute_root(epoch_hashes.clone());
+        
+        let last_epoch_output = circuit_inputs.epochs.last().unwrap().expected_circuit_outputs.clone();
+
+        Self {
+            batch_root,
+            latest_batch_output: last_epoch_output,
+        }
     }
 }

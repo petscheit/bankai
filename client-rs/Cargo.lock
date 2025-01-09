@@ -778,6 +778,7 @@ dependencies = [
  "clap",
  "dotenv",
  "ethereum_serde_utils 0.7.0",
+ "glob",
  "hex",
  "itertools 0.13.0",
  "rand",

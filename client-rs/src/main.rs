@@ -165,6 +165,12 @@ enum Commands {
         #[arg(long, short)]
         slot: u64,
     },
+    VerifyEpochBatch {
+        #[arg(long, short)]
+        batch_id: String,
+        #[arg(long, short)] 
+        slot: u64,
+    },
     VerifyCommittee {
         #[arg(long, short)]
         batch_id: String,
@@ -315,6 +321,22 @@ async fn main() -> Result<(), Error> {
                 .await?;
             if status == "DONE" {
                 let update = EpochUpdate::from_json::<EpochUpdate>(slot)?;
+                bankai
+                    .starknet_client
+                    .submit_update(update.expected_circuit_outputs, &bankai.config)
+                    .await?;
+                println!("Successfully submitted epoch update");
+            } else {
+                println!("Batch not completed yet. Status: {}", status);
+            }
+        }
+        Commands::VerifyEpochBatch { batch_id, slot } => {
+            let status = bankai
+                .atlantic_client
+                .check_batch_status(batch_id.as_str())
+                .await?;
+            if status == "DONE" {
+                let update = EpochUpdateBatch::from_json::<EpochUpdateBatch>(slot)?;
                 bankai
                     .starknet_client
                     .submit_update(update.expected_circuit_outputs, &bankai.config)

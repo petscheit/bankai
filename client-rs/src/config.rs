@@ -6,7 +6,7 @@ pub struct BankaiConfig {
     pub contract_address: Felt,
     pub committee_update_program_hash: Felt,
     pub epoch_update_program_hash: Felt,
-    pub epoch_batch_update_program_hash: Felt,
+    pub epoch_batch_program_hash: Felt,
     pub contract_path: String,
     pub epoch_circuit_path: String,
     pub epoch_batch_circuit_path: String,
@@ -18,11 +18,11 @@ impl Default for BankaiConfig {
     fn default() -> Self {
         Self {
             contract_class_hash: Felt::from_hex(
-                "0x7b2245b6c3f824ec63b28cdcc0405890811f605eafbfb136cb1bea4cffdab9d",
+                "0x02b5b08b233132464c437cf15509338e65ae7acc20419a37a9449a1d8e927f46",
             )
             .unwrap(),
             contract_address: Felt::from_hex(
-                "0x5b16f63a4165bad1a247df2d27d8068aed713da76833811580f92ca357bcf0c",
+                "0x440b622a97fab3f31a35e7e710a8a508f6693d61d74171b5c2304f5e37ccde8",
             )
             .unwrap(),
             committee_update_program_hash: Felt::from_hex(
@@ -33,8 +33,8 @@ impl Default for BankaiConfig {
                 "0x5daec246cf8296195084c05ca21ee0f77452c39e635232565557a9f3ce9f596",
             )
             .unwrap(),
-            epoch_batch_update_program_hash: Felt::from_hex(
-                "0x7a366dc7388a22d4539f5863f6470b847d13ec308a741ac7b26a7d6a5a093d5",
+            epoch_batch_program_hash: Felt::from_hex(
+                "0x19bc492f1036c889939a5174e8f77ffbe89676c8d5f1adef0a825d2a6cc2a2f",
             )
             .unwrap(),
             contract_path: "../contract/target/release/bankai_BankaiContract.contract_class.json"
