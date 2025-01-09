@@ -69,7 +69,8 @@ impl EpochUpdateBatch {
 
         let expected_circuit_outputs = ExpectedEpochBatchOutputs::from_inputs(&circuit_inputs);
 
-        let epoch_hashes = circuit_inputs.epochs
+        let epoch_hashes = circuit_inputs
+            .epochs
             .iter()
             .map(|epoch| epoch.expected_circuit_outputs.hash())
             .collect::<Vec<Felt>>();
@@ -78,7 +79,6 @@ impl EpochUpdateBatch {
 
         // Verify each path matches the root
         for (index, path) in paths.iter().enumerate() {
-            // println!("Index: {:?}", index);
             let computed_root = hash_path(epoch_hashes[index], path, index);
             if computed_root != root {
                 panic!("Path {} does not match root", index);
@@ -86,13 +86,12 @@ impl EpochUpdateBatch {
         }
 
         let batch = EpochUpdateBatch {
-            circuit_inputs: circuit_inputs,
+            circuit_inputs,
             expected_circuit_outputs,
             merkle_paths: paths,
         };
 
         Ok(batch)
-         
     }
 }
 
@@ -137,14 +136,20 @@ impl Provable for EpochUpdateBatch {
         T: serde::de::DeserializeOwned,
     {
         // Pattern match for files like: batches/epoch_batch/6709248_to_6710272/input_batch_6709248_to_6710272.json
-        let path = format!("batches/epoch_batch/*_to_{}/input_batch_*_to_{}.json", slot, slot);
-        let glob_pattern = glob::glob(&path).map_err(|e| Error::IoError(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
-        
+        let path = format!(
+            "batches/epoch_batch/*_to_{}/input_batch_*_to_{}.json",
+            slot, slot
+        );
+        let glob_pattern = glob::glob(&path)
+            .map_err(|e| Error::IoError(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
         // Take the first matching file
-        let path = glob_pattern
-            .take(1)
-            .next()
-            .ok_or_else(|| Error::IoError(std::io::Error::new(std::io::ErrorKind::NotFound, "No matching file found")))?;
+        let path = glob_pattern.take(1).next().ok_or_else(|| {
+            Error::IoError(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "No matching file found",
+            ))
+        })?;
 
         let json = fs::read_to_string(path.unwrap()).map_err(Error::IoError)?;
         serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
@@ -184,12 +189,26 @@ impl Submittable<EpochUpdateBatchInputs> for ExpectedEpochBatchOutputs {
     }
 
     fn to_calldata(&self) -> Vec<Felt> {
-        let (header_root_high, header_root_low) = self.latest_batch_output.beacon_header_root.as_slice().split_at(16);
-        let (beacon_state_root_high, beacon_state_root_low) =
-            self.latest_batch_output.beacon_state_root.as_slice().split_at(16);
-        let (execution_header_hash_high, execution_header_hash_low) =
-            self.latest_batch_output.execution_header_hash.as_slice().split_at(16);
-        let (committee_hash_high, committee_hash_low) = self.latest_batch_output.committee_hash.as_slice().split_at(16);
+        let (header_root_high, header_root_low) = self
+            .latest_batch_output
+            .beacon_header_root
+            .as_slice()
+            .split_at(16);
+        let (beacon_state_root_high, beacon_state_root_low) = self
+            .latest_batch_output
+            .beacon_state_root
+            .as_slice()
+            .split_at(16);
+        let (execution_header_hash_high, execution_header_hash_low) = self
+            .latest_batch_output
+            .execution_header_hash
+            .as_slice()
+            .split_at(16);
+        let (committee_hash_high, committee_hash_low) = self
+            .latest_batch_output
+            .committee_hash
+            .as_slice()
+            .split_at(16);
         vec![
             self.batch_root,
             Felt::from_bytes_be_slice(header_root_low),
@@ -207,14 +226,20 @@ impl Submittable<EpochUpdateBatchInputs> for ExpectedEpochBatchOutputs {
     }
 
     fn from_inputs(circuit_inputs: &EpochUpdateBatchInputs) -> Self {
-        let epoch_hashes = circuit_inputs.epochs
+        let epoch_hashes = circuit_inputs
+            .epochs
             .iter()
             .map(|epoch| epoch.expected_circuit_outputs.hash())
             .collect::<Vec<Felt>>();
 
         let batch_root = compute_root(epoch_hashes.clone());
-        
-        let last_epoch_output = circuit_inputs.epochs.last().unwrap().expected_circuit_outputs.clone();
+
+        let last_epoch_output = circuit_inputs
+            .epochs
+            .last()
+            .unwrap()
+            .expected_circuit_outputs
+            .clone();
 
         Self {
             batch_root,

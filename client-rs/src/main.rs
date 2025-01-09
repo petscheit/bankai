@@ -168,7 +168,7 @@ enum Commands {
     VerifyEpochBatch {
         #[arg(long, short)]
         batch_id: String,
-        #[arg(long, short)] 
+        #[arg(long, short)]
         slot: u64,
     },
     VerifyCommittee {
