@@ -121,7 +121,7 @@ impl CommitteeCircuitInputs {
 
         // Compute the state root using the Merkle path
 
-        merkle::hash_merkle_path(self.next_sync_committee_branch.clone(), leaf, 55)
+        merkle::sha256::hash_path(self.next_sync_committee_branch.clone(), leaf, 55)
     }
 }
 

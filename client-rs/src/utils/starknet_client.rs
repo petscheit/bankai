@@ -71,7 +71,7 @@ impl StarknetClient {
         );
 
         let contract_factory = ContractFactory::new(class_hash, self.account.clone());
-        let deploy_tx = contract_factory.deploy_v1(init_data.to_calldata(), felt!("1122"), false);
+        let deploy_tx = contract_factory.deploy_v1(init_data.to_calldata(), felt!("1337"), false);
 
         let contract_address = deploy_tx.deployed_address();
 
@@ -154,7 +154,10 @@ impl StarknetClient {
         Ok(())
     }
 
-    pub async fn get_latest_epoch(&self, config: &BankaiConfig) -> Result<Felt, StarknetError> {
+    pub async fn get_latest_epoch_slot(
+        &self,
+        config: &BankaiConfig,
+    ) -> Result<Felt, StarknetError> {
         let latest_epoch = self
             .account
             .provider()
@@ -169,6 +172,18 @@ impl StarknetClient {
             .await
             .map_err(StarknetError::ProviderError)?;
         Ok(*latest_epoch.first().unwrap())
+    }
+
+    // Computes the slot numbers for the current term.
+    pub async fn get_batching_range(
+        &self,
+        config: &BankaiConfig,
+    ) -> Result<(u64, u64), StarknetError> {
+        let latest_epoch_slot = self.get_latest_epoch_slot(config).await? + felt!("96");
+        let next_epoch = (u64::try_from(latest_epoch_slot).unwrap() / 32) * 32 + 32;
+        let term = next_epoch / 0x2000;
+        let terms_last_epoch = (term + 1) * 0x2000 - 32;
+        Ok((next_epoch, terms_last_epoch))
     }
 
     pub async fn get_latest_committee_id(

@@ -12,6 +12,7 @@ pub trait Submittable<T> {
 
 pub enum ProofType {
     Epoch,
+    EpochBatch,
     SyncCommittee,
 }
 

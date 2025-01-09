@@ -9,6 +9,7 @@ pub struct ContractInitializationData {
     pub(crate) committee_hash: FixedBytes<32>,
     pub(crate) committee_update_program_hash: Felt,
     pub(crate) epoch_update_program_hash: Felt,
+    pub(crate) epoch_batch_program_hash: Felt,
 }
 
 impl ContractInitializationData {
@@ -23,6 +24,7 @@ impl ContractInitializationData {
             committee_hash: committee.get_committee_hash(),
             committee_update_program_hash: config.committee_update_program_hash,
             epoch_update_program_hash: config.epoch_update_program_hash,
+            epoch_batch_program_hash: config.epoch_batch_program_hash,
         })
     }
 
@@ -34,6 +36,7 @@ impl ContractInitializationData {
             Felt::from_bytes_be_slice(committee_high),
             self.committee_update_program_hash,
             self.epoch_update_program_hash,
+            self.epoch_batch_program_hash,
         ]
     }
 }

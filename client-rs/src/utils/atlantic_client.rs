@@ -39,6 +39,7 @@ impl AtlanticClient {
             match batch.proof_type() {
                 ProofType::Epoch => "epoch",
                 ProofType::SyncCommittee => "sync_committee",
+                ProofType::EpochBatch => "epoch_batch",
             }
         );
         // Build the form
