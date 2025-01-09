@@ -1,9 +1,7 @@
-
-
-pub(crate) mod Sha256Merkle {
+pub(crate) mod sha256 {
+    use crate::Error;
     use alloy_primitives::FixedBytes;
     use sha2::{Digest, Sha256};
-    use crate::Error;
 
     pub fn hash_path(
         path: Vec<FixedBytes<32>>,
@@ -14,7 +12,7 @@ pub(crate) mod Sha256Merkle {
         let mut data = [0u8; 64];
         let mut g_index = index;
         let mut witness = path.into_iter().rev().collect::<Vec<FixedBytes<32>>>();
-    
+
         while let Some(sibling) = witness.pop() {
             if g_index % 2 == 0 {
                 // left node
@@ -29,18 +27,21 @@ pub(crate) mod Sha256Merkle {
         }
         value
     }
-    
-    pub fn generate_path(leaves: Vec<FixedBytes<32>>, leaf_index: usize) -> Result<Vec<FixedBytes<32>>, Error> {
+
+    pub fn generate_path(
+        leaves: Vec<FixedBytes<32>>,
+        leaf_index: usize,
+    ) -> Result<Vec<FixedBytes<32>>, Error> {
         if leaf_index >= leaves.len() {
             return Err(Error::InvalidMerkleTree);
         }
-    
+
         // Calculate the smallest power of 2 that can fit all leaves
         let mut tree_size = 1;
         while tree_size < leaves.len() {
             tree_size *= 2;
         }
-    
+
         let mut path = Vec::new();
         let mut current_level: Vec<[u8; 32]> = leaves
             .iter()
@@ -50,14 +51,14 @@ pub(crate) mod Sha256Merkle {
                 array
             })
             .collect();
-    
+
         // Pad with zero hashes to reach the next power of 2
         while current_level.len() < tree_size {
             current_level.push([0u8; 32]);
         }
-    
+
         let mut current_index = leaf_index;
-    
+
         // Generate proof up to root
         while current_level.len() > 1 {
             let is_right = current_index % 2 == 1;
@@ -66,10 +67,10 @@ pub(crate) mod Sha256Merkle {
             } else {
                 current_index + 1
             };
-    
+
             // Add sibling to proof
             path.push(FixedBytes::from_slice(&current_level[sibling_index]));
-    
+
             // Prepare next level
             let mut next_level = Vec::with_capacity(current_level.len() / 2);
             for pair in current_level.chunks(2) {
@@ -81,17 +82,16 @@ pub(crate) mod Sha256Merkle {
                 result.copy_from_slice(&hash);
                 next_level.push(result);
             }
-    
+
             current_level = next_level;
             current_index /= 2;
         }
-    
+
         Ok(path)
     }
 }
 
-
-pub(crate) mod PoseidonMerkle {
+pub(crate) mod poseidon {
     use starknet_crypto::{poseidon_hash, Felt};
 
     pub fn compute_root(leaves: Vec<Felt>) -> Felt {
@@ -100,27 +100,27 @@ pub(crate) mod PoseidonMerkle {
         while tree_size < leaves.len() {
             tree_size *= 2;
         }
-    
+
         let mut current_level = leaves;
-        
+
         // Pad with zero hashes to reach the next power of 2
         while current_level.len() < tree_size {
             current_level.push(Felt::ZERO);
         }
-    
+
         // Build tree level by level until we reach the root
         while current_level.len() > 1 {
             let mut next_level = Vec::with_capacity(current_level.len() / 2);
-            
+
             // Process pairs of nodes
             for pair in current_level.chunks(2) {
                 let hash = poseidon_hash(pair[0], pair[1]);
                 next_level.push(hash);
             }
-            
+
             current_level = next_level;
         }
-    
+
         // Return the root (the only remaining element)
         current_level[0]
     }
@@ -133,7 +133,7 @@ pub(crate) mod PoseidonMerkle {
         }
 
         let mut current_level = leaves.clone();
-        
+
         // Pad with zero hashes to reach the next power of 2
         while current_level.len() < tree_size {
             current_level.push(Felt::ZERO);
@@ -141,30 +141,30 @@ pub(crate) mod PoseidonMerkle {
 
         // Store all levels of the tree to construct paths later
         let mut tree_levels = vec![current_level.clone()];
-        
+
         // Build tree level by level until we reach the root
         while current_level.len() > 1 {
             let mut next_level = Vec::with_capacity(current_level.len() / 2);
-            
+
             // Process pairs of nodes
             for pair in current_level.chunks(2) {
                 let hash = poseidon_hash(pair[0], pair[1]);
                 next_level.push(hash);
             }
-            
+
             current_level = next_level;
             tree_levels.push(current_level.clone());
         }
 
         let root = tree_levels.last().unwrap()[0];
-        
+
         // Generate a path for each original leaf
         let mut paths = Vec::with_capacity(leaves.len());
-        
+
         for leaf_idx in 0..leaves.len() {
             let mut path = Vec::new();
             let mut current_idx = leaf_idx;
-            
+
             // Go through each level (except the root) to build the path
             for level in &tree_levels[..tree_levels.len() - 1] {
                 // If current_idx is even, take the right sibling
@@ -174,22 +174,18 @@ pub(crate) mod PoseidonMerkle {
                 } else {
                     current_idx - 1
                 };
-                
+
                 path.push(level[sibling_idx]);
                 current_idx /= 2;
             }
-            
+
             paths.push(path);
         }
 
         (root, paths)
     }
 
-    pub fn hash_path(
-        leaf: Felt,
-        path: &[Felt],
-        index: usize,
-    ) -> Felt {
+    pub fn hash_path(leaf: Felt, path: &[Felt], index: usize) -> Felt {
         let mut current_hash = leaf;
         let mut current_index = index;
 
@@ -209,6 +205,4 @@ pub(crate) mod PoseidonMerkle {
 
         current_hash
     }
-
 }
-

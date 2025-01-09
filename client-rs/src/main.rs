@@ -1,12 +1,13 @@
 mod config;
 mod contract_init;
+pub mod epoch_batch;
 mod epoch_update;
+mod execution_header;
 mod sync_committee;
 mod traits;
 mod utils;
-mod execution_header;
-pub mod epoch_batch;
 
+use beacon_state_proof::error::Error as BeaconStateProofError;
 use config::BankaiConfig;
 use contract_init::ContractInitializationData;
 use epoch_batch::EpochUpdateBatch;
@@ -16,7 +17,6 @@ use starknet::core::types::Felt;
 use sync_committee::SyncCommitteeUpdate;
 use traits::Provable;
 use utils::{atlantic_client::AtlanticClient, cairo_runner::CairoRunner};
-use beacon_state_proof::error::Error as BeaconStateProofError;
 use utils::{
     rpc::BeaconRpcClient,
     starknet_client::{StarknetClient, StarknetError},
@@ -46,7 +46,7 @@ pub enum Error {
     CairoRunError(String),
     AtlanticError(reqwest::Error),
     InvalidResponse(String),
-    InvalidMerkleTree
+    InvalidMerkleTree,
 }
 
 impl From<StarknetError> for Error {

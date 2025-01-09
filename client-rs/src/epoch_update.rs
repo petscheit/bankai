@@ -1,7 +1,10 @@
 use std::fs;
 
 use crate::{
-    execution_header::ExecutionHeaderProof, traits::{ProofType, Provable, Submittable}, utils::{hashing::get_committee_hash, rpc::BeaconRpcClient}, Error
+    execution_header::ExecutionHeaderProof,
+    traits::{ProofType, Provable, Submittable},
+    utils::{hashing::get_committee_hash, rpc::BeaconRpcClient},
+    Error,
 };
 use alloy_primitives::FixedBytes;
 use alloy_rpc_types_beacon::{
@@ -11,10 +14,9 @@ use bls12_381::{G1Affine, G1Projective, G2Affine};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use starknet::{core::types::Felt, macros::selector};
+use starknet_crypto::poseidon_hash_many;
 use tree_hash::TreeHash;
 use tree_hash_derive::TreeHash;
-use starknet_crypto::poseidon_hash_many;
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdate {
@@ -23,7 +25,7 @@ pub struct EpochUpdate {
 }
 
 impl EpochUpdate {
-    pub async fn new(client: &BeaconRpcClient, slot: u64) -> Result<Self, Error> {
+    pub(crate) async fn new(client: &BeaconRpcClient, slot: u64) -> Result<Self, Error> {
         let circuit_inputs = EpochCircuitInputs::generate_epoch_proof(client, slot).await?;
         let expected_circuit_outputs = ExpectedEpochUpdateOutputs::from_inputs(&circuit_inputs);
         Ok(Self {
@@ -156,7 +158,7 @@ impl From<Vec<String>> for SyncCommitteeValidatorPubs {
 }
 
 impl EpochCircuitInputs {
-    pub async fn generate_epoch_proof(
+    pub(crate) async fn generate_epoch_proof(
         client: &BeaconRpcClient,
         mut slot: u64,
     ) -> Result<EpochCircuitInputs, Error> {
@@ -391,7 +393,14 @@ impl ExpectedEpochUpdateOutputs {
 
 impl Submittable<EpochCircuitInputs> for ExpectedEpochUpdateOutputs {
     fn from_inputs(circuit_inputs: &EpochCircuitInputs) -> Self {
-        let block_hash: FixedBytes<32> = FixedBytes::from_slice(circuit_inputs.execution_header_proof.execution_payload_header.block_hash().into_root().as_bytes());
+        let block_hash: FixedBytes<32> = FixedBytes::from_slice(
+            circuit_inputs
+                .execution_header_proof
+                .execution_payload_header
+                .block_hash()
+                .into_root()
+                .as_bytes(),
+        );
         Self {
             beacon_header_root: circuit_inputs.header.tree_hash_root(),
             beacon_state_root: circuit_inputs.header.state_root,
@@ -399,14 +408,19 @@ impl Submittable<EpochCircuitInputs> for ExpectedEpochUpdateOutputs {
             committee_hash: get_committee_hash(circuit_inputs.aggregate_pub.0),
             n_signers: 512 - circuit_inputs.non_signers.len() as u64,
             execution_header_hash: block_hash,
-            execution_header_height: circuit_inputs.execution_header_proof.execution_payload_header.block_number(),
+            execution_header_height: circuit_inputs
+                .execution_header_proof
+                .execution_payload_header
+                .block_number(),
         }
     }
 
     fn to_calldata(&self) -> Vec<Felt> {
         let (header_root_high, header_root_low) = self.beacon_header_root.as_slice().split_at(16);
-        let (beacon_state_root_high, beacon_state_root_low) = self.beacon_state_root.as_slice().split_at(16);
-        let (execution_header_hash_high, execution_header_hash_low) = self.execution_header_hash.as_slice().split_at(16);
+        let (beacon_state_root_high, beacon_state_root_low) =
+            self.beacon_state_root.as_slice().split_at(16);
+        let (execution_header_hash_high, execution_header_hash_low) =
+            self.execution_header_hash.as_slice().split_at(16);
         let (committee_hash_high, committee_hash_low) = self.committee_hash.as_slice().split_at(16);
         vec![
             Felt::from_bytes_be_slice(header_root_low),
