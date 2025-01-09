@@ -1,9 +1,17 @@
-// %builtins range_check bitwise
+// %builtins output range_check bitwise poseidon range_check96 add_mod mul_mod
+
+from starkware.cairo.common.cairo_builtins import PoseidonBuiltin, ModBuiltin
+
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
 from starkware.cairo.common.uint256 import Uint256, uint256_reverse_endian
 from starkware.cairo.common.builtin_keccak.keccak import keccak_uint256s_bigend
 from starkware.cairo.common.memcpy import memcpy
+from starkware.cairo.common.memset import memset
 from starkware.cairo.common.alloc import alloc
+from starkware.cairo.common.builtin_poseidon.poseidon import (
+    poseidon_hash,
+    poseidon_hash_many,
+)
 from sha import SHA256
 from cairo.src.utils import pow2alloc128, felt_divmod
 
@@ -50,7 +58,70 @@ namespace SSZ {
 
         return result;
     }
+
+    func hash_execution_payload_header_root{
+        range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*, sha256_ptr: felt*
+    }() -> (header_root: Uint256, header_hash: Uint256, header_height: felt) {
+        alloc_locals;
+
+        let (logs_bloom_segments: felt*) = alloc();
+        %{
+            header = program_input["circuit_inputs"]["execution_header_proof"]["execution_payload_header"]
+        %}
+
+        let (leaf_segments: felt*) = alloc();
+        %{
+            from cairo.py.ssz import hash_tree_root_of_execution_payload_header
+            from cairo.py.utils import hex_to_bytes
+
+            # Build a dict in the format that hash_tree_root_of_execution_payload_header expects:
+            fields = {
+                "parent_hash":       hex_to_bytes(header["parent_hash"]),
+                "fee_recipient":     hex_to_bytes(header["fee_recipient"]),
+                "state_root":        hex_to_bytes(header["state_root"]),
+                "receipts_root":     hex_to_bytes(header["receipts_root"]),
+                "logs_bloom":        hex_to_bytes(header["logs_bloom"]),
+                "prev_randao":       hex_to_bytes(header["prev_randao"]),
+                "block_number":      int(header["block_number"]),
+                "gas_limit":         int(header["gas_limit"]),
+                "gas_used":          int(header["gas_used"]),
+                "timestamp":         int(header["timestamp"]),
+                "extra_data":        hex_to_bytes(header["extra_data"]),
+                "base_fee_per_gas":  int(header["base_fee_per_gas"]),
+                "block_hash":        hex_to_bytes(header["block_hash"]),
+                "transactions_root": hex_to_bytes(header["transactions_root"]),
+                "withdrawals_root":  hex_to_bytes(header["withdrawals_root"]),
+                "blob_gas_used":     int(header["blob_gas_used"]),
+                "excess_blob_gas":   int(header["excess_blob_gas"]),
+            }
+
+            # Compute the container Merkle root
+            root, fields = hash_tree_root_of_execution_payload_header(fields)
+
+            leaf_segments = []
+            for field in fields:
+
+                high_segment = int.from_bytes(field[:16], 'big')
+                low_segment = int.from_bytes(field[16:], 'big')
+                leaf_segments.extend([low_segment, high_segment])
+
+            # Write segments to memory
+            segments.write_arg(ids.leaf_segments, leaf_segments)
+
+        %}
+
+        memset(dst=leaf_segments + 34, value=0, n=30);
+
+        let leafs = cast(leaf_segments, Uint256*);
+        let root = MerkleTree.compute_root(leafs=leafs, leafs_len=32);
+
+        let (header_height) = uint256_reverse_endian(leafs[6]);
+
+        return (root, leafs[12], header_height.low);
+    }
 }
+
+
 
 namespace MerkleTree {
     func compute_root{
@@ -74,7 +145,7 @@ namespace MerkleTree {
         let (tree: felt*) = alloc();
         let tree_len = 2 * leafs_len - 1;  // number nodes in the tree (not accounting for chunking)
 
-        // copy the leafs to the end of the tree arra
+        // copy the leafs to the end of the tree array
         memcpy(dst=tree + (tree_len - leafs_len) * 8, src=chunked_leafs, len=leafs_len * 8);
 
         with sha256_ptr {
@@ -88,7 +159,6 @@ namespace MerkleTree {
         }
 
         let result = MerkleUtils.chunks_to_uint256(output=tree - 8);
-
         return result;
     }
 
@@ -188,6 +258,31 @@ namespace MerkleUtils {
         return chunk_leafs(leafs=leafs + Uint256.SIZE, leafs_len=leafs_len, index=index + 1);
     }
 
+    func chunk_uint256{range_check_ptr, pow2_array: felt*}(value: Uint256) -> felt* {
+        let (output_ptr: felt*) = alloc();
+        // Process left-high
+        let (q0, r0) = felt_divmod(value.high, pow2_array[32]);
+        let (q1, r1) = felt_divmod(q0, pow2_array[32]);
+        let (q2, r2) = felt_divmod(q1, pow2_array[32]);
+        let (q3, r3) = felt_divmod(q2, pow2_array[32]);
+        assert [output_ptr] = r3;
+        assert [output_ptr + 1] = r2;
+        assert [output_ptr + 2] = r1;
+        assert [output_ptr + 3] = r0;
+
+        // Proccess left-low
+        let (q4, r4) = felt_divmod(value.low, pow2_array[32]);
+        let (q5, r5) = felt_divmod(q4, pow2_array[32]);
+        let (q6, r6) = felt_divmod(q5, pow2_array[32]);
+        let (q7, r7) = felt_divmod(q6, pow2_array[32]);
+        assert [output_ptr + 4] = r7;
+        assert [output_ptr + 5] = r6;
+        assert [output_ptr + 6] = r5;
+        assert [output_ptr + 7] = r4;
+
+        return output_ptr;
+    }
+
     func chunks_to_uint256{pow2_array: felt*}(output: felt*) -> Uint256 {
         let low = [output + 4] * pow2_array[96] + [output + 5] * pow2_array[64] + [output + 6] *
             pow2_array[32] + [output + 7];
@@ -196,3 +291,27 @@ namespace MerkleUtils {
         return (Uint256(low=low, high=high));
     }
 }
+
+
+// func main{
+//     output_ptr: felt*,
+//     range_check_ptr,
+//     bitwise_ptr: BitwiseBuiltin*,
+//     poseidon_ptr: PoseidonBuiltin*,
+//     range_check96_ptr: felt*,
+//     add_mod_ptr: ModBuiltin*,
+//     mul_mod_ptr: ModBuiltin*,
+// }() {
+//     alloc_locals;
+
+//     let (pow2_array) = pow2alloc128();
+//     let (sha256_ptr, sha256_ptr_start) = SHA256.init();
+
+//     with pow2_array, sha256_ptr {
+//         SSZ.hash_execution_payload_header_root();
+//     }
+
+//     SHA256.finalize(sha256_ptr_start, sha256_ptr);
+
+//     return ();
+// }

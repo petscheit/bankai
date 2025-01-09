@@ -21,6 +21,7 @@ serde_derive = "1.0.215"
 serde_json = "1.0.133"
 tokio = { version = "1.0", features = ["full"] }
 beacon-state-proof = { git = "https://github.com/petscheit/beacon-state-proof" }
+types = { path = "../../lighthouse/consensus/types", package = "types" }
 sha2 = "0.10.8"
 reqwest = { version = "0.12.9", features = ["json", "multipart", "stream"] }
 rand = "0.8.5"
@@ -49,3 +50,5 @@ postgres-types = { version = "0.2.8", features = ["derive"] }
 num_cpus = "1.16.0"
 
 
+starknet-crypto = "0.7.3"
+glob = "0.3.2"

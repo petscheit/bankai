@@ -5,6 +5,8 @@ use alloy_rpc_types_beacon::header::HeaderResponse;
 use itertools::Itertools;
 use reqwest::Client;
 use serde_json::Value;
+use types::eth_spec::MainnetEthSpec;
+use types::{BeaconBlockBody, FullPayload};
 
 /// A client for interacting with the Ethereum Beacon Chain RPC endpoints.
 /// Provides methods to fetch headers, sync aggregates, and validator information.
@@ -39,6 +41,19 @@ impl BeaconRpcClient {
             .await
             .map_err(Error::RpcError)
     }
+
+    // async fn get_ssz_blob(&self, route: &str) -> Result<Bytes, Error> {
+    //     let url = format!("{}/{}", self.rpc_url, route);
+    //     self.provider
+    //         .get(url)
+    //         .header("Accept", "application/octet-stream")
+    //         .send()
+    //         .await
+    //         .map_err(Error::RpcError)?
+    //         .bytes()
+    //         .await
+    //         .map_err(Error::RpcError)
+    // }
 
     /// Fetches the beacon chain header for a specific slot.
     /// This provides information about the block at the given slot number.
@@ -138,6 +153,20 @@ impl BeaconRpcClient {
                     .ok_or(Error::FetchSyncCommitteeError)
             })
             .collect()
+    }
+
+    pub async fn get_block_body(
+        &self,
+        slot: u64,
+    ) -> Result<BeaconBlockBody<MainnetEthSpec, FullPayload<MainnetEthSpec>>, Error> {
+        let json = self
+            .get_json(&format!("eth/v2/beacon/blocks/{}", slot))
+            .await?;
+
+        let block: BeaconBlockBody<MainnetEthSpec, FullPayload<MainnetEthSpec>> =
+            serde_json::from_value(json["data"]["message"]["body"].clone()).unwrap();
+
+        Ok(block)
     }
 
     /// Fetches the public keys of validators in the sync committee for a given slot.

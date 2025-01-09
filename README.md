@@ -47,9 +47,10 @@ The verification of an Beacon chain epoch requires the following steps:
 4. ✓ Validate signature
 5. ✓ Compute committee hash
 6. ✓ Count number of signers
-7. ✓ Generate verification outputs
+7. ✓ Decommit Execution Header hash and height (adds 130k steps of sha256)
+8. ✓ Generate verification outputs
 
-Implementation details can be found in `epoch_update.cairo` (~175k steps).
+Implementation details can be found in `epoch_update.cairo` (~350k steps).
 
 ### Sync Committee Update Operations
 To maintain continuous operation, the system validates sync committee updates through:

@@ -12,6 +12,7 @@ impl CairoRunner {
         let program_path = match input.proof_type() {
             ProofType::Epoch => config.epoch_circuit_path.clone(),
             ProofType::SyncCommittee => config.committee_circuit_path.clone(),
+            ProofType::EpochBatch => config.epoch_batch_circuit_path.clone(),
         };
 
         let pie_path = input.pie_path();

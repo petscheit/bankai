@@ -81,5 +81,11 @@ def print_g2(msg, ptr):
 def uint256_to_int(ptr):
     return ptr.high * 2**128 + ptr.low
 
+def int_to_uint256(value: int):
+    return [value & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, value >> 128]
+
 def uint384_to_int(ptr):
     return ptr.d3 * 2**288 + ptr.d2 * 2**192 + ptr.d1 * 2**96 + ptr.d0
+
+def hex_to_bytes(h: str) -> bytes:
+    return bytes.fromhex(h.removeprefix("0x"))

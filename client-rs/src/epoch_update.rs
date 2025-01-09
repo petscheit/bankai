@@ -1,6 +1,7 @@
 use std::fs;
 
 use crate::{
+    execution_header::ExecutionHeaderProof,
     traits::{ProofType, Provable, Submittable},
     utils::{hashing::get_committee_hash, rpc::BeaconRpcClient},
     Error,
@@ -13,6 +14,7 @@ use bls12_381::{G1Affine, G1Projective, G2Affine};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use starknet::{core::types::Felt, macros::selector};
+use starknet_crypto::poseidon_hash_many;
 use tree_hash::TreeHash;
 use tree_hash_derive::TreeHash;
 
@@ -26,13 +28,13 @@ pub struct EpochProof {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdate {
     pub circuit_inputs: EpochCircuitInputs,
-    pub expected_circuit_outputs: ExpectedCircuitOutputs,
+    pub expected_circuit_outputs: ExpectedEpochUpdateOutputs,
 }
 
 impl EpochUpdate {
-    pub async fn new(client: &BeaconRpcClient, slot: u64) -> Result<Self, Error> {
+    pub(crate) async fn new(client: &BeaconRpcClient, slot: u64) -> Result<Self, Error> {
         let circuit_inputs = EpochCircuitInputs::generate_epoch_proof(client, slot).await?;
-        let expected_circuit_outputs = ExpectedCircuitOutputs::from_inputs(&circuit_inputs);
+        let expected_circuit_outputs = ExpectedEpochUpdateOutputs::from_inputs(&circuit_inputs);
         Ok(Self {
             circuit_inputs,
             expected_circuit_outputs,
@@ -93,6 +95,8 @@ pub struct EpochCircuitInputs {
     pub aggregate_pub: G1Point,
     /// Public keys of validators who didn't sign
     pub non_signers: Vec<G1Point>,
+    /// Proof of inclusion for the execution payload header
+    pub execution_header_proof: ExecutionHeaderProof,
 }
 
 /// Represents a beacon chain block header
@@ -161,7 +165,7 @@ impl From<Vec<String>> for SyncCommitteeValidatorPubs {
 }
 
 impl EpochCircuitInputs {
-    pub async fn generate_epoch_proof(
+    pub(crate) async fn generate_epoch_proof(
         client: &BeaconRpcClient,
         mut slot: u64,
     ) -> Result<EpochCircuitInputs, Error> {
@@ -188,6 +192,7 @@ impl EpochCircuitInputs {
             signature_point,
             aggregate_pub: G1Point(validator_pubs.aggregate_pub),
             non_signers: non_signers.iter().map(|p| G1Point(*p)).collect(),
+            execution_header_proof: ExecutionHeaderProof::fetch_proof(client, slot).await?,
         })
     }
 
@@ -238,9 +243,9 @@ impl From<HeaderResponse> for BeaconHeader {
 }
 
 #[derive(Debug)]
-pub struct G1Point(G1Affine);
+pub struct G1Point(pub G1Affine);
 #[derive(Debug)]
-pub struct G2Point(G2Affine);
+pub struct G2Point(pub G2Affine);
 
 impl Serialize for G1Point {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -375,39 +380,67 @@ impl<'de> Deserialize<'de> for G2Point {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ExpectedCircuitOutputs {
-    pub header_root: FixedBytes<32>,
-    pub state_root: FixedBytes<32>,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ExpectedEpochUpdateOutputs {
+    pub beacon_header_root: FixedBytes<32>,
+    pub beacon_state_root: FixedBytes<32>,
+    pub slot: u64,
     pub committee_hash: FixedBytes<32>,
     pub n_signers: u64,
-    pub slot: u64,
+    pub execution_header_hash: FixedBytes<32>,
+    pub execution_header_height: u64,
 }
 
-impl Submittable<EpochCircuitInputs> for ExpectedCircuitOutputs {
+impl ExpectedEpochUpdateOutputs {
+    pub fn hash(&self) -> Felt {
+        let felts = self.to_calldata();
+        poseidon_hash_many(&felts)
+    }
+}
+
+impl Submittable<EpochCircuitInputs> for ExpectedEpochUpdateOutputs {
     fn from_inputs(circuit_inputs: &EpochCircuitInputs) -> Self {
+        let block_hash: FixedBytes<32> = FixedBytes::from_slice(
+            circuit_inputs
+                .execution_header_proof
+                .execution_payload_header
+                .block_hash()
+                .into_root()
+                .as_bytes(),
+        );
         Self {
-            header_root: circuit_inputs.header.tree_hash_root(),
-            state_root: circuit_inputs.header.state_root,
+            beacon_header_root: circuit_inputs.header.tree_hash_root(),
+            beacon_state_root: circuit_inputs.header.state_root,
+            slot: circuit_inputs.header.slot,
             committee_hash: get_committee_hash(circuit_inputs.aggregate_pub.0),
             n_signers: 512 - circuit_inputs.non_signers.len() as u64,
-            slot: circuit_inputs.header.slot,
+            execution_header_hash: block_hash,
+            execution_header_height: circuit_inputs
+                .execution_header_proof
+                .execution_payload_header
+                .block_number(),
         }
     }
 
     fn to_calldata(&self) -> Vec<Felt> {
-        let (header_root_high, header_root_low) = self.header_root.as_slice().split_at(16);
-        let (state_root_high, state_root_low) = self.state_root.as_slice().split_at(16);
+        let (header_root_high, header_root_low) = self.beacon_header_root.as_slice().split_at(16);
+        let (beacon_state_root_high, beacon_state_root_low) =
+            self.beacon_state_root.as_slice().split_at(16);
+        let (execution_header_hash_high, execution_header_hash_low) =
+            self.execution_header_hash.as_slice().split_at(16);
         let (committee_hash_high, committee_hash_low) = self.committee_hash.as_slice().split_at(16);
         vec![
             Felt::from_bytes_be_slice(header_root_low),
             Felt::from_bytes_be_slice(header_root_high),
-            Felt::from_bytes_be_slice(state_root_low),
-            Felt::from_bytes_be_slice(state_root_high),
+            Felt::from_bytes_be_slice(beacon_state_root_low),
+            Felt::from_bytes_be_slice(beacon_state_root_high),
+            Felt::from(self.slot),
             Felt::from_bytes_be_slice(committee_hash_low),
             Felt::from_bytes_be_slice(committee_hash_high),
             Felt::from(self.n_signers),
-            Felt::from(self.slot),
+            Felt::from_bytes_be_slice(execution_header_hash_low),
+            Felt::from_bytes_be_slice(execution_header_hash_high),
+            Felt::from(self.execution_header_height),
         ]
     }
 

@@ -1,13 +1,18 @@
 mod config;
 mod contract_init;
+pub mod epoch_batch;
 mod epoch_update;
+mod execution_header;
 mod sync_committee;
 mod traits;
 mod utils;
 
+use beacon_state_proof::error::Error as BeaconStateProofError;
 use config::BankaiConfig;
 use contract_init::ContractInitializationData;
+use epoch_batch::EpochUpdateBatch;
 use epoch_update::EpochUpdate;
+use execution_header::ExecutionHeaderProof;
 use starknet::core::types::Felt;
 use sync_committee::SyncCommitteeUpdate;
 use traits::Provable;
@@ -30,6 +35,7 @@ pub enum Error {
     DeserializeError(String),
     IoError(std::io::Error),
     StarknetError(StarknetError),
+    BeaconStateProofError(BeaconStateProofError),
     BlockNotFound,
     FetchSyncCommitteeError,
     FailedFetchingBeaconState,
@@ -40,6 +46,7 @@ pub enum Error {
     CairoRunError(String),
     AtlanticError(reqwest::Error),
     InvalidResponse(String),
+    InvalidMerkleTree,
 }
 
 impl From<StarknetError> for Error {
@@ -143,6 +150,7 @@ enum Commands {
     },
     ProveNextCommittee,
     ProveNextEpoch,
+    ProveNextEpochBatch,
     CheckBatchStatus {
         #[arg(long, short)]
         batch_id: String,
@@ -157,11 +165,21 @@ enum Commands {
         #[arg(long, short)]
         slot: u64,
     },
+    VerifyEpochBatch {
+        #[arg(long, short)]
+        batch_id: String,
+        #[arg(long, short)]
+        slot: u64,
+    },
     VerifyCommittee {
         #[arg(long, short)]
         batch_id: String,
         #[arg(long, short)]
         slot: u64,
+    },
+    ExecutionHeader {
+        #[arg(long, short)]
+        block: u64,
     },
 }
 
@@ -185,6 +203,12 @@ async fn main() -> Result<(), Error> {
     let bankai = BankaiClient::new().await;
 
     match cli.command {
+        Commands::ExecutionHeader { block } => {
+            let proof = ExecutionHeaderProof::fetch_proof(&bankai.client, block).await?;
+            let json = serde_json::to_string_pretty(&proof)
+                .map_err(|e| Error::DeserializeError(e.to_string()))?;
+            println!("{}", json);
+        }
         Commands::CommitteeUpdate { slot, export } => {
             println!("SyncCommittee command received with slot: {}", slot);
             let proof = bankai.get_sync_committee_update(slot).await?;
@@ -257,7 +281,7 @@ async fn main() -> Result<(), Error> {
             println!("Min Slot Required: {}", lowest_committee_update_slot);
             let latest_epoch = bankai
                 .starknet_client
-                .get_latest_epoch(&bankai.config)
+                .get_latest_epoch_slot(&bankai.config)
                 .await?;
             println!("Latest epoch: {}", latest_epoch);
             if latest_epoch < lowest_committee_update_slot {
@@ -273,13 +297,19 @@ async fn main() -> Result<(), Error> {
         Commands::ProveNextEpoch => {
             let latest_epoch = bankai
                 .starknet_client
-                .get_latest_epoch(&bankai.config)
+                .get_latest_epoch_slot(&bankai.config)
                 .await?;
             println!("Latest Epoch: {}", latest_epoch);
             // make sure next_epoch % 32 == 0
             let next_epoch = (u64::try_from(latest_epoch).unwrap() / 32) * 32 + 32;
             println!("Fetching Inputs for Epoch: {}", next_epoch);
             let proof = bankai.get_epoch_proof(next_epoch).await?;
+            CairoRunner::generate_pie(&proof, &bankai.config)?;
+            let batch_id = bankai.atlantic_client.submit_batch(proof).await?;
+            println!("Batch Submitted: {}", batch_id);
+        }
+        Commands::ProveNextEpochBatch => {
+            let proof = EpochUpdateBatch::new(&bankai).await?;
             CairoRunner::generate_pie(&proof, &bankai.config)?;
             let batch_id = bankai.atlantic_client.submit_batch(proof).await?;
             println!("Batch Submitted: {}", batch_id);
@@ -291,6 +321,22 @@ async fn main() -> Result<(), Error> {
                 .await?;
             if status == "DONE" {
                 let update = EpochUpdate::from_json::<EpochUpdate>(slot)?;
+                bankai
+                    .starknet_client
+                    .submit_update(update.expected_circuit_outputs, &bankai.config)
+                    .await?;
+                println!("Successfully submitted epoch update");
+            } else {
+                println!("Batch not completed yet. Status: {}", status);
+            }
+        }
+        Commands::VerifyEpochBatch { batch_id, slot } => {
+            let status = bankai
+                .atlantic_client
+                .check_batch_status(batch_id.as_str())
+                .await?;
+            if status == "DONE" {
+                let update = EpochUpdateBatch::from_json::<EpochUpdateBatch>(slot)?;
                 bankai
                     .starknet_client
                     .submit_update(update.expected_circuit_outputs, &bankai.config)
