@@ -5,11 +5,11 @@ edition = "2021"
 
 [[bin]]
 name = "daemon"  # Binary name (used with `cargo run --bin bin1`)
-path = "src/main.rs"  # Path to the source file for this binary
+path = "src/daemon.rs"  # Path to the source file for this binary
 
 [[bin]]
 name = "cli"
-path = "src/cli.rs"
+path = "src/main.rs"
 
 
 [dependencies]

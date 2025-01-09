@@ -198,7 +198,8 @@ impl AtlanticClient {
             }
 
             trace!(
-                "Batch not completed yet. Status: {}. Pooling attempt {}/{}",
+                "Batch {} not completed yet. Status: {}. Pooling attempt {}/{}",
+                batch_id,
                 status,
                 attempt,
                 max_retries
