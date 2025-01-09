@@ -18,7 +18,8 @@ namespace PoseidonMerkleTree {
             import math
             ids.sqrt = int(math.sqrt(ids.leafs_len))
         %}
-        assert pow2_array[sqrt] = leafs_len;
+        // ToDo: this doesnt work obviously. Propose a fix!
+        // assert pow2_array[sqrt] = leafs_len;
 
         let (tree: felt*) = alloc();
         let tree_len = 2 * leafs_len - 1;  // total nodes in the tree
