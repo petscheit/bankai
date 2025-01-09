@@ -36,16 +36,19 @@ pub struct ExpectedEpochUpdateBatchOutputs {
 impl EpochUpdateBatch {
     pub async fn new(bankai: &BankaiClient) -> Result<EpochUpdateBatch, Error> {
         let (start_slot, mut end_slot) = bankai.starknet_client.get_batching_range(&bankai.config).await?;
-        println!("Start slot: {}, End slot: {}", start_slot, end_slot);
+        println!("Slots in Term: Start {}, End {}", start_slot, end_slot);
+        let epoch_gap = (end_slot - start_slot) / SLOTS_PER_EPOCH;
+        println!("Available Epochs: {}", epoch_gap);
 
-        let gap = end_slot - start_slot;
 
         // if the gap is smaller then x2 the target size, use the entire gap
-        if gap >= TARGET_BATCH_SIZE * SLOTS_PER_EPOCH * 2 {
+        if epoch_gap >= TARGET_BATCH_SIZE * 2 {
             end_slot = start_slot + TARGET_BATCH_SIZE * SLOTS_PER_EPOCH;
         }
 
-        println!("Selected start slot: {}, End slot: {}", start_slot, end_slot);
+        println!("Selected Slots: Start {}, End {}", start_slot, end_slot);
+        println!("Epoch Count: {}", (end_slot - start_slot) / SLOTS_PER_EPOCH);
+
         let mut epochs = vec![];
         
         // Fetch epochs sequentially from start_slot to end_slot, incrementing by 32 each time
@@ -60,21 +63,16 @@ impl EpochUpdateBatch {
             current_slot += 32;
         }
 
-        println!("Epochs length: {}", epochs.len());
-
         let committee_hash = epochs[0].expected_circuit_outputs.committee_hash;
         println!("Committee hash: {:?}", committee_hash);
 
         let epoch_hashes = epochs.iter().map(|epoch| epoch.expected_circuit_outputs.hash()).collect::<Vec<Felt>>();
-        println!("Epoch hashes: {:?}", epoch_hashes);
 
         let batch_root = compute_root(epoch_hashes.clone());
         println!("Batch root: {:?}", batch_root);
 
         let (root, paths) = compute_paths(epoch_hashes.clone());
-        println!("Root: {:?}", root);
-        println!("Paths: {:?}", paths);
-
+        
         // Verify each path matches the root
         for (index, path) in paths.iter().enumerate() {
             let computed_root = hash_path(epoch_hashes[index], path, index);

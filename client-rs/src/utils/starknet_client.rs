@@ -178,10 +178,8 @@ impl StarknetClient {
     ) -> Result<(u64, u64), StarknetError> {
         let latest_epoch_slot = self.get_latest_epoch_slot(config).await?;
         let next_epoch = (u64::try_from(latest_epoch_slot).unwrap() / 32) * 32 + 32;
-
-        let term = u64::try_from(latest_epoch_slot).unwrap()  / 0x2000;
+        let term = u64::try_from(next_epoch).unwrap()  / 0x2000;
         let terms_last_epoch = (term + 1) * 0x2000 - 32;
-
         Ok((next_epoch, terms_last_epoch))
     }
 
