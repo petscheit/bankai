@@ -169,15 +169,22 @@ impl EpochCircuitInputs {
         client: &BeaconRpcClient,
         mut slot: u64,
     ) -> Result<EpochCircuitInputs, Error> {
-        // First attempt with original slot
-        let header = match client.get_header(slot).await {
-            Ok(header) => header,
-            Err(Error::EmptySlotDetected(_)) => {
-                slot += 1;
-                println!("Empty slot detected! Fetching slot: {}", slot);
-                client.get_header(slot).await?
+        let mut attempts = 0;
+        const MAX_ATTEMPTS: u8 = 3;
+
+        let header = loop {
+            match client.get_header(slot).await {
+                Ok(header) => break header,
+                Err(Error::EmptySlotDetected(_)) => {
+                    attempts += 1;
+                    if attempts >= MAX_ATTEMPTS {
+                        return Err(Error::EmptySlotDetected(slot));
+                    }
+                    slot += 1;
+                    println!("Empty slot detected! Attempt {}/{}. Fetching slot: {}", attempts, MAX_ATTEMPTS, slot);
+                }
+                Err(e) => return Err(e), // Propagate other errors immediately
             }
-            Err(e) => return Err(e), // Propagate other errors immediately
         };
 
         let sync_agg = client.get_sync_aggregate(slot).await?;
