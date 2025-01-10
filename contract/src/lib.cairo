@@ -144,7 +144,7 @@ pub mod BankaiContract {
         epoch_batch_program_hash: felt252,
     ) {
         self.owner.write(get_caller_address());
-        self.latest_epoch.write(0);
+        self.latest_epoch_slot.write(0);
 
         // Write trusted initial committee
         self.initialization_committee.write(committee_id);
@@ -163,8 +163,8 @@ pub mod BankaiContract {
             self.committee.read(committee_id)
         }
 
-        fn get_latest_epoch(self: @ContractState) -> u64 {
-            self.latest_epoch.read()
+        fn get_latest_epoch_slot(self: @ContractState) -> u64 {
+            self.latest_epoch_slot.read()
         }
 
         fn get_latest_committee_id(self: @ContractState) -> u64 {
@@ -237,7 +237,7 @@ pub mod BankaiContract {
             };
             self.epochs.write(slot, epoch_proof);
 
-            self.latest_epoch.write(slot);
+            self.latest_epoch_slot.write(slot);
             self.emit(Event::EpochUpdated(EpochUpdated {
                 beacon_root: header_root, slot: slot, execution_hash: execution_hash, execution_height: execution_height,
             }));
@@ -269,7 +269,7 @@ pub mod BankaiContract {
             };
             self.epochs.write(slot, epoch_proof);
 
-            self.latest_epoch.write(slot);
+            self.latest_epoch_slot.write(slot);
             self.emit(Event::EpochBatch(EpochBatch {
                 batch_root: batch_root, beacon_root: header_root, slot: slot, execution_hash: execution_hash, execution_height: execution_height,
             }));
@@ -305,7 +305,7 @@ pub mod BankaiContract {
             };
             self.epochs.write(slot, epoch_proof);
 
-            self.latest_epoch.write(slot);
+            self.latest_epoch_slot.write(slot);
             self.emit(Event::EpochDecommitted(EpochDecommitted {
                 batch_root: batch_root, slot: slot, execution_hash: execution_hash, execution_height: execution_height,
             }));

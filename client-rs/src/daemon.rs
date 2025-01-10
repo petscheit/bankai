@@ -783,14 +783,14 @@ async fn process_job(
             //update_job_status(&db_client, job.job_id, JobStatus::Created).await?;
 
             // 1) Fetch the latest on-chain verified epoch
-            let latest_epoch = bankai
+            let latest_epoch_slot = bankai
                 .starknet_client
                 .get_latest_epoch_slot(&bankai.config)
                 .await?;
 
             info!(
-                "[EPOCH JOB] Latest onchain verified epoch: {}",
-                latest_epoch
+                "[EPOCH JOB] Latest onchain verified epoch slot: {}",
+                latest_epoch_slot
             );
 
             // make sure next_epoch % 32 == 0
