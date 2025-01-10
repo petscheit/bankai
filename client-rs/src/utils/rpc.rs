@@ -77,15 +77,24 @@ impl BeaconRpcClient {
     /// the previous slot's header.
     pub async fn get_sync_aggregate(&self, mut slot: u64) -> Result<SyncAggregate, Error> {
         slot += 1; // signature is in the next slot
-                   // Ensure the slot is not missed and increment in case it is
-        match self.get_header(slot).await {
-            Ok(header) => header,
-            Err(Error::EmptySlotDetected(_)) => {
-                slot += 1;
-                println!("Empty slot detected! Fetching slot: {}", slot);
-                self.get_header(slot).await?
+        
+        let mut attempts = 0;
+        const MAX_ATTEMPTS: u8 = 3;
+
+        // Ensure the slot is not missed and increment in case it is
+        let _header = loop {
+            match self.get_header(slot).await {
+                Ok(header) => break header,
+                Err(Error::EmptySlotDetected(_)) => {
+                    attempts += 1;
+                    if attempts >= MAX_ATTEMPTS {
+                        return Err(Error::EmptySlotDetected(slot));
+                    }
+                    slot += 1;
+                    println!("Empty slot detected! Attempt {}/{}. Fetching slot: {}", attempts, MAX_ATTEMPTS, slot);
+                }
+                Err(e) => return Err(e), // Propagate other errors immediately
             }
-            Err(e) => return Err(e), // Propagate other errors immediately
         };
 
         let json = self
