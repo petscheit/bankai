@@ -645,7 +645,7 @@ dependencies = [
 [[package]]
 name = "bls"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
+source = "git+https://github.com/petscheit/lighthouse.git#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "arbitrary",
  "blst",
@@ -838,6 +838,7 @@ dependencies = [
  "tracing-subscriber",
  "tree_hash 0.8.0",
  "tree_hash_derive 0.8.0",
+ "types",
  "uuid 1.11.0",
 ]
 
@@ -850,7 +851,7 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 [[package]]
 name = "compare_fields"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
+source = "git+https://github.com/petscheit/lighthouse.git#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "itertools 0.10.5",
 ]
@@ -858,7 +859,7 @@ dependencies = [
 [[package]]
 name = "compare_fields_derive"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
+source = "git+https://github.com/petscheit/lighthouse.git#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -1267,7 +1268,7 @@ dependencies = [
 [[package]]
 name = "eth2_interop_keypairs"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
+source = "git+https://github.com/petscheit/lighthouse.git#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "bls",
  "ethereum_hashing 0.6.0",
@@ -2170,7 +2171,7 @@ dependencies = [
 [[package]]
 name = "int_to_bytes"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
+source = "git+https://github.com/petscheit/lighthouse.git#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "bytes",
 ]
@@ -2256,7 +2257,7 @@ dependencies = [
 [[package]]
 name = "kzg"
 version = "0.1.0"
-source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
+source = "git+https://github.com/petscheit/lighthouse.git#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "arbitrary",
  "c-kzg",
@@ -2380,7 +2381,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "merkle_proof"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
+source = "git+https://github.com/petscheit/lighthouse.git#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "ethereum-types",
  "ethereum_hashing 0.6.0",
@@ -3309,7 +3310,7 @@ checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 [[package]]
 name = "safe_arith"
 version = "0.1.0"
-source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
+source = "git+https://github.com/petscheit/lighthouse.git#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 
 [[package]]
 name = "salsa20"
@@ -3903,7 +3904,7 @@ dependencies = [
 [[package]]
 name = "swap_or_not_shuffle"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
+source = "git+https://github.com/petscheit/lighthouse.git#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "ethereum-types",
  "ethereum_hashing 0.6.0",
@@ -4022,7 +4023,7 @@ dependencies = [
 [[package]]
 name = "test_random_derive"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
+source = "git+https://github.com/petscheit/lighthouse.git#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -4434,7 +4435,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 [[package]]
 name = "types"
 version = "0.2.1"
-source = "git+https://github.com/petscheit/lighthouse#dad6bfb285942b8f3076b26a446bc8bb8d114968"
+source = "git+https://github.com/petscheit/lighthouse.git#dad6bfb285942b8f3076b26a446bc8bb8d114968"
 dependencies = [
  "alloy-primitives 0.7.7",
  "alloy-rlp",
