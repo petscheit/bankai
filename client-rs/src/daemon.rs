@@ -1,11 +1,14 @@
 mod config;
 mod contract_init;
+pub mod epoch_batch;
 mod epoch_update;
+mod execution_header;
 mod sync_committee;
 mod traits;
 mod utils;
 
-use alloy_primitives::TxHash;
+
+//use alloy_primitives::TxHash;
 use config::BankaiConfig;
 use serde_json::json;
 
@@ -14,8 +17,8 @@ use alloy_rpc_types_beacon::events::HeadEvent;
 use axum::{
     extract::{DefaultBodyLimit, Path, State},
     //http::{header, StatusCode},
-    response::{IntoResponse, Json, Response},
-    routing::{get, post},
+    response::{IntoResponse, Json},
+    routing::{get},
     Router,
 };
 use contract_init::ContractInitializationData;
@@ -60,7 +63,7 @@ impl std::fmt::Display for StarknetError {
 
 impl std::error::Error for StarknetError {}
 
-#[derive(Debug, FromSql, ToSql)]
+#[derive(Debug, FromSql, ToSql, Clone)]
 #[postgres(name = "job_status")]
 enum JobStatus {
     #[postgres(name = "CREATED")]
@@ -105,7 +108,7 @@ impl ToString for JobStatus {
     }
 }
 
-#[derive(Debug, FromSql, ToSql)]
+#[derive(Debug, FromSql, ToSql, Clone)]
 enum JobType {
     EpochUpdate,
     SyncComiteeUpdate,
@@ -135,6 +138,7 @@ pub enum Error {
     AtlanticError(reqwest::Error),
     InvalidResponse(String),
     PoolingTimeout(String),
+    InvalidMerkleTree
 }
 
 impl fmt::Display for Error {
@@ -156,6 +160,7 @@ impl fmt::Display for Error {
             Error::AtlanticError(err) => write!(f, "Atlantic RPC error: {}", err),
             Error::InvalidResponse(msg) => write!(f, "Invalid response: {}", msg),
             Error::PoolingTimeout(msg) => write!(f, "Pooling timeout: {}", msg),
+            Error::InvalidMerkleTree => write!(f, "Invalid Merkle Tree"),
         }
     }
 }
@@ -178,7 +183,7 @@ impl From<StarknetError> for Error {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Job {
     job_id: Uuid,
     job_type: JobType,
@@ -226,15 +231,23 @@ impl BankaiClient {
         &self,
         mut slot: u64,
     ) -> Result<SyncCommitteeUpdate, Error> {
+        let mut attempts = 0;
+        const MAX_ATTEMPTS: u8 = 3;
+
         // Before we start generating the proof, we ensure the slot was not missed
-        match self.client.get_header(slot).await {
-            Ok(header) => header,
-            Err(Error::EmptySlotDetected(_)) => {
-                slot += 1;
-                println!("Empty slot detected! Fetching slot: {}", slot);
-                self.client.get_header(slot).await?
+        let _header = loop {
+            match self.client.get_header(slot).await {
+                Ok(header) => break header,
+                Err(Error::EmptySlotDetected(_)) => {
+                    attempts += 1;
+                    if attempts >= MAX_ATTEMPTS {
+                        return Err(Error::EmptySlotDetected(slot));
+                    }
+                    slot += 1;
+                    println!("Empty slot detected! Attempt {}/{}. Fetching slot: {}", attempts, MAX_ATTEMPTS, slot);
+                }
+                Err(e) => return Err(e), // Propagate other errors immediately
             }
-            Err(e) => return Err(e), // Propagate other errors immediately
         };
 
         let proof: SyncCommitteeUpdate = SyncCommitteeUpdate::new(&self.client, slot).await?;
@@ -358,7 +371,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let bankai = Arc::new(BankaiClient::new().await);
     // Clone the Arc for use in async task
-    let bankai_for_task = Arc::clone(&bankai);
+    //let bankai_for_task = Arc::clone(&bankai);
 
     // Beacon node endpoint construction for ervents
     let events_endpoint = format!(
@@ -495,11 +508,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             job_id: job_id.clone(),
                             job_type: JobType::EpochUpdate,
                             job_status: JobStatus::Created,
-                            slot: parsed_event.slot - 32,
+                            slot: parsed_event.slot,
                         };
 
                         let db_client = db_client.clone();
-                        match create_job(db_client, job_id, parsed_event.slot).await {
+                        match create_job(db_client, job.clone()).await {
                             // Insert new job record to DB
                             Ok(()) => {
                                 // Handle success
@@ -576,8 +589,6 @@ async fn insert_verified_epoch(
     epoch_id: u64,
     epoch_proof: EpochProof,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let status = JobStatus::Created; // new job starts at 'Created'
-
     client
         .execute(
             "INSERT INTO verified_epoch (epoch_id, header_root, state_root, n_signers) VALUES ($1)",
@@ -598,8 +609,6 @@ async fn insert_verified_sync_committee(
     sync_committee_id: u64,
     sync_committee_hash: FixedBytes<32>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let status = JobStatus::Created; // new job starts at 'Created'
-
     client
         .execute(
             "INSERT INTO verified_sync_committee (sync_committee_id, sync_committee_hash) VALUES ($1)",
@@ -612,18 +621,15 @@ async fn insert_verified_sync_committee(
 
 async fn create_job(
     client: Arc<Client>,
-    job_id: Uuid,
-    slot: u64,
+    job: Job
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let status = JobStatus::Created; // new job starts at 'Created'
-
     client
         .execute(
             "INSERT INTO jobs (job_uuid, job_status, slot, type) VALUES ($1, $2, $3, $4)",
             &[
-                &job_id,
-                &status.to_string(),
-                &(slot as i64),
+                &job.job_id,
+                &job.job_status.to_string(),
+                &(job.slot as i64),
                 &"EPOCH_UPDATE",
             ],
         )
@@ -779,7 +785,7 @@ async fn process_job(
             // 1) Fetch the latest on-chain verified epoch
             let latest_epoch = bankai
                 .starknet_client
-                .get_latest_epoch(&bankai.config)
+                .get_latest_epoch_slot(&bankai.config)
                 .await?;
 
             info!(
@@ -788,7 +794,7 @@ async fn process_job(
             );
 
             // make sure next_epoch % 32 == 0
-            let next_epoch = (u64::try_from(latest_epoch).unwrap() / 32) * 32 + 32;
+            let next_epoch = (u64::try_from(latest_epoch).unwrap() / SLOTS_PER_EPOCH) * SLOTS_PER_EPOCH + SLOTS_PER_EPOCH;
             info!(
                 "[EPOCH JOB] Fetching Inputs for next Epoch: {}...",
                 next_epoch
@@ -932,7 +938,7 @@ async fn process_job(
 
             let latest_epoch = bankai
                 .starknet_client
-                .get_latest_epoch(&bankai.config)
+                .get_latest_epoch_slot(&bankai.config)
                 .await?;
 
             let lowest_committee_update_slot = (latest_committee_id) * Felt::from(0x2000);
@@ -1123,7 +1129,7 @@ async fn handle_get_latest_verified_slot(State(state): State<AppState>) -> impl 
     match state
         .bankai
         .starknet_client
-        .get_latest_epoch(&state.bankai.config)
+        .get_latest_epoch_slot(&state.bankai.config)
         .await
     {
         Ok(latest_epoch) => {
