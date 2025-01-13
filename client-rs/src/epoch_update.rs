@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use starknet::{core::types::Felt, macros::selector};
 use starknet_crypto::poseidon_hash_many;
+use tracing::info;
 use tree_hash::TreeHash;
 use tree_hash_derive::TreeHash;
 
@@ -181,7 +182,10 @@ impl EpochCircuitInputs {
                         return Err(Error::EmptySlotDetected(slot));
                     }
                     slot += 1;
-                    println!("Empty slot detected! Attempt {}/{}. Fetching slot: {}", attempts, MAX_ATTEMPTS, slot);
+                    info!(
+                        "Empty slot detected! Attempt {}/{}. Fetching slot: {}",
+                        attempts, MAX_ATTEMPTS, slot
+                    );
                 }
                 Err(e) => return Err(e), // Propagate other errors immediately
             }

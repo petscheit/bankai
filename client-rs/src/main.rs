@@ -1,8 +1,10 @@
 mod config;
+mod constants;
 mod contract_init;
 pub mod epoch_batch;
 mod epoch_update;
 mod execution_header;
+mod helpers;
 mod sync_committee;
 mod traits;
 mod utils;
@@ -27,6 +29,8 @@ use utils::{
 use clap::{Parser, Subcommand};
 use dotenv::from_filename;
 use std::env;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 
 #[derive(Debug)]
 pub enum Error {
@@ -100,7 +104,10 @@ impl BankaiClient {
                         return Err(Error::EmptySlotDetected(slot));
                     }
                     slot += 1;
-                    println!("Empty slot detected! Attempt {}/{}. Fetching slot: {}", attempts, MAX_ATTEMPTS, slot);
+                    println!(
+                        "Empty slot detected! Attempt {}/{}. Fetching slot: {}",
+                        attempts, MAX_ATTEMPTS, slot
+                    );
                 }
                 Err(e) => return Err(e), // Propagate other errors immediately
             }
@@ -206,6 +213,13 @@ struct Cli {
 async fn main() -> Result<(), Error> {
     // Load .env.sepolia file
     from_filename(".env.sepolia").ok();
+
+    let subscriber = FmtSubscriber::builder()
+        //.with_max_level(Level::DEBUG)
+        .with_max_level(Level::INFO)
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     let cli = Cli::parse();
     let bankai = BankaiClient::new().await;
@@ -317,9 +331,10 @@ async fn main() -> Result<(), Error> {
             println!("Batch Submitted: {}", batch_id);
         }
         Commands::ProveNextEpochBatch => {
-            let proof = EpochUpdateBatch::new(&bankai).await?;
-            CairoRunner::generate_pie(&proof, &bankai.config)?;
-            let batch_id = bankai.atlantic_client.submit_batch(proof).await?;
+            let epoch_update = EpochUpdateBatch::new(&bankai).await?;
+            println!("Update contents: {:?}", epoch_update);
+            CairoRunner::generate_pie(&epoch_update, &bankai.config)?;
+            let batch_id = bankai.atlantic_client.submit_batch(epoch_update).await?;
             println!("Batch Submitted: {}", batch_id);
         }
         Commands::VerifyEpoch { batch_id, slot } => {

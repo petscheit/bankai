@@ -15,7 +15,7 @@ pub struct EpochProof {
 #[starknet::interface]
 pub trait IBankaiContract<TContractState> {
     fn get_committee_hash(self: @TContractState, committee_id: u64) -> u256;
-    fn get_latest_epoch(self: @TContractState) -> u64;
+    fn get_latest_epoch_slot(self: @TContractState) -> u64;
     fn get_latest_committee_id(self: @TContractState) -> u64;
     fn get_committee_update_program_hash(self: @TContractState) -> felt252;
     fn get_epoch_update_program_hash(self: @TContractState) -> felt252;
@@ -126,7 +126,7 @@ pub mod BankaiContract {
         epochs: Map::<u64, EpochProof>, // maps beacon slot to header root and state root
         batches: Map::<felt252, bool>, // Available batch roots
         owner: ContractAddress,
-        latest_epoch: u64,
+        latest_epoch_slot: u64,
         latest_committee_id: u64,
         initialization_committee: u64,
         committee_update_program_hash: felt252,
@@ -313,7 +313,7 @@ pub mod BankaiContract {
 
     }
 
-   
+
     fn compute_committee_proof_fact_hash(
         self: @ContractState, beacon_state_root: u256, committee_hash: u256, slot: u64,
     ) -> felt252 {
@@ -371,7 +371,7 @@ pub mod BankaiContract {
             SHARP_BOOTLOADER_PROGRAM_HASH,
             self.epoch_batch_program_hash.read(),
             [
-                batch_root, header_root.low.into(), 
+                batch_root, header_root.low.into(),
                 header_root.high.into(), state_root.low.into(),
                 state_root.high.into(), slot.into(), committee_hash.low.into(),
                 committee_hash.high.into(), n_signers.into(), execution_hash.low.into(),

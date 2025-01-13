@@ -1,18 +1,20 @@
+use crate::constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE};
 use crate::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs};
+use crate::helpers::slot_to_epoch_id;
 use crate::traits::{Provable, Submittable};
 use crate::utils::hashing::get_committee_hash;
 use crate::utils::merkle::poseidon::{compute_paths, compute_root, hash_path};
 use crate::{BankaiClient, Error};
 use alloy_primitives::FixedBytes;
 use hex;
+use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use starknet::macros::selector;
 use starknet_crypto::Felt;
 use std::fs;
-
-const TARGET_BATCH_SIZE: u64 = 32;
-const SLOTS_PER_EPOCH: u64 = 32;
+use tokio_postgres::Client;
+use tracing::{error, info, warn};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdateBatch {
@@ -39,27 +41,39 @@ impl EpochUpdateBatch {
             .starknet_client
             .get_batching_range(&bankai.config)
             .await?;
-        println!("Slots in Term: Start {}, End {}", start_slot, end_slot);
+        info!("Slots in Term: Start {}, End {}", start_slot, end_slot);
         let epoch_gap = (end_slot - start_slot) / SLOTS_PER_EPOCH;
-        println!("Available Epochs: {}", epoch_gap);
+        info!(
+            "Available Epochs in this Sync Committee period: {}",
+            epoch_gap
+        );
 
         // if the gap is smaller then x2 the target size, use the entire gap
         if epoch_gap >= TARGET_BATCH_SIZE * 2 {
             end_slot = start_slot + TARGET_BATCH_SIZE * SLOTS_PER_EPOCH;
         }
 
-        println!("Selected Slots: Start {}, End {}", start_slot, end_slot);
-        println!("Epoch Count: {}", (end_slot - start_slot) / SLOTS_PER_EPOCH);
+        info!("Selected Slots: Start {}, End {}", start_slot, end_slot);
+        info!("Epoch Count: {}", (end_slot - start_slot) / SLOTS_PER_EPOCH);
 
         let mut epochs = vec![];
 
         // Fetch epochs sequentially from start_slot to end_slot, incrementing by 32 each time
         let mut current_slot = start_slot;
-        while current_slot <= end_slot {
+        while current_slot < end_slot {
+            // Current slot is the starting slot of epoch
+            info!(
+                "Getting data for slot: {} Epoch: {} Epochs batch position {}/{}",
+                current_slot,
+                slot_to_epoch_id(current_slot),
+                epochs.len(),
+                TARGET_BATCH_SIZE
+            );
             let epoch_update = EpochUpdate::new(&bankai.client, current_slot).await?;
 
             epochs.push(epoch_update);
             current_slot += 32;
+            //info!("epochspush");
         }
 
         let circuit_inputs = EpochUpdateBatchInputs {
@@ -84,6 +98,104 @@ impl EpochUpdateBatch {
                 panic!("Path {} does not match root", index);
             }
         }
+
+        let batch = EpochUpdateBatch {
+            circuit_inputs,
+            expected_circuit_outputs,
+            merkle_paths: paths,
+        };
+
+        Ok(batch)
+    }
+
+    pub(crate) async fn new_by_slot(
+        bankai: &BankaiClient,
+        db_client: &Client,
+        slot: u64,
+    ) -> Result<EpochUpdateBatch, Error> {
+        let (start_slot, mut end_slot) = bankai
+            .starknet_client
+            .get_batching_range_for_slot(&bankai.config, slot)
+            .await?;
+        info!("Slots in Term: Start {}, End {}", start_slot, end_slot);
+        let epoch_gap = (end_slot - start_slot) / SLOTS_PER_EPOCH;
+        info!(
+            "Available Epochs in this Sync Committee period: {}",
+            epoch_gap
+        );
+
+        // if the gap is smaller then x2 the target size, use the entire gap
+        if epoch_gap >= TARGET_BATCH_SIZE * 2 {
+            end_slot = start_slot + TARGET_BATCH_SIZE * SLOTS_PER_EPOCH;
+        }
+
+        info!("Selected Slots: Start {}, End {}", start_slot, end_slot);
+        info!("Epoch Count: {}", (end_slot - start_slot) / SLOTS_PER_EPOCH);
+
+        let mut epochs = vec![];
+
+        // Fetch epochs sequentially from start_slot to end_slot, incrementing by 32 each time
+        let mut current_slot = start_slot;
+        while current_slot < end_slot {
+            info!(
+                "Getting data for slot: {} Epoch: {} Epochs batch position {}/{}",
+                current_slot,
+                slot_to_epoch_id(current_slot),
+                epochs.len(),
+                TARGET_BATCH_SIZE
+            );
+            let epoch_update = EpochUpdate::new(&bankai.client, current_slot).await?;
+
+            epochs.push(epoch_update);
+            current_slot += 32;
+        }
+
+        let circuit_inputs = EpochUpdateBatchInputs {
+            committee_hash: get_committee_hash(epochs[0].circuit_inputs.aggregate_pub.0),
+            epochs,
+        };
+
+        let expected_circuit_outputs = ExpectedEpochBatchOutputs::from_inputs(&circuit_inputs);
+
+        let epoch_hashes = circuit_inputs
+            .epochs
+            .iter()
+            .map(|epoch| epoch.expected_circuit_outputs.hash())
+            .collect::<Vec<Felt>>();
+
+        let (root, paths) = compute_paths(epoch_hashes.clone());
+
+        // Verify each path matches the root
+        current_slot = start_slot;
+        for (index, path) in paths.iter().enumerate() {
+            let computed_root = hash_path(epoch_hashes[index], path, index);
+            if computed_root != root {
+                panic!("Path {} does not match root", index);
+            }
+            // Insert merkle paths to database
+            let current_epoch = slot_to_epoch_id(current_slot);
+            for (path_index, current_path) in path.iter().enumerate() {
+                match db_client
+                    .execute(
+                        "INSERT INTO epoch_merkle_paths (epoch_id, path_index, merkle_path) VALUES ($1, $2, $3)",
+                        &[&current_epoch.to_i32(), &path_index.to_i32(), &current_path.to_string()],
+                    )
+                    .await
+                {
+                    // Insert new job record to DB
+                    Ok((status)) => {
+                        // Merkle path inserted
+                    }
+                    Err(e) => {
+                        // Failed to insert merkle path
+                        error!("Unable to insert merkle path for epoch to database, {}", e);
+                    }
+                };
+            }
+            current_slot += 32;
+        }
+
+        info!("Paths {:?}", paths);
 
         let batch = EpochUpdateBatch {
             circuit_inputs,

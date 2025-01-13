@@ -52,3 +52,4 @@ num_cpus = "1.16.0"
 
 starknet-crypto = "0.7.3"
 glob = "0.3.2"
+num-traits = "0.2.19"
