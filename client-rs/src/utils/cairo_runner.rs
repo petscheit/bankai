@@ -1,12 +1,14 @@
 use crate::traits::ProofType;
 use crate::BankaiConfig;
 use crate::{traits::Provable, Error};
+use tokio::task;
+use tokio::task::JoinError;
 use tracing::info;
 
 pub struct CairoRunner();
 
 impl CairoRunner {
-    pub fn generate_pie(input: &impl Provable, config: &BankaiConfig) -> Result<(), Error> {
+    pub async fn generate_pie(input: &impl Provable, config: &BankaiConfig) -> Result<(), Error> {
         let input_path = input.export()?;
 
         let program_path = match input.proof_type() {
@@ -19,17 +21,23 @@ impl CairoRunner {
         info!("Generating trace...");
         let start_time = std::time::Instant::now();
 
-        // Execute cairo-run command
-        let output = std::process::Command::new("../venv/bin/cairo-run")
-            .arg("--program")
-            .arg(program_path)
-            .arg("--program_input")
-            .arg(input_path)
-            .arg("--cairo_pie_output")
-            .arg(pie_path)
-            .arg("--layout=all_cairo")
-            .output()
-            .map_err(|e| Error::CairoRunError(format!("Failed to execute commands: {}", e)))?;
+        // Offload the blocking command execution to a dedicated thread
+        let output = task::spawn_blocking(move || {
+            std::process::Command::new("../venv/bin/cairo-run")
+                .arg("--program")
+                .arg(&program_path)
+                .arg("--program_input")
+                .arg(&input_path)
+                .arg("--cairo_pie_output")
+                .arg(&pie_path)
+                .arg("--layout=all_cairo")
+                .output()
+                .map_err(|e| Error::CairoRunError(format!("Failed to execute commands: {}", e)))
+        })
+        .await
+        .map_err(|join_err: JoinError| {
+            Error::CairoRunError(format!("spawn_blocking failed: {}", join_err))
+        })??;
 
         let duration = start_time.elapsed();
 

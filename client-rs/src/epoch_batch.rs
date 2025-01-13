@@ -1,6 +1,6 @@
 use crate::constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE};
 use crate::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs};
-use crate::helpers::slot_to_epoch_id;
+use crate::helpers::{calculate_slots_range_for_batch, slot_to_epoch_id};
 use crate::traits::{Provable, Submittable};
 use crate::utils::hashing::get_committee_hash;
 use crate::utils::merkle::poseidon::{compute_paths, compute_root, hash_path};
@@ -113,25 +113,7 @@ impl EpochUpdateBatch {
         db_client: &Client,
         slot: u64,
     ) -> Result<EpochUpdateBatch, Error> {
-        let (start_slot, mut end_slot) = bankai
-            .starknet_client
-            .get_batching_range_for_slot(&bankai.config, slot)
-            .await?;
-        info!("Slots in Term: Start {}, End {}", start_slot, end_slot);
-        let epoch_gap = (end_slot - start_slot) / SLOTS_PER_EPOCH;
-        info!(
-            "Available Epochs in this Sync Committee period: {}",
-            epoch_gap
-        );
-
-        // if the gap is smaller then x2 the target size, use the entire gap
-        if epoch_gap >= TARGET_BATCH_SIZE * 2 {
-            end_slot = start_slot + TARGET_BATCH_SIZE * SLOTS_PER_EPOCH;
-        }
-
-        info!("Selected Slots: Start {}, End {}", start_slot, end_slot);
-        info!("Epoch Count: {}", (end_slot - start_slot) / SLOTS_PER_EPOCH);
-
+        let (start_slot, end_slot) = calculate_slots_range_for_batch(slot);
         let mut epochs = vec![];
 
         // Fetch epochs sequentially from start_slot to end_slot, incrementing by 32 each time

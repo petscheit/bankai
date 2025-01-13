@@ -418,7 +418,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // let db_client_for_task =db_client.clone();
 
-    let tx_for_task = tx.clone();
+    let tx_for_listener = tx.clone();
 
     let app_state: AppState = AppState {
         db_client: db_client_for_state,
@@ -489,154 +489,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 if let Some(json_data) = extract_json(&event_text) {
                                     match serde_json::from_str::<HeadEvent>(&json_data) {
                                         Ok(parsed_event) => {
-                                            //let is_node_in_sync = false;
-                                            let bankai = bankai_for_listener.clone();
-
                                             let epoch_id =
                                                 helpers::slot_to_epoch_id(parsed_event.slot);
                                             let sync_committee_id =
                                                 helpers::slot_to_sync_committee_id(
                                                     parsed_event.slot,
                                                 );
-
                                             info!(
                                                 "New slot event detected: {} |  Block: {} | Epoch: {} | Sync committee: {} | Is epoch transition: {}",
                                                 parsed_event.slot, parsed_event.block, epoch_id, sync_committee_id, parsed_event.epoch_transition
                                             );
 
-                                            let latest_epoch_slot = bankai
-                                                .starknet_client
-                                                .get_latest_epoch_slot(&bankai.config)
-                                                .await
-                                                .unwrap()
-                                                .to_u64()
-                                                .unwrap();
-
-                                            let latest_verified_epoch_id =
-                                                helpers::slot_to_epoch_id(latest_epoch_slot);
-                                            let epochs_behind = epoch_id - latest_verified_epoch_id;
-
-                                            // We getting the last slot in progress to determine next slots to prove
-                                            let mut last_slot_in_progress: u64 = 1000000;
-                                            match get_latest_slot_id_in_progress(
-                                                &db_client_for_listener.clone(),
+                                            handle_beacon_chain_head_event(
+                                                parsed_event,
+                                                bankai_for_listener.clone(),
+                                                db_client_for_listener.clone(),
+                                                tx_for_listener.clone(),
                                             )
-                                            .await
-                                            {
-                                                Ok(Some(slot)) => {
-                                                    last_slot_in_progress = slot.to_u64().unwrap();
-                                                    info!(
-                                                        "Latest in progress slot: {}  Epoch: {}",
-                                                        last_slot_in_progress,
-                                                        helpers::slot_to_epoch_id(
-                                                            last_slot_in_progress
-                                                        )
-                                                    );
-                                                }
-                                                Ok(None) => {
-                                                    warn!("No any in progress slot");
-                                                }
-                                                Err(e) => {
-                                                    error!(
-                                                        "Error while getting latest in progress slot ID: {}",
-                                                        e
-                                                    );
-                                                }
-                                            }
-
-                                            if epochs_behind > constants::TARGET_BATCH_SIZE {
-                                                // is_node_in_sync = true;
-
-                                                warn!(
-                                                    "Bankai is out of sync now. Node is {} epochs behind network. Current Beacon Chain epoch: {} Latest verified epoch: {} Sync in progress...",
-                                                    epochs_behind, epoch_id, latest_verified_epoch_id
-                                                );
-
-                                                match run_batch_update_job(
-                                                    db_client_for_listener.clone(),
-                                                    last_slot_in_progress
-                                                        + (constants::SLOTS_PER_EPOCH
-                                                            * constants::TARGET_BATCH_SIZE),
-                                                    tx_for_task.clone(),
-                                                )
-                                                .await
-                                                {
-                                                    // Insert new job record to DB
-                                                    Ok(()) => {}
-                                                    Err(e) => {}
-                                                };
-
-                                                // let epoch_update = EpochUpdateBatch::new_by_slot(
-                                                //     &bankai,
-                                                //     &db_client_for_listener.clone(),
-                                                //     last_slot_in_progress
-                                                //         + constants::SLOTS_PER_EPOCH,
-                                                // )
-                                                // .await?;
-                                            }
-
-                                            // Check if sync committee update is needed
-                                            //sync_committee_id
-
-                                            if latest_epoch_slot
-                                                % constants::SLOTS_PER_SYNC_COMMITTEE
-                                                == 0
-                                            {}
-
-                                            //return;
-
-                                            // When we doing EpochBatchUpdate the slot is latest_batch_output
-                                            // So for each batch update we takin into account effectiviely the latest slot from given batch
-
-                                            let db_client = db_client_for_listener.clone();
-
-                                            // evaluete_jobs_statuses();
-                                            // broadcast_ready_jobs();
-
-                                            // We can do all circuit computations up to latest slot in advance, but the onchain broadcasts must be send in correct order
-                                            // By correct order mean that within the same sync committe the epochs are not needed to be broadcasted in order
-                                            // but the order of sync_commite_update->epoch_update must be correct, we firstly need to have correct sync committe veryfied
-                                            // before we verify epoch "belonging" to this sync committee
-
-                                            if parsed_event.epoch_transition {
-                                                info!("Beacon Chain epoch transition detected. New epoch: {} | Starting processing epoch proving...", epoch_id);
-
-                                                // Check also now if slot is the moment of switch to new sync committee set
-                                                if parsed_event.slot
-                                                    % constants::SLOTS_PER_SYNC_COMMITTEE
-                                                    == 0
-                                                {
-                                                    info!("Beacon Chain sync committee rotation occured. Slot {} | Sync committee id: {}", parsed_event.slot, sync_committee_id);
-                                                }
-
-                                                let job_id = Uuid::new_v4();
-                                                let job = Job {
-                                                    job_id: job_id.clone(),
-                                                    job_type: JobType::EpochBatchUpdate,
-                                                    job_status: JobStatus::Created,
-                                                    slot: parsed_event.slot, // It is the last slot for given batch
-                                                };
-
-                                                let db_client = db_client_for_listener.clone();
-                                                match create_job(db_client, job.clone()).await {
-                                                    // Insert new job record to DB
-                                                    Ok(()) => {
-                                                        // Handle success
-                                                        info!(
-                                                            "Job created successfully with ID: {}",
-                                                            job_id
-                                                        );
-                                                        if tx_for_task.send(job).await.is_err() {
-                                                            error!("Failed to send job.");
-                                                        }
-                                                        // If starting committee update job, first ensule that the corresponding slot is registered in contract
-                                                    }
-                                                    Err(e) => {
-                                                        // Handle the error
-                                                        error!("Error creating job: {}", e);
-                                                    }
-                                                }
-                                            }
+                                            .await;
                                         }
                                         Err(err) => {
                                             warn!("Failed to parse JSON data: {}", err);
@@ -660,6 +530,132 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     server_task.await?;
 
     Ok(())
+}
+
+async fn handle_beacon_chain_head_event(
+    parsed_event: HeadEvent,
+    bankai: Arc<BankaiClient>,
+    db_client: Arc<Client>,
+    tx: mpsc::Sender<Job>,
+) -> () {
+    let epoch_id = helpers::slot_to_epoch_id(parsed_event.slot);
+    let sync_committee_id = helpers::slot_to_sync_committee_id(parsed_event.slot);
+
+    let latest_epoch_slot = bankai
+        .starknet_client
+        .get_latest_epoch_slot(&bankai.config)
+        .await
+        .unwrap()
+        .to_u64()
+        .unwrap();
+
+    let latest_verified_epoch_id = helpers::slot_to_epoch_id(latest_epoch_slot);
+    let epochs_behind = epoch_id - latest_verified_epoch_id;
+
+    // We getting the last slot in progress to determine next slots to prove
+    let mut last_slot_in_progress: u64 = 1000000;
+    match get_latest_slot_id_in_progress(&db_client.clone()).await {
+        Ok(Some(slot)) => {
+            last_slot_in_progress = slot.to_u64().unwrap();
+            info!(
+                "Latest in progress slot: {}  Epoch: {}",
+                last_slot_in_progress,
+                helpers::slot_to_epoch_id(last_slot_in_progress)
+            );
+        }
+        Ok(None) => {
+            warn!("No any in progress slot");
+        }
+        Err(e) => {
+            error!("Error while getting latest in progress slot ID: {}", e);
+        }
+    }
+
+    if epochs_behind > constants::TARGET_BATCH_SIZE {
+        // is_node_in_sync = true;
+
+        warn!(
+            "Bankai is out of sync now. Node is {} epochs behind network. Current Beacon Chain epoch: {} Latest verified epoch: {} Sync in progress...",
+            epochs_behind, epoch_id, latest_verified_epoch_id
+        );
+
+        match run_batch_update_job(
+            db_client.clone(),
+            last_slot_in_progress + (constants::SLOTS_PER_EPOCH * constants::TARGET_BATCH_SIZE),
+            tx.clone(),
+        )
+        .await
+        {
+            // Insert new job record to DB
+            Ok(()) => {}
+            Err(e) => {}
+        };
+
+        // let epoch_update = EpochUpdateBatch::new_by_slot(
+        //     &bankai,
+        //     &db_client_for_listener.clone(),
+        //     last_slot_in_progress
+        //         + constants::SLOTS_PER_EPOCH,
+        // )
+        // .await?;
+    }
+
+    // Check if sync committee update is needed
+    //sync_committee_id
+
+    if latest_epoch_slot % constants::SLOTS_PER_SYNC_COMMITTEE == 0 {}
+
+    //return;
+
+    // When we doing EpochBatchUpdate the slot is latest_batch_output
+    // So for each batch update we takin into account effectiviely the latest slot from given batch
+
+    let db_client = db_client.clone();
+
+    // evaluete_jobs_statuses();
+    // broadcast_ready_jobs();
+
+    // We can do all circuit computations up to latest slot in advance, but the onchain broadcasts must be send in correct order
+    // By correct order mean that within the same sync committe the epochs are not needed to be broadcasted in order
+    // but the order of sync_commite_update->epoch_update must be correct, we firstly need to have correct sync committe veryfied
+    // before we verify epoch "belonging" to this sync committee
+
+    // if parsed_event.epoch_transition {
+    //     info!("Beacon Chain epoch transition detected. New epoch: {} | Starting processing epoch proving...", epoch_id);
+
+    //     // Check also now if slot is the moment of switch to new sync committee set
+    //     if parsed_event.slot % constants::SLOTS_PER_SYNC_COMMITTEE == 0 {
+    //         info!(
+    //             "Beacon Chain sync committee rotation occured. Slot {} | Sync committee id: {}",
+    //             parsed_event.slot, sync_committee_id
+    //         );
+    //     }
+
+    //     let job_id = Uuid::new_v4();
+    //     let job = Job {
+    //         job_id: job_id.clone(),
+    //         job_type: JobType::EpochBatchUpdate,
+    //         job_status: JobStatus::Created,
+    //         slot: parsed_event.slot, // It is the last slot for given batch
+    //     };
+
+    //     let db_client = db_client_for_listener.clone();
+    //     match create_job(db_client, job.clone()).await {
+    //         // Insert new job record to DB
+    //         Ok(()) => {
+    //             // Handle success
+    //             info!("Job created successfully with ID: {}", job_id);
+    //             if tx_for_task.send(job).await.is_err() {
+    //                 error!("Failed to send job.");
+    //             }
+    //             // If starting committee update job, first ensule that the corresponding slot is registered in contract
+    //         }
+    //         Err(e) => {
+    //             // Handle the error
+    //             error!("Error creating job: {}", e);
+    //         }
+    //     }
+    // }
 }
 
 async fn run_batch_update_job(
@@ -703,7 +699,7 @@ async fn set_atlantic_job_queryid(
         AtlanticJobType::ProofGeneration => {
             client
             .execute(
-                "UPDATE jobs SET atlantic_batch_id_proof_generation = $1, updated_at = NOW() WHERE job_uuid = $2",
+                "UPDATE jobs SET atlantic_proof_generate_batch_id = $1, updated_at = NOW() WHERE job_uuid = $2",
                 &[&batch_id.to_string(), &job_id],
             )
             .await?;
@@ -711,7 +707,7 @@ async fn set_atlantic_job_queryid(
         AtlanticJobType::ProofWrapping => {
             client
             .execute(
-                "UPDATE jobs SET atlantic_batch_id_proof_wrapping = $1, updated_at = NOW() WHERE job_uuid = $2",
+                "UPDATE jobs SET atlantic_proof_wrapper_batch_id = $1, updated_at = NOW() WHERE job_uuid = $2",
                 &[&batch_id.to_string(), &job_id],
             )
             .await?;
@@ -719,41 +715,6 @@ async fn set_atlantic_job_queryid(
           //     println!("Unk", status);
           // }
     }
-
-    Ok(())
-}
-
-async fn insert_verified_epoch(
-    client: &Client,
-    epoch_id: u64,
-    epoch_proof: EpochProof,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    client
-        .execute(
-            "INSERT INTO verified_epoch (epoch_id, header_root, state_root, n_signers) VALUES ($1)",
-            &[
-                &epoch_id.to_string(),
-                &epoch_proof.header_root.to_string(),
-                &epoch_proof.state_root.to_string(),
-                &epoch_proof.n_signers.to_string(),
-            ],
-        )
-        .await?;
-
-    Ok(())
-}
-
-async fn insert_verified_sync_committee(
-    client: &Client,
-    sync_committee_id: u64,
-    sync_committee_hash: FixedBytes<32>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    client
-        .execute(
-            "INSERT INTO verified_sync_committee (sync_committee_id, sync_committee_hash) VALUES ($1)",
-            &[&sync_committee_id.to_string(), &sync_committee_hash.to_string()],
-        )
-        .await?;
 
     Ok(())
 }
@@ -1002,7 +963,7 @@ async fn process_job(
                 next_epoch
             );
 
-            CairoRunner::generate_pie(&proof, &bankai.config)?;
+            CairoRunner::generate_pie(&proof, &bankai.config).await?;
 
             info!(
                 "[EPOCH JOB] Pie generated successfully for Epoch: {}...",
@@ -1149,7 +1110,7 @@ async fn process_job(
                 latest_committee_id
             );
 
-            CairoRunner::generate_pie(&update, &bankai.config)?;
+            CairoRunner::generate_pie(&update, &bankai.config).await?;
 
             update_job_status(&db_client, job.job_id, JobStatus::PieGenerated).await?;
 
@@ -1244,7 +1205,7 @@ async fn process_job(
         JobType::EpochBatchUpdate => {
             let proof = EpochUpdateBatch::new_by_slot(&bankai, &db_client, job.slot).await?;
 
-            CairoRunner::generate_pie(&proof, &bankai.config)?;
+            CairoRunner::generate_pie(&proof, &bankai.config).await?;
             let batch_id = bankai.atlantic_client.submit_batch(proof).await?;
 
             info!(

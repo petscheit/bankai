@@ -190,18 +190,6 @@ impl StarknetClient {
         Ok((next_epoch_slot, terms_last_epoch_slot))
     }
 
-    // Computes the slot numbers for term of specified slot
-    pub async fn get_batching_range_for_slot(
-        &self,
-        config: &BankaiConfig,
-        slot: u64,
-    ) -> Result<(u64, u64), StarknetError> {
-        let next_epoch_slot = (u64::try_from(slot).unwrap() / 32) * 32 + 32;
-        let term = next_epoch_slot / 0x2000;
-        let terms_last_epoch_slot = (term + 1) * 0x2000 - 32;
-        Ok((next_epoch_slot, terms_last_epoch_slot))
-    }
-
     pub async fn get_latest_committee_id(
         &self,
         config: &BankaiConfig,
