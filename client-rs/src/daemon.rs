@@ -1,3 +1,4 @@
+mod bankai_client;
 mod config;
 mod constants;
 mod contract_init;
@@ -5,10 +6,11 @@ pub mod epoch_batch;
 mod epoch_update;
 mod execution_header;
 mod helpers;
+mod routes;
+mod state;
 mod sync_committee;
 mod traits;
 mod utils;
-
 //use alloy_primitives::TxHash;
 use alloy_primitives::FixedBytes;
 use alloy_rpc_types_beacon::events::HeadEvent;
@@ -19,26 +21,33 @@ use axum::{
     routing::get,
     Router,
 };
+use bankai_client::BankaiClient;
 use config::BankaiConfig;
 use constants::SLOTS_PER_EPOCH;
 use contract_init::ContractInitializationData;
 use dotenv::from_filename;
 use epoch_update::{EpochProof, EpochUpdate};
 use num_traits::cast::ToPrimitive;
-use postgres_types::{FromSql, ToSql};
 use reqwest;
 use serde_json::json;
 use starknet::core::types::Felt;
+use state::check_env_vars;
+use state::{AppState, Job};
+use state::{AtlanticJobType, Error, JobStatus, JobType};
 use std::env;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::task;
 use tokio_postgres::{Client, NoTls};
 use tokio_stream::StreamExt;
+use tower::ServiceBuilder;
+use tower_http::trace::TraceLayer;
 use tracing::{error, info, trace, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 use traits::Provable;
-use utils::{atlantic_client::AtlanticClient, cairo_runner::CairoRunner};
+use utils::{
+    atlantic_client::AtlanticClient, cairo_runner::CairoRunner, database_manager::DatabaseManager,
+};
 use utils::{
     rpc::BeaconRpcClient,
     //  bankai_client::BankaiClient,
@@ -46,261 +55,15 @@ use utils::{
 };
 //use std::error::Error as StdError;
 use epoch_batch::EpochUpdateBatch;
+use routes::{
+    handle_get_epoch_update, handle_get_latest_verified_slot, handle_get_merkle_paths_for_epoch,
+    handle_get_status,
+};
 use std::fmt;
 use std::net::SocketAddr;
 use sync_committee::SyncCommitteeUpdate;
 use tokio::time::Duration;
 use uuid::Uuid;
-
-impl std::fmt::Display for StarknetError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            StarknetError::ProviderError(err) => write!(f, "Provider error: {}", err),
-            StarknetError::AccountError(msg) => write!(f, "Account error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for StarknetError {}
-
-#[derive(Debug, FromSql, ToSql, Clone)]
-#[postgres(name = "job_status")]
-enum JobStatus {
-    #[postgres(name = "CREATED")]
-    Created,
-    #[postgres(name = "FETCHED_PROOF")]
-    FetchedProof,
-    #[postgres(name = "PIE_GENERATED")]
-    PieGenerated,
-    #[postgres(name = "OFFCHAIN_PROOF_REQUESTED")]
-    OffchainProofRequested,
-    #[postgres(name = "OFFCHAIN_PROOF_RETRIEVED")]
-    OffchainProofRetrieved,
-    #[postgres(name = "WRAP_PROOF_REQUESTED")]
-    WrapProofRequested,
-    #[postgres(name = "WRAPPED_PROOF_DONE")]
-    WrappedProofDone,
-    #[postgres(name = "READY_TO_BROADCAST")]
-    ReadyToBroadcast,
-    #[postgres(name = "PROOF_VERIFY_CALLED_ONCHAIN")]
-    ProofVerifyCalledOnchain,
-    #[postgres(name = "VERIFIED_FACT_REGISTERED")]
-    VerifiedFactRegistered,
-    #[postgres(name = "ERROR")]
-    Error,
-    #[postgres(name = "CANCELLED")]
-    Cancelled,
-}
-
-impl ToString for JobStatus {
-    fn to_string(&self) -> String {
-        match self {
-            JobStatus::Created => "CREATED".to_string(),
-            JobStatus::FetchedProof => "FETCHED_PROOF".to_string(),
-            JobStatus::PieGenerated => "PIE_GENERATED".to_string(),
-            JobStatus::OffchainProofRequested => "OFFCHAIN_PROOF_REQUESTED".to_string(),
-            JobStatus::OffchainProofRetrieved => "OFFCHAIN_PROOF_RETRIEVED".to_string(),
-            JobStatus::WrapProofRequested => "WRAP_PROOF_REQUESTED".to_string(),
-            JobStatus::WrappedProofDone => "WRAPPED_PROOF_DONE".to_string(),
-            JobStatus::ReadyToBroadcast => "READY_TO_BROADCAST".to_string(),
-            JobStatus::ProofVerifyCalledOnchain => "PROOF_VERIFY_CALLED_ONCHAIN".to_string(),
-            JobStatus::VerifiedFactRegistered => "VERIFIED_FACT_REGISTERED".to_string(),
-            JobStatus::Cancelled => "CANCELLED".to_string(),
-            JobStatus::Error => "ERROR".to_string(),
-        }
-    }
-}
-
-#[derive(Debug, FromSql, ToSql, Clone)]
-enum JobType {
-    EpochUpdate,
-    EpochBatchUpdate,
-    SyncComiteeUpdate,
-}
-
-#[derive(Debug, FromSql, ToSql)]
-enum AtlanticJobType {
-    ProofGeneration,
-    ProofWrapping,
-}
-
-#[derive(Debug)]
-pub enum Error {
-    InvalidProof,
-    RpcError(reqwest::Error),
-    DeserializeError(String),
-    IoError(std::io::Error),
-    StarknetError(StarknetError),
-    BlockNotFound,
-    FetchSyncCommitteeError,
-    FailedFetchingBeaconState,
-    InvalidBLSPoint,
-    MissingRpcUrl,
-    EmptySlotDetected(u64),
-    RequiresNewerEpoch(Felt),
-    CairoRunError(String),
-    AtlanticError(reqwest::Error),
-    InvalidResponse(String),
-    PoolingTimeout(String),
-    InvalidMerkleTree,
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::InvalidProof => write!(f, "Invalid proof provided"),
-            Error::RpcError(err) => write!(f, "RPC error: {}", err),
-            Error::DeserializeError(msg) => write!(f, "Deserialization error: {}", msg),
-            Error::IoError(err) => write!(f, "I/O error: {}", err),
-            Error::StarknetError(err) => write!(f, "Starknet error: {}", err),
-            Error::BlockNotFound => write!(f, "Block not found"),
-            Error::FetchSyncCommitteeError => write!(f, "Failed to fetch sync committee"),
-            Error::FailedFetchingBeaconState => write!(f, "Failed to fetch beacon state"),
-            Error::InvalidBLSPoint => write!(f, "Invalid BLS point"),
-            Error::MissingRpcUrl => write!(f, "Missing RPC URL"),
-            Error::EmptySlotDetected(slot) => write!(f, "Empty slot detected: {}", slot),
-            Error::RequiresNewerEpoch(felt) => write!(f, "Requires newer epoch: {}", felt),
-            Error::CairoRunError(msg) => write!(f, "Cairo run error: {}", msg),
-            Error::AtlanticError(err) => write!(f, "Atlantic RPC error: {}", err),
-            Error::InvalidResponse(msg) => write!(f, "Invalid response: {}", msg),
-            Error::PoolingTimeout(msg) => write!(f, "Pooling timeout: {}", msg),
-            Error::InvalidMerkleTree => write!(f, "Invalid Merkle Tree"),
-        }
-    }
-}
-
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Error::RpcError(err) => Some(err),
-            Error::IoError(err) => Some(err),
-            Error::StarknetError(err) => Some(err),
-            Error::AtlanticError(err) => Some(err),
-            _ => None, // No underlying source for other variants
-        }
-    }
-}
-
-impl From<StarknetError> for Error {
-    fn from(e: StarknetError) -> Self {
-        Error::StarknetError(e)
-    }
-}
-
-#[derive(Clone, Debug)]
-struct Job {
-    job_id: Uuid,
-    job_type: JobType,
-    job_status: JobStatus,
-    slot: u64,
-}
-
-#[derive(Clone, Debug)]
-struct AppState {
-    db_client: Arc<Client>,
-    tx: mpsc::Sender<Job>,
-    bankai: Arc<BankaiClient>,
-}
-
-#[derive(Debug)]
-struct BankaiClient {
-    client: BeaconRpcClient,
-    starknet_client: StarknetClient,
-    config: BankaiConfig,
-    atlantic_client: AtlanticClient,
-}
-
-impl BankaiClient {
-    pub async fn new() -> Self {
-        from_filename(".env.sepolia").ok();
-        let config = BankaiConfig::default();
-        Self {
-            client: BeaconRpcClient::new(env::var("BEACON_RPC_URL").unwrap()),
-            starknet_client: StarknetClient::new(
-                env::var("STARKNET_RPC_URL").unwrap().as_str(),
-                env::var("STARKNET_ADDRESS").unwrap().as_str(),
-                env::var("STARKNET_PRIVATE_KEY").unwrap().as_str(),
-            )
-            .await
-            .unwrap(),
-            atlantic_client: AtlanticClient::new(
-                config.atlantic_endpoint.clone(),
-                env::var("ATLANTIC_API_KEY").unwrap(),
-            ),
-            config,
-        }
-    }
-
-    pub async fn get_sync_committee_update(
-        &self,
-        mut slot: u64,
-    ) -> Result<SyncCommitteeUpdate, Error> {
-        let mut attempts = 0;
-        const MAX_ATTEMPTS: u8 = 3;
-
-        // Before we start generating the proof, we ensure the slot was not missed
-        let _header = loop {
-            match self.client.get_header(slot).await {
-                Ok(header) => break header,
-                Err(Error::EmptySlotDetected(_)) => {
-                    attempts += 1;
-                    if attempts >= MAX_ATTEMPTS {
-                        return Err(Error::EmptySlotDetected(slot));
-                    }
-                    slot += 1;
-                    info!(
-                        "Empty slot detected! Attempt {}/{}. Fetching slot: {}",
-                        attempts, MAX_ATTEMPTS, slot
-                    );
-                }
-                Err(e) => return Err(e), // Propagate other errors immediately
-            }
-        };
-
-        let proof: SyncCommitteeUpdate = SyncCommitteeUpdate::new(&self.client, slot).await?;
-
-        Ok(proof)
-    }
-
-    pub async fn get_epoch_proof(&self, slot: u64) -> Result<EpochUpdate, Error> {
-        let epoch_proof = EpochUpdate::new(&self.client, slot).await?;
-        Ok(epoch_proof)
-    }
-
-    pub async fn get_contract_initialization_data(
-        &self,
-        slot: u64,
-        config: &BankaiConfig,
-    ) -> Result<ContractInitializationData, Error> {
-        let contract_init = ContractInitializationData::new(&self.client, slot, config).await?;
-        Ok(contract_init)
-    }
-}
-
-fn check_env_vars() -> Result<(), String> {
-    let required_vars = [
-        "BEACON_RPC_URL",
-        "STARKNET_RPC_URL",
-        "STARKNET_ADDRESS",
-        "STARKNET_PRIVATE_KEY",
-        "ATLANTIC_API_KEY",
-        "PROOF_REGISTRY",
-        "POSTGRESQL_HOST",
-        "POSTGRESQL_USER",
-        "POSTGRESQL_PASSWORD",
-        "POSTGRESQL_DB_NAME",
-        "RPC_LISTEN_HOST",
-        "RPC_LISTEN_PORT",
-    ];
-
-    for &var in &required_vars {
-        if env::var(var).is_err() {
-            return Err(format!("Environment variable `{}` is not set", var));
-        }
-    }
-
-    Ok(())
-}
 
 // Since beacon chain RPCs have different response structure (quicknode responds different than nidereal) we use this event extraction logic
 fn extract_json(event_text: &str) -> Option<String> {
@@ -378,6 +141,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     };
 
     //let db_client_for_task = Arc::new(db_client);
+    // Create a new DatabaseManager
+    let db_manager = Arc::new(DatabaseManager::new(connection_string).await);
 
     let bankai = Arc::new(BankaiClient::new().await);
     // Clone the Arc for use in async task
@@ -445,6 +210,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // .route("/debug/get-job-status", get(handle_get_job_status))
         // .route("/get-merkle-inclusion-proof", get(handle_get_merkle_inclusion_proof))
         .layer(DefaultBodyLimit::disable())
+        .layer(
+            ServiceBuilder::new().layer(TraceLayer::new_for_http()), // Example: for logging/tracing
+        )
         .with_state(app_state);
 
     let addr = "0.0.0.0:3000".parse::<SocketAddr>()?;
@@ -687,36 +455,6 @@ async fn run_batch_update_job(
             return Err(e.into());
         }
     }
-}
-
-async fn set_atlantic_job_queryid(
-    client: &Client,
-    job_id: Uuid,
-    batch_id: String,
-    atlantic_job_type: AtlanticJobType,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    match atlantic_job_type {
-        AtlanticJobType::ProofGeneration => {
-            client
-            .execute(
-                "UPDATE jobs SET atlantic_proof_generate_batch_id = $1, updated_at = NOW() WHERE job_uuid = $2",
-                &[&batch_id.to_string(), &job_id],
-            )
-            .await?;
-        }
-        AtlanticJobType::ProofWrapping => {
-            client
-            .execute(
-                "UPDATE jobs SET atlantic_proof_wrapper_batch_id = $1, updated_at = NOW() WHERE job_uuid = $2",
-                &[&batch_id.to_string(), &job_id],
-            )
-            .await?;
-        } // _ => {
-          //     println!("Unk", status);
-          // }
-    }
-
-    Ok(())
 }
 
 async fn create_job(
@@ -1300,127 +1038,4 @@ async fn process_job(
     }
 
     Ok(())
-}
-
-//  RPC requests handling functions //
-
-async fn handle_get_status(State(state): State<AppState>) -> impl IntoResponse {
-    Json(json!({ "success": true }))
-}
-
-async fn handle_get_epoch_update(
-    Path(slot): Path<u64>,
-    State(state): State<AppState>,
-) -> impl IntoResponse {
-    match state.bankai.get_epoch_proof(slot).await {
-        Ok(epoch_update) => {
-            // Convert `EpochUpdate` to `serde_json::Value`
-            let value = serde_json::to_value(epoch_update).unwrap_or_else(|err| {
-                eprintln!("Failed to serialize EpochUpdate: {:?}", err);
-                json!({ "error": "Internal server error" })
-            });
-            Json(value)
-        }
-        Err(err) => {
-            eprintln!("Failed to fetch proof: {:?}", err);
-            Json(json!({ "error": "Failed to fetch proof" }))
-        }
-    }
-}
-
-// async fn handle_get_epoch_proof(
-//     Path(slot): Path<u64>,
-//     State(state): State<AppState>,
-// ) -> impl IntoResponse {
-//     match state.bankai.starknet_client.get_epoch_proof(slot).await {
-//         Ok(epoch_update) => {
-//             // Convert `EpochUpdate` to `serde_json::Value`
-//             let value = serde_json::to_value(epoch_update).unwrap_or_else(|err| {
-//                 eprintln!("Failed to serialize EpochUpdate: {:?}", err);
-//                 json!({ "error": "Internal server error" })
-//             });
-//             Json(value)
-//         }
-//         Err(err) => {
-//             eprintln!("Failed to fetch proof: {:?}", err);
-//             Json(json!({ "error": "Failed to fetch proof" }))
-//         }
-//     }
-// }
-
-// async fn handle_get_committee_hash(
-//     Path(committee_id): Path<u64>,
-//     State(state): State<AppState>,
-// ) -> impl IntoResponse {
-//     match state.bankai.starknet_client.get_committee_hash(committee_id).await {
-//         Ok(committee_hash) => {
-//             // Convert `EpochUpdate` to `serde_json::Value`
-//             let value = serde_json::to_value(committee_hash).unwrap_or_else(|err| {
-//                 eprintln!("Failed to serialize EpochUpdate: {:?}", err);
-//                 json!({ "error": "Internal server error" })
-//             });
-//             Json(value)
-//         }
-//         Err(err) => {
-//             eprintln!("Failed to fetch proof: {:?}", err);
-//             Json(json!({ "error": "Failed to fetch proof" }))
-//         }
-//     }
-// }
-
-async fn handle_get_latest_verified_slot(State(state): State<AppState>) -> impl IntoResponse {
-    match state
-        .bankai
-        .starknet_client
-        .get_latest_epoch_slot(&state.bankai.config)
-        .await
-    {
-        Ok(latest_epoch) => {
-            // Convert `Felt` to a string and parse it as a hexadecimal number
-            let hex_string = latest_epoch.to_string(); // Ensure this converts to a "0x..." string
-            match u64::from_str_radix(hex_string.trim_start_matches("0x"), 16) {
-                Ok(decimal_epoch) => Json(json!({ "latest_verified_slot": decimal_epoch })),
-                Err(err) => {
-                    eprintln!("Failed to parse latest_epoch as decimal: {:?}", err);
-                    Json(json!({ "error": "Invalid epoch format" }))
-                }
-            }
-        }
-        Err(err) => {
-            eprintln!("Failed to fetch latest epoch: {:?}", err);
-            Json(json!({ "error": "Failed to fetch latest epoch" }))
-        }
-    }
-}
-
-// async fn handle_get_job_status(
-//     Path(job_id): Path<u64>,
-//     State(state): State<AppState>,
-// ) -> impl IntoResponse {
-//     match fetch_job_status(&state.db_client, job_id).await {
-//         Ok(job_status) => Json(job_status),
-//         Err(err) => {
-//             eprintln!("Failed to fetch job status: {:?}", err);
-//             Json(json!({ "error": "Failed to fetch job status" }))
-//         }
-//     }
-// }
-
-async fn handle_get_merkle_paths_for_epoch(
-    Path(epoch_id): Path<i32>,
-    State(state): State<AppState>,
-) -> impl IntoResponse {
-    match get_merkle_paths_for_epoch(&state.db_client, epoch_id).await {
-        Ok(merkle_paths) => {
-            if merkle_paths.len() > 0 {
-                Json(json!({ "epoch_id": epoch_id, "merkle_paths": merkle_paths }))
-            } else {
-                Json(json!({ "error": "Epoch not available now" }))
-            }
-        }
-        Err(err) => {
-            error!("Failed to fetch merkle paths epoch: {:?}", err);
-            Json(json!({ "error": "Failed to fetch latest epoch" }))
-        }
-    }
 }

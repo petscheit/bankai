@@ -113,6 +113,14 @@ impl EpochUpdateBatch {
         db_client: &Client,
         slot: u64,
     ) -> Result<EpochUpdateBatch, Error> {
+        let _permit = bankai
+            .config
+            .epoch_data_fetching_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|e| Error::CairoRunError(format!("Semaphore error: {}", e)))?;
+
         let (start_slot, end_slot) = calculate_slots_range_for_batch(slot);
         let mut epochs = vec![];
 

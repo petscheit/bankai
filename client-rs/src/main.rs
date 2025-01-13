@@ -312,7 +312,7 @@ async fn main() -> Result<(), Error> {
             let update = bankai
                 .get_sync_committee_update(latest_epoch.try_into().unwrap())
                 .await?;
-            CairoRunner::generate_pie(&update, &bankai.config)?;
+            CairoRunner::generate_pie(&update, &bankai.config).await?;
             let batch_id = bankai.atlantic_client.submit_batch(update).await?;
             println!("Batch Submitted: {}", batch_id);
         }
@@ -326,14 +326,14 @@ async fn main() -> Result<(), Error> {
             let next_epoch = (u64::try_from(latest_epoch).unwrap() / 32) * 32 + 32;
             println!("Fetching Inputs for Epoch: {}", next_epoch);
             let proof = bankai.get_epoch_proof(next_epoch).await?;
-            CairoRunner::generate_pie(&proof, &bankai.config)?;
+            CairoRunner::generate_pie(&proof, &bankai.config).await?;
             let batch_id = bankai.atlantic_client.submit_batch(proof).await?;
             println!("Batch Submitted: {}", batch_id);
         }
         Commands::ProveNextEpochBatch => {
             let epoch_update = EpochUpdateBatch::new(&bankai).await?;
             println!("Update contents: {:?}", epoch_update);
-            CairoRunner::generate_pie(&epoch_update, &bankai.config)?;
+            CairoRunner::generate_pie(&epoch_update, &bankai.config).await?;
             let batch_id = bankai.atlantic_client.submit_batch(epoch_update).await?;
             println!("Batch Submitted: {}", batch_id);
         }

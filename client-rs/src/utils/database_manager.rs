@@ -1,3 +1,15 @@
+use crate::epoch_update::{EpochProof, EpochUpdate};
+use crate::state::{AtlanticJobType, JobStatus, JobType};
+use alloy_primitives::FixedBytes;
+use std::error::Error;
+use tokio_postgres::{Client, NoTls};
+use tracing::{error, info};
+use uuid::Uuid;
+
+pub struct DatabaseManager {
+    client: Client,
+}
+
 impl DatabaseManager {
     pub async fn new(db_url: &str) -> Result<Self, Box<dyn Error + Send + Sync>> {
         let (client, connection) = tokio_postgres::connect(db_url, NoTls).await?;
@@ -5,9 +17,11 @@ impl DatabaseManager {
         // Spawn a task to handle the connection so it is always polled
         tokio::spawn(async move {
             if let Err(e) = connection.await {
-                eprintln!("Database connection error: {}", e);
+                error!("Database connection error: {}", e);
             }
         });
+
+        info!("Successfully connected to the database!");
 
         Ok(Self { client })
     }
@@ -50,6 +64,36 @@ impl DatabaseManager {
                 ],
             )
             .await?;
+
+        Ok(())
+    }
+
+    pub async fn set_atlantic_job_queryid(
+        &self,
+        job_id: Uuid,
+        batch_id: String,
+        atlantic_job_type: AtlanticJobType,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        match atlantic_job_type {
+            AtlanticJobType::ProofGeneration => {
+                self.client
+                .execute(
+                    "UPDATE jobs SET atlantic_proof_generate_batch_id = $1, updated_at = NOW() WHERE job_uuid = $2",
+                    &[&batch_id.to_string(), &job_id],
+                )
+                .await?;
+            }
+            AtlanticJobType::ProofWrapping => {
+                self.client
+                .execute(
+                    "UPDATE jobs SET atlantic_proof_wrapper_batch_id = $1, updated_at = NOW() WHERE job_uuid = $2",
+                    &[&batch_id.to_string(), &job_id],
+                )
+                .await?;
+            } // _ => {
+              //     println!("Unk", status);
+              // }
+        }
 
         Ok(())
     }

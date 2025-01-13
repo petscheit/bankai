@@ -15,6 +15,7 @@ pub struct BankaiConfig {
     pub committee_circuit_path: String,
     pub atlantic_endpoint: String,
     pub pie_generation_semaphore: Arc<Semaphore>,
+    pub epoch_data_fetching_semaphore: Arc<Semaphore>,
 }
 
 impl Default for BankaiConfig {
@@ -48,6 +49,7 @@ impl Default for BankaiConfig {
             atlantic_endpoint: "https://atlantic.api.herodotus.cloud".to_string(),
             // Set how many concurrent pie generation (trace generation) tasks are allowed
             pie_generation_semaphore: Arc::new(Semaphore::new(3)), // 3 at once
+            epoch_data_fetching_semaphore: Arc::new(Semaphore::new(2)), // 2 at once
         }
     }
 }
