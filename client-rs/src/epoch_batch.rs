@@ -178,7 +178,7 @@ impl EpochUpdateBatch {
                 match db_client
                     .execute(
                         "INSERT INTO epoch_merkle_paths (epoch_id, path_index, merkle_path) VALUES ($1, $2, $3)",
-                        &[&current_epoch.to_i32(), &path_index.to_i32(), &current_path.to_string()],
+                        &[&current_epoch.to_i32(), &path_index.to_i32(), &current_path.to_hex_string()],
                     )
                     .await
                 {

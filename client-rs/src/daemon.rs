@@ -431,7 +431,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         //.route("/get-epoch-proof/:slot", get(handle_get_epoch_proof))
         //.route("/get-committee-hash/:committee_id", get(handle_get_committee_hash))
         .route(
-            "/get_merkle_paths_for_epoch/:slot",
+            "/get_merkle_paths_for_epoch/:epoch_id",
             get(handle_get_merkle_paths_for_epoch),
         )
         .route(
@@ -1451,12 +1451,15 @@ async fn handle_get_merkle_paths_for_epoch(
 ) -> impl IntoResponse {
     match get_merkle_paths_for_epoch(&state.db_client, epoch_id).await {
         Ok(merkle_paths) => {
-            info!("paths: {:?}", merkle_paths);
-            Json(merkle_paths);
+            if merkle_paths.len() > 0 {
+                Json(json!({ "epoch_id": epoch_id, "merkle_paths": merkle_paths }))
+            } else {
+                Json(json!({ "error": "Epoch not available now" }))
+            }
         }
         Err(err) => {
             error!("Failed to fetch merkle paths epoch: {:?}", err);
-            Json(json!({ "error": "Failed to fetch latest epoch" }));
+            Json(json!({ "error": "Failed to fetch latest epoch" }))
         }
     }
 }
