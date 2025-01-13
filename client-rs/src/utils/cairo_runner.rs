@@ -9,6 +9,15 @@ pub struct CairoRunner();
 
 impl CairoRunner {
     pub async fn generate_pie(input: &impl Provable, config: &BankaiConfig) -> Result<(), Error> {
+        // Acquire a permit from the semaphore.
+        // If all permits are in use we will wait until one is available.
+        let _permit = config
+            .pie_generation_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|e| Error::CairoRunError(format!("Semaphore error: {}", e)))?;
+
         let input_path = input.export()?;
 
         let program_path = match input.proof_type() {

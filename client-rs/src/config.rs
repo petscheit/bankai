@@ -1,4 +1,6 @@
 use starknet::core::types::Felt;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 #[derive(Clone, Debug)]
 pub struct BankaiConfig {
@@ -12,6 +14,7 @@ pub struct BankaiConfig {
     pub epoch_batch_circuit_path: String,
     pub committee_circuit_path: String,
     pub atlantic_endpoint: String,
+    pub pie_generation_semaphore: Arc<Semaphore>,
 }
 
 impl Default for BankaiConfig {
@@ -43,6 +46,8 @@ impl Default for BankaiConfig {
             epoch_batch_circuit_path: "../cairo/build/epoch_batch.json".to_string(),
             committee_circuit_path: "../cairo/build/committee_update.json".to_string(),
             atlantic_endpoint: "https://atlantic.api.herodotus.cloud".to_string(),
+            // Set how many concurrent pie generation (trace generation) tasks are allowed
+            pie_generation_semaphore: Arc::new(Semaphore::new(3)), // 3 at once
         }
     }
 }

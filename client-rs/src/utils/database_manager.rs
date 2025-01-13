@@ -12,7 +12,6 @@ impl DatabaseManager {
         Ok(Self { client })
     }
 
-    /// Inserts a verified epoch into the `verified_epoch` table.
     pub async fn insert_verified_epoch(
         &self,
         epoch_id: u64,
