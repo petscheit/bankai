@@ -15,6 +15,11 @@ use starknet_crypto::Felt;
 use std::fs;
 use tokio_postgres::Client;
 use tracing::{error, info, warn};
+use crate::utils::{
+    database_manager::DatabaseManager,
+};
+use std::sync::Arc;
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdateBatch {
@@ -110,7 +115,7 @@ impl EpochUpdateBatch {
 
     pub(crate) async fn new_by_slot(
         bankai: &BankaiClient,
-        db_client: &Client,
+        db_manager: Arc<DatabaseManager>,
         slot: u64,
     ) -> Result<EpochUpdateBatch, Error> {
         let _permit = bankai
@@ -165,22 +170,7 @@ impl EpochUpdateBatch {
             // Insert merkle paths to database
             let current_epoch = slot_to_epoch_id(current_slot);
             for (path_index, current_path) in path.iter().enumerate() {
-                match db_client
-                    .execute(
-                        "INSERT INTO epoch_merkle_paths (epoch_id, path_index, merkle_path) VALUES ($1, $2, $3)",
-                        &[&current_epoch.to_i32(), &path_index.to_i32(), &current_path.to_hex_string()],
-                    )
-                    .await
-                {
-                    // Insert new job record to DB
-                    Ok((status)) => {
-                        // Merkle path inserted
-                    }
-                    Err(e) => {
-                        // Failed to insert merkle path
-                        error!("Unable to insert merkle path for epoch to database, {}", e);
-                    }
-                };
+                db_manager.insert_merkle_path_for_epoch(current_epoch.to_i32().unwrap(), path_index.to_i32().unwrap(), current_path.to_hex_string());
             }
             current_slot += 32;
         }

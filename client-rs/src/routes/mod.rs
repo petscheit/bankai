@@ -117,7 +117,7 @@ pub async fn handle_get_merkle_paths_for_epoch(
     Path(epoch_id): Path<i32>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    match get_merkle_paths_for_epoch(&state.db_client, epoch_id).await {
+    match state.db_manager.get_merkle_paths_for_epoch(epoch_id).await {
         Ok(merkle_paths) => {
             if merkle_paths.len() > 0 {
                 Json(json!({ "epoch_id": epoch_id, "merkle_paths": merkle_paths }))

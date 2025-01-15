@@ -1,5 +1,8 @@
 use crate::bankai_client::BankaiClient;
 use crate::utils::starknet_client::StarknetError;
+use crate::utils::{
+    database_manager::DatabaseManager,
+};
 use postgres_types::{FromSql, ToSql};
 use starknet::core::types::Felt;
 use std::env;
@@ -19,7 +22,7 @@ pub struct Job {
 
 #[derive(Clone, Debug)]
 pub struct AppState {
-    pub db_client: Arc<Client>,
+    pub db_manager: Arc<DatabaseManager>,
     pub tx: mpsc::Sender<Job>,
     pub bankai: Arc<BankaiClient>,
 }
