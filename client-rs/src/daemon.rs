@@ -563,6 +563,18 @@ async fn broadcast_onchain_ready_jobs(
 
                 // Insert data to DB after successful onchain sync committee verification
                 //let sync_committee_hash = update.expected_circuit_outputs.committee_hash;
+                let sync_committee_hash = match bankai
+                    .starknet_client
+                    .get_committee_hash(slot, &bankai.config)
+                    .await
+                {
+                    Ok((sync_committee_hash)) => sync_committee_hash,
+                    Err(e) => {
+                        // Handle the error
+                        return Err(e.into());
+                    }
+                };
+
                 db_manager
                     .insert_verified_sync_committee(job.slot.to_u64().unwrap(), sync_committee_hash)
                     .await?;
