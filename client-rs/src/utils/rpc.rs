@@ -5,6 +5,7 @@ use alloy_rpc_types_beacon::header::HeaderResponse;
 use itertools::Itertools;
 use reqwest::Client;
 use serde_json::Value;
+use tracing::warn;
 use types::eth_spec::MainnetEthSpec;
 use types::{BeaconBlockBody, FullPayload};
 
@@ -78,7 +79,7 @@ impl BeaconRpcClient {
     /// the previous slot's header.
     pub async fn get_sync_aggregate(&self, mut slot: u64) -> Result<SyncAggregate, Error> {
         slot += 1; // signature is in the next slot
-        
+
         let mut attempts = 0;
         const MAX_ATTEMPTS: u8 = 3;
 
@@ -92,7 +93,10 @@ impl BeaconRpcClient {
                         return Err(Error::EmptySlotDetected(slot));
                     }
                     slot += 1;
-                    println!("Empty slot detected! Attempt {}/{}. Fetching slot: {}", attempts, MAX_ATTEMPTS, slot);
+                    warn!(
+                        "Empty slot detected! Attempt {}/{}. Fetching slot: {}",
+                        attempts, MAX_ATTEMPTS, slot
+                    );
                 }
                 Err(e) => return Err(e), // Propagate other errors immediately
             }

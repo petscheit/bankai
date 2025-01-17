@@ -57,6 +57,7 @@ impl StarknetClient {
         })
     }
 
+    #[cfg(feature = "cli")]
     pub async fn deploy_contract(
         &self,
         init_data: ContractInitializationData,
@@ -96,6 +97,14 @@ impl StarknetClient {
         update: impl Submittable<T>,
         config: &BankaiConfig,
     ) -> Result<Felt, StarknetError> {
+        println!(
+            "{:?}",
+            vec![Call {
+                to: config.contract_address,
+                selector: update.get_contract_selector(),
+                calldata: update.to_calldata(),
+            }]
+        );
         let result = self
             .account
             .execute_v1(vec![Call {

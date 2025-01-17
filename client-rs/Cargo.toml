@@ -3,6 +3,10 @@ name = "client-rs"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+daemon = []
+cli = []
+
 [[bin]]
 name = "daemon"        # Binary name (used with `cargo run --bin bin1`)
 path = "src/daemon.rs" # Path to the source file for this binary
@@ -10,6 +14,7 @@ path = "src/daemon.rs" # Path to the source file for this binary
 [[bin]]
 name = "cli"
 path = "src/main.rs"
+required-features = ["cli"]
 
 
 [dependencies]
@@ -54,3 +59,4 @@ glob = "0.3.2"
 num-traits = "0.2.19"
 tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["trace"] }
+chrono = "0.4.39"

@@ -3,6 +3,7 @@ use crate::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs};
 use crate::helpers::{calculate_slots_range_for_batch, slot_to_epoch_id};
 use crate::traits::{Provable, Submittable};
 use crate::utils::hashing::get_committee_hash;
+
 use crate::utils::merkle::poseidon::{compute_paths, compute_root, hash_path};
 use crate::{BankaiClient, Error};
 use alloy_primitives::FixedBytes;
@@ -13,13 +14,10 @@ use sha2::{Digest, Sha256};
 use starknet::macros::selector;
 use starknet_crypto::Felt;
 use std::fs;
-use tokio_postgres::Client;
-use tracing::{error, info, warn};
-use crate::utils::{
-    database_manager::DatabaseManager,
-};
-use std::sync::Arc;
 
+use crate::utils::database_manager::DatabaseManager;
+use std::sync::Arc;
+use tracing::{debug, info};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdateBatch {
@@ -41,6 +39,7 @@ pub struct ExpectedEpochBatchOutputs {
 }
 
 impl EpochUpdateBatch {
+    #[cfg(feature = "cli")]
     pub(crate) async fn new(bankai: &BankaiClient) -> Result<EpochUpdateBatch, Error> {
         let (start_slot, mut end_slot) = bankai
             .starknet_client
@@ -170,7 +169,14 @@ impl EpochUpdateBatch {
             // Insert merkle paths to database
             let current_epoch = slot_to_epoch_id(current_slot);
             for (path_index, current_path) in path.iter().enumerate() {
-                db_manager.insert_merkle_path_for_epoch(current_epoch.to_i32().unwrap(), path_index.to_i32().unwrap(), current_path.to_hex_string());
+                db_manager
+                    .insert_merkle_path_for_epoch(
+                        current_epoch.to_i32().unwrap(),
+                        path_index.to_i32().unwrap(),
+                        current_path.to_hex_string(),
+                    )
+                    .await
+                    .map_err(|e| Error::DatabaseError(e.to_string()))?;
             }
             current_slot += 32;
         }
@@ -184,6 +190,33 @@ impl EpochUpdateBatch {
         };
 
         Ok(batch)
+    }
+}
+
+impl EpochUpdateBatch {
+    pub fn from_json<T>(first_slot: u64, last_slot: u64) -> Result<T, Error>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        // Pattern match for files like: batches/epoch_batch/6709248_to_6710272/input_batch_6709248_to_6710272.json
+        let path = format!(
+            "batches/epoch_batch/{}_to_{}/input_batch_{}_to_{}.json",
+            first_slot, last_slot, first_slot, last_slot
+        );
+        debug!(path);
+        let glob_pattern = glob::glob(&path)
+            .map_err(|e| Error::IoError(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
+        // Take the first matching file
+        let path = glob_pattern.take(1).next().ok_or_else(|| {
+            Error::IoError(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "No matching file found",
+            ))
+        })?;
+
+        let json = fs::read_to_string(path.unwrap()).map_err(Error::IoError)?;
+        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
     }
 }
 
@@ -221,30 +254,6 @@ impl Provable for EpochUpdateBatch {
         );
         fs::write(path.clone(), json).map_err(Error::IoError)?;
         Ok(path)
-    }
-
-    fn from_json<T>(slot: u64) -> Result<T, Error>
-    where
-        T: serde::de::DeserializeOwned,
-    {
-        // Pattern match for files like: batches/epoch_batch/6709248_to_6710272/input_batch_6709248_to_6710272.json
-        let path = format!(
-            "batches/epoch_batch/*_to_{}/input_batch_*_to_{}.json",
-            slot, slot
-        );
-        let glob_pattern = glob::glob(&path)
-            .map_err(|e| Error::IoError(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
-
-        // Take the first matching file
-        let path = glob_pattern.take(1).next().ok_or_else(|| {
-            Error::IoError(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "No matching file found",
-            ))
-        })?;
-
-        let json = fs::read_to_string(path.unwrap()).map_err(Error::IoError)?;
-        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
     }
 
     fn proof_type(&self) -> crate::traits::ProofType {

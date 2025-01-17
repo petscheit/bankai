@@ -4,14 +4,26 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use num_traits::cast::ToPrimitive;
 use serde_json::{json, Value};
-use tracing::{error, info, trace, warn, Level};
+use tracing::error;
 
 //  RPC requests handling functions //
 
 // Handler for GET /status
-pub async fn handle_get_status(State(_state): State<AppState>) -> impl IntoResponse {
-    Json(json!({ "success": true }))
+pub async fn handle_get_status(State(state): State<AppState>) -> impl IntoResponse {
+    let last_slot_in_progress = match state.db_manager.get_latest_slot_id_in_progress().await {
+        Ok(Some(slot)) => {
+            let last_slot_in_progress = slot.to_u64().unwrap();
+            last_slot_in_progress
+        }
+        Ok(None) => 0,
+        Err(e) => 0,
+    };
+
+    Json(json!({ "success": true, "details": {
+        "last_slot_in_progress": last_slot_in_progress
+    } }))
 }
 
 // Handler for GET /epoch/:slot

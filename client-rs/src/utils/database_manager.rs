@@ -1,11 +1,24 @@
-use crate::epoch_update::{EpochProof, EpochUpdate};
-use crate::state::{AtlanticJobType, JobStatus, JobType, Job};
+use crate::epoch_update::EpochProof;
+use crate::state::{AtlanticJobType, Error, Job, JobStatus, JobType};
 use alloy_primitives::FixedBytes;
-use std::error::Error;
-use tokio_postgres::{Client, NoTls};
+use starknet::core::types::Felt;
+use std::str::FromStr;
+//use std::error::Error;
+use chrono::NaiveDateTime;
+use tokio_postgres::{Client, Row};
 use tracing::{error, info};
 use uuid::Uuid;
-use starknet::core::types::Felt;
+
+#[derive(Debug)]
+pub struct JobSchema {
+    pub job_uuid: uuid::Uuid,
+    pub job_status: JobStatus,
+    pub slot: i64,
+    pub batch_range_begin_epoch: i64,
+    pub batch_range_end_epoch: i64,
+    pub job_type: JobType,
+    pub updated_at: i64,
+}
 
 #[derive(Debug)]
 pub struct DatabaseManager {
@@ -21,7 +34,7 @@ impl DatabaseManager {
                         eprintln!("Connection error: {}", e);
                     }
                 });
-    
+
                 info!("Connected to the database successfully!");
                 client
             }
@@ -30,20 +43,19 @@ impl DatabaseManager {
                 std::process::exit(1); // Exit with non-zero status code
             }
         };
-     
+
         Self { client }
     }
-    
 
     pub async fn insert_verified_epoch(
         &self,
         epoch_id: u64,
         epoch_proof: EpochProof,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         self.client
             .execute(
                 "INSERT INTO verified_epoch (epoch_id, header_root, state_root, n_signers)
-             VALUES ($1, $2, $3, $4)",
+             VALUES ($1, $2, $3, $4, $4, $6)",
                 &[
                     &epoch_id.to_string(),
                     &epoch_proof.header_root.to_string(),
@@ -62,7 +74,7 @@ impl DatabaseManager {
         &self,
         sync_committee_id: u64,
         sync_committee_hash: FixedBytes<32>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         self.client
             .execute(
                 "INSERT INTO verified_sync_committee (sync_committee_id, sync_committee_hash)
@@ -121,27 +133,30 @@ impl DatabaseManager {
                     &"EPOCH_UPDATE",
                 ],
             )
-            .await?;
-    
+            .await
+            .map_err(|e| Error::DatabaseError(e.to_string()))?;
+
         Ok(())
     }
-    
+
     pub async fn fetch_job_status(
         &self,
         job_id: Uuid,
     ) -> Result<Option<JobStatus>, Box<dyn std::error::Error + Send + Sync>> {
-        let row_opt = self.client
+        let row_opt = self
+            .client
             .query_opt("SELECT status FROM jobs WHERE job_id = $1", &[&job_id])
             .await?;
-    
+
         Ok(row_opt.map(|row| row.get("status")))
     }
-    
+
     pub async fn get_latest_slot_id_in_progress(
         &self,
     ) -> Result<Option<i64>, Box<dyn std::error::Error + Send + Sync>> {
         // Query the latest slot with job_status in ('in_progress', 'initialized')
-        let row_opt = self.client
+        let row_opt = self
+            .client
             .query_opt(
                 "SELECT slot FROM jobs
                  WHERE job_status IN ($1, $2)
@@ -150,7 +165,7 @@ impl DatabaseManager {
                 &[&"CREATED", &"PIE_GENERATED"],
             )
             .await?;
-    
+
         // Extract and return the slot ID
         if let Some(row) = row_opt {
             Ok(Some(row.get::<_, i64>("slot")))
@@ -158,13 +173,14 @@ impl DatabaseManager {
             Ok(None)
         }
     }
-    
+
     pub async fn get_merkle_paths_for_epoch(
         &self,
         epoch_id: i32,
     ) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
         // Query all merkle paths for the given epoch_id
-        let rows = self.client
+        let rows = self
+            .client
             .query(
                 "SELECT merkle_path FROM epoch_merkle_paths
                  WHERE epoch_id = $1
@@ -172,15 +188,88 @@ impl DatabaseManager {
                 &[&epoch_id],
             )
             .await?;
-    
+
         let paths: Vec<String> = rows
             .iter()
             .map(|row| row.get::<_, String>("merkle_path"))
             .collect();
-    
+
         Ok(paths)
     }
-    
+
+    pub async fn get_compute_finsihed_jobs_to_proccess_onchain_call(
+        &self,
+        last_epoch: JobStatus,
+    ) -> Result<Vec<JobSchema>, Box<dyn std::error::Error + Send + Sync>> {
+        let rows = self
+            .client
+            .query(
+                "SELECT * FROM jobs
+                 WHERE job_status = 'OFFCHAIN_COMPUTATION_FINISHED' AND job_type = 'EPOCH_BATCH_UPDATE'  AND batch_range_end_epoch <= $1",
+                &[&last_epoch],
+            )
+            .await?;
+
+        // Map rows into Job structs
+        let jobs: Vec<JobSchema> = rows
+            .into_iter()
+            .map(|row: Row| JobSchema {
+                job_uuid: row.get("job_uuid"),
+                job_status: row.get("job_status"),
+                slot: row.get("slot"),
+                batch_range_begin_epoch: row.get("batch_range_begin_epoch"),
+                batch_range_end_epoch: row.get("batch_range_end_epoch"),
+                job_type: row.get("type"),
+                updated_at: row.get("updated_at"),
+            })
+            .collect();
+
+        Ok(jobs)
+    }
+
+    pub async fn get_jobs_with_status(
+        &self,
+        desired_status: JobStatus,
+    ) -> Result<Vec<JobSchema>, Box<dyn std::error::Error + Send + Sync>> {
+        // Query all jobs with the given job_status
+        let rows = self
+            .client
+            .query(
+                "SELECT * FROM jobs
+                 WHERE job_status = $1",
+                &[&desired_status],
+            )
+            .await?;
+
+        // Map rows into JobSchema structs
+        let jobs: Vec<JobSchema> = rows
+            .into_iter()
+            .map(
+                |row: Row| -> Result<JobSchema, Box<dyn std::error::Error + Send + Sync>> {
+                    let job_type_str: String = row.get("type");
+                    let job_status_str: String = row.get("job_status");
+
+                    let job_type = JobType::from_str(&job_type_str)
+                        .map_err(|err| format!("Failed to parse job type: {}", err))?;
+                    let job_status = JobStatus::from_str(&job_status_str)
+                        .map_err(|err| format!("Failed to parse job status: {}", err))?;
+
+                    Ok(JobSchema {
+                        job_uuid: row.get("job_uuid"),
+                        job_status,
+                        slot: row.get("slot"),
+                        batch_range_begin_epoch: row.get("batch_range_begin_epoch"),
+                        batch_range_end_epoch: row.get("batch_range_end_epoch"),
+                        job_type,
+                        updated_at: row.get("updated_at"),
+                    })
+                },
+            )
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(jobs)
+    }
+
     pub async fn update_job_status(
         &self,
         job_id: Uuid,
@@ -194,7 +283,7 @@ impl DatabaseManager {
             .await?;
         Ok(())
     }
-    
+
     pub async fn set_job_txhash(
         &self,
         job_id: Uuid,
@@ -208,7 +297,7 @@ impl DatabaseManager {
             .await?;
         Ok(())
     }
-    
+
     pub async fn cancell_all_unfinished_jobs(
         &self,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -225,7 +314,7 @@ impl DatabaseManager {
         &self,
         epoch: i32,
         path_index: i32,
-        path: String
+        path: String,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         self.client
             .execute(
@@ -235,13 +324,13 @@ impl DatabaseManager {
             .await?;
         Ok(())
     }
-    
+
     // async fn fetch_job_by_status(
     //     client: &Client,
     //     status: JobStatus,
     // ) -> Result<Option<Job>, Box<dyn std::error::Error + Send + Sync>> {
     //     let tx = client.transaction().await?;
-    
+
     //     let row_opt = tx
     //         .query_opt(
     //             r#"
@@ -255,7 +344,7 @@ impl DatabaseManager {
     //             &[&status],
     //         )
     //         .await?;
-    
+
     //     let job = if let Some(row) = row_opt {
     //         Some(Job {
     //             job_id: row.get("job_id"),
@@ -266,11 +355,11 @@ impl DatabaseManager {
     //     } else {
     //         None
     //     };
-    
+
     //     tx.commit().await?;
     //     Ok(job)
     // }
-    
+
     // async fn add_verified_epoch(
     //     client: Arc<Client>,
     //     slot: u64,
@@ -281,7 +370,7 @@ impl DatabaseManager {
     //             &[&slot, &status.to_string(), &(slot as i64), &"EPOCH_UPDATE"],
     //         )
     //         .await?;
-    
+
     //     Ok(())
     // }
 }

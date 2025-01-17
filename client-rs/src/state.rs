@@ -1,15 +1,13 @@
 use crate::bankai_client::BankaiClient;
+use crate::utils::database_manager::DatabaseManager;
 use crate::utils::starknet_client::StarknetError;
-use crate::utils::{
-    database_manager::DatabaseManager,
-};
 use postgres_types::{FromSql, ToSql};
 use starknet::core::types::Felt;
 use std::env;
 use std::fmt;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tokio_postgres::Client;
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -32,8 +30,8 @@ pub struct AppState {
 pub enum JobStatus {
     #[postgres(name = "CREATED")]
     Created,
-    #[postgres(name = "FETCHED_PROOF")]
-    FetchedProof,
+    #[postgres(name = "PROGRAM_INPUTS_PREPARED")]
+    ProgramInputsPrepared,
     #[postgres(name = "PIE_GENERATED")]
     PieGenerated,
     #[postgres(name = "OFFCHAIN_PROOF_REQUESTED")]
@@ -44,8 +42,10 @@ pub enum JobStatus {
     WrapProofRequested,
     #[postgres(name = "WRAPPED_PROOF_DONE")]
     WrappedProofDone,
-    #[postgres(name = "READY_TO_BROADCAST")]
-    ReadyToBroadcast,
+    #[postgres(name = "OFFCHAIN_COMPUTATION_FINISHED")]
+    OffchainComputationFinished,
+    #[postgres(name = "READY_TO_BROADCAST_ONCHAIN")]
+    ReadyToBroadcastOnchain,
     #[postgres(name = "PROOF_VERIFY_CALLED_ONCHAIN")]
     ProofVerifyCalledOnchain,
     #[postgres(name = "VERIFIED_FACT_REGISTERED")]
@@ -60,13 +60,14 @@ impl ToString for JobStatus {
     fn to_string(&self) -> String {
         match self {
             JobStatus::Created => "CREATED".to_string(),
-            JobStatus::FetchedProof => "FETCHED_PROOF".to_string(),
+            JobStatus::ProgramInputsPrepared => "PROGRAM_INPUTS_PREPARED".to_string(),
             JobStatus::PieGenerated => "PIE_GENERATED".to_string(),
             JobStatus::OffchainProofRequested => "OFFCHAIN_PROOF_REQUESTED".to_string(),
             JobStatus::OffchainProofRetrieved => "OFFCHAIN_PROOF_RETRIEVED".to_string(),
             JobStatus::WrapProofRequested => "WRAP_PROOF_REQUESTED".to_string(),
             JobStatus::WrappedProofDone => "WRAPPED_PROOF_DONE".to_string(),
-            JobStatus::ReadyToBroadcast => "READY_TO_BROADCAST".to_string(),
+            JobStatus::OffchainComputationFinished => "OFFCHAIN_COMPUTATION_FINISHED".to_string(),
+            JobStatus::ReadyToBroadcastOnchain => "READY_TO_BROADCAST_ONCHAIN".to_string(),
             JobStatus::ProofVerifyCalledOnchain => "PROOF_VERIFY_CALLED_ONCHAIN".to_string(),
             JobStatus::VerifiedFactRegistered => "VERIFIED_FACT_REGISTERED".to_string(),
             JobStatus::Cancelled => "CANCELLED".to_string(),
@@ -75,11 +76,58 @@ impl ToString for JobStatus {
     }
 }
 
+impl FromStr for JobStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "CREATED" => Ok(JobStatus::Created),
+            "PROGRAM_INPUTS_PREPARED" => Ok(JobStatus::ProgramInputsPrepared),
+            "PIE_GENERATED" => Ok(JobStatus::PieGenerated),
+            "OFFCHAIN_PROOF_REQUESTED" => Ok(JobStatus::OffchainProofRequested),
+            "OFFCHAIN_PROOF_RETRIEVED" => Ok(JobStatus::OffchainProofRetrieved),
+            "WRAP_PROOF_REQUESTED" => Ok(JobStatus::WrapProofRequested),
+            "WRAPPED_PROOF_DONE" => Ok(JobStatus::WrappedProofDone),
+            "OFFCHAIN_COMPUTATION_FINISHED" => Ok(JobStatus::OffchainComputationFinished),
+            "READY_TO_BROADCAST_ONCHAIN" => Ok(JobStatus::ReadyToBroadcastOnchain),
+            "PROOF_VERIFY_CALLED_ONCHAIN" => Ok(JobStatus::ProofVerifyCalledOnchain),
+            "VERIFIED_FACT_REGISTERED" => Ok(JobStatus::VerifiedFactRegistered),
+            "CANCELLED" => Ok(JobStatus::Cancelled),
+            "ERROR" => Ok(JobStatus::Error),
+            _ => Err(format!("Invalid job status: {}", s)),
+        }
+    }
+}
+
 #[derive(Debug, FromSql, ToSql, Clone)]
 pub enum JobType {
     EpochUpdate,
     EpochBatchUpdate,
-    SyncComiteeUpdate,
+    SyncCommitteeUpdate,
+}
+
+impl FromStr for JobType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "EPOCH_UPDATE" => Ok(JobType::EpochUpdate),
+            "EPOCH_BATCH_UPDATE" => Ok(JobType::EpochBatchUpdate),
+            "SYNC_COMMITTEE_UPDATE" => Ok(JobType::SyncCommitteeUpdate),
+            _ => Err(format!("Invalid job type: {}", s)),
+        }
+    }
+}
+
+impl fmt::Display for JobType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = match self {
+            JobType::EpochUpdate => "EPOCH_UPDATE",
+            JobType::EpochBatchUpdate => "EPOCH_BATCH_UPDATE",
+            JobType::SyncCommitteeUpdate => "SYNC_COMMITTEE_UPDATE",
+        };
+        write!(f, "{}", value)
+    }
 }
 
 #[derive(Debug, FromSql, ToSql)]
@@ -127,6 +175,7 @@ impl std::fmt::Display for StarknetError {
 
 impl std::error::Error for StarknetError {}
 
+#[allow(unused)]
 #[derive(Debug)]
 pub enum Error {
     InvalidProof,
@@ -146,6 +195,7 @@ pub enum Error {
     InvalidResponse(String),
     PoolingTimeout(String),
     InvalidMerkleTree,
+    DatabaseError(String),
 }
 
 impl fmt::Display for Error {
@@ -168,6 +218,7 @@ impl fmt::Display for Error {
             Error::InvalidResponse(msg) => write!(f, "Invalid response: {}", msg),
             Error::PoolingTimeout(msg) => write!(f, "Pooling timeout: {}", msg),
             Error::InvalidMerkleTree => write!(f, "Invalid Merkle Tree"),
+            Error::DatabaseError(msg) => write!(f, "Database error: {}", msg),
         }
     }
 }

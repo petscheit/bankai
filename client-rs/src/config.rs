@@ -48,7 +48,7 @@ impl Default for BankaiConfig {
             committee_circuit_path: "../cairo/build/committee_update.json".to_string(),
             atlantic_endpoint: "https://atlantic.api.herodotus.cloud".to_string(),
             // Set how many concurrent pie generation (trace generation) tasks are allowed
-            pie_generation_semaphore: Arc::new(Semaphore::new(3)), // 3 at once
+            pie_generation_semaphore: Arc::new(Semaphore::new(1)), // 3 at once
             epoch_data_fetching_semaphore: Arc::new(Semaphore::new(2)), // 2 at once
         }
     }

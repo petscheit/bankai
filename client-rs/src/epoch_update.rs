@@ -45,6 +45,17 @@ impl EpochUpdate {
     }
 }
 
+impl EpochUpdate {
+    pub fn from_json<T>(slot: u64) -> Result<T, Error>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let path = format!("batches/epoch/{}/input_{}.json", slot, slot);
+        let json = fs::read_to_string(path).map_err(Error::IoError)?;
+        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
+    }
+}
+
 impl Provable for EpochUpdate {
     fn id(&self) -> String {
         let mut hasher = Sha256::new();
@@ -63,15 +74,6 @@ impl Provable for EpochUpdate {
         );
         fs::write(path.clone(), json).map_err(Error::IoError)?;
         Ok(path)
-    }
-
-    fn from_json<T>(slot: u64) -> Result<T, Error>
-    where
-        T: serde::de::DeserializeOwned,
-    {
-        let path = format!("batches/epoch/{}/input_{}.json", slot, slot);
-        let json = fs::read_to_string(path).map_err(Error::IoError)?;
-        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
     }
 
     fn pie_path(&self) -> String {

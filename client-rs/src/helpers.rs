@@ -1,5 +1,7 @@
 use crate::{
-    constants::{SLOTS_PER_EPOCH, SLOTS_PER_SYNC_COMMITTEE, TARGET_BATCH_SIZE},
+    constants::{
+        EPOCHS_PER_SYNC_COMMITTEE, SLOTS_PER_EPOCH, SLOTS_PER_SYNC_COMMITTEE, TARGET_BATCH_SIZE,
+    },
     Error,
 };
 use tracing::info;
@@ -35,10 +37,20 @@ pub fn calculate_slots_range_for_batch(first_slot: u64) -> (u64, u64) {
     (start_slot, end_slot)
 }
 
-// Computes the slot numbers for term of specified slot
+/// Computes the slot numbers for term of specified slot
 pub async fn calculate_batching_range_for_slot(slot: u64) -> Result<(u64, u64), Error> {
     let next_epoch_slot = (u64::try_from(slot).unwrap() / 32) * 32 + 32;
     let term = next_epoch_slot / 0x2000;
     let terms_last_epoch_slot = (term + 1) * 0x2000 - 32;
     Ok((next_epoch_slot, terms_last_epoch_slot))
+}
+
+/// Returns the first epoch signed by the specified sync committee
+pub fn get_first_epoch_for_sync_committee(sync_committee_id: u64) -> u64 {
+    sync_committee_id * EPOCHS_PER_SYNC_COMMITTEE
+}
+
+/// Returns the last epoch signed by the specified sync committee
+pub fn get_last_epoch_for_sync_committee(sync_committee_id: u64) -> u64 {
+    (sync_committee_id + 1) * EPOCHS_PER_SYNC_COMMITTEE - 1
 }
