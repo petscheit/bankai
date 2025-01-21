@@ -1,6 +1,6 @@
 use crate::constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE};
 use crate::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs};
-use crate::helpers::{calculate_slots_range_for_batch, slot_to_epoch_id};
+use crate::helpers::{calculate_slots_range_for_batch, get_first_slot_for_epoch, slot_to_epoch_id};
 use crate::traits::{Provable, Submittable};
 use crate::utils::hashing::get_committee_hash;
 
@@ -179,6 +179,87 @@ impl EpochUpdateBatch {
                     .map_err(|e| Error::DatabaseError(e.to_string()))?;
             }
             current_slot += 32;
+        }
+
+        info!("Paths {:?}", paths);
+
+        let batch = EpochUpdateBatch {
+            circuit_inputs,
+            expected_circuit_outputs,
+            merkle_paths: paths,
+        };
+
+        Ok(batch)
+    }
+
+    pub(crate) async fn new_by_epoch_range(
+        bankai: &BankaiClient,
+        db_manager: Arc<DatabaseManager>,
+        start_epoch: u64,
+        end_epoch: u64,
+    ) -> Result<EpochUpdateBatch, Error> {
+        let _permit = bankai
+            .config
+            .epoch_data_fetching_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|e| Error::CairoRunError(format!("Semaphore error: {}", e)))?;
+
+        let mut epochs = vec![];
+
+        // Fetch epochs sequentially from start_slot to end_slot, incrementing by 32 each time
+        let mut current_epoch = start_epoch;
+        while current_epoch < end_epoch {
+            info!(
+                "Getting data for Epoch: {} First slot for this epoch: {} | Epochs batch position {}/{}",
+                current_epoch,
+                get_first_slot_for_epoch(current_epoch),
+                epochs.len(),
+                TARGET_BATCH_SIZE
+            );
+            let epoch_update =
+                EpochUpdate::new(&bankai.client, get_first_slot_for_epoch(current_epoch)).await?;
+
+            epochs.push(epoch_update);
+            current_epoch += 1;
+        }
+
+        let circuit_inputs = EpochUpdateBatchInputs {
+            committee_hash: get_committee_hash(epochs[0].circuit_inputs.aggregate_pub.0),
+            epochs,
+        };
+
+        let expected_circuit_outputs = ExpectedEpochBatchOutputs::from_inputs(&circuit_inputs);
+
+        let epoch_hashes = circuit_inputs
+            .epochs
+            .iter()
+            .map(|epoch| epoch.expected_circuit_outputs.hash())
+            .collect::<Vec<Felt>>();
+
+        let (root, paths) = compute_paths(epoch_hashes.clone());
+
+        // Verify each path matches the root
+        current_epoch = start_epoch;
+        for (index, path) in paths.iter().enumerate() {
+            let computed_root = hash_path(epoch_hashes[index], path, index);
+            if computed_root != root {
+                panic!("Path {} does not match root", index);
+            }
+            // Insert merkle paths to database
+            //let current_epoch = slot_to_epoch_id(current_slot);
+            for (path_index, current_path) in path.iter().enumerate() {
+                db_manager
+                    .insert_merkle_path_for_epoch(
+                        current_epoch.to_i32().unwrap(),
+                        path_index.to_i32().unwrap(),
+                        current_path.to_hex_string(),
+                    )
+                    .await
+                    .map_err(|e| Error::DatabaseError(e.to_string()))?;
+            }
+            current_epoch += 1;
         }
 
         info!("Paths {:?}", paths);

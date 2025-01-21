@@ -5,6 +5,7 @@ use starknet::core::types::Felt;
 use std::str::FromStr;
 //use std::error::Error;
 use chrono::NaiveDateTime;
+use num_traits::ToPrimitive;
 use tokio_postgres::{Client, Row};
 use tracing::{error, info};
 use uuid::Uuid;
@@ -73,16 +74,13 @@ impl DatabaseManager {
     pub async fn insert_verified_sync_committee(
         &self,
         sync_committee_id: u64,
-        sync_committee_hash: FixedBytes<32>,
+        sync_committee_hash: String,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         self.client
             .execute(
                 "INSERT INTO verified_sync_committee (sync_committee_id, sync_committee_hash)
              VALUES ($1, $2)",
-                &[
-                    &sync_committee_id.to_string(),
-                    &sync_committee_hash.to_string(),
-                ],
+                &[&sync_committee_id.to_string(), &sync_committee_hash],
             )
             .await?;
 
@@ -123,18 +121,39 @@ impl DatabaseManager {
         &self,
         job: Job,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        self.client
-            .execute(
-                "INSERT INTO jobs (job_uuid, job_status, slot, type) VALUES ($1, $2, $3, $4)",
-                &[
-                    &job.job_id,
-                    &job.job_status.to_string(),
-                    &(job.slot as i64),
-                    &"EPOCH_UPDATE",
-                ],
-            )
-            .await
-            .map_err(|e| Error::DatabaseError(e.to_string()))?;
+        match job.job_type {
+            JobType::EpochBatchUpdate => {
+                self.client
+                    .execute(
+                        "INSERT INTO jobs (job_uuid, job_status, slot, type, batch_range_begin_epoch, batch_range_end_epoch) VALUES ($1, $2, $3, $4, $5, $6)",
+                        &[
+                            &job.job_id,
+                            &job.job_status.to_string(),
+                            &(job.slot as i64),
+                            &"EPOCH_BATCH_UPDATE",
+                            &(job.batch_range_begin_epoch.unwrap() as i64),
+                            &(job.batch_range_end_epoch.unwrap() as i64),
+                        ],
+                    )
+                    .await
+                    .map_err(|e| Error::DatabaseError(e.to_string()))?;
+            }
+            JobType::EpochUpdate => {}
+            JobType::SyncCommitteeUpdate => {
+                self.client
+                    .execute(
+                        "INSERT INTO jobs (job_uuid, job_status, slot, type) VALUES ($1, $2, $3, $4, $5, $6)",
+                        &[
+                            &job.job_id,
+                            &job.job_status.to_string(),
+                            &(job.slot as i64),
+                            &"SYNC_COMMITTEE_UPDATE",
+                        ],
+                    )
+                    .await
+                    .map_err(|e| Error::DatabaseError(e.to_string()))?;
+            }
+        }
 
         Ok(())
     }
@@ -153,7 +172,7 @@ impl DatabaseManager {
 
     pub async fn get_latest_slot_id_in_progress(
         &self,
-    ) -> Result<Option<i64>, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
         // Query the latest slot with job_status in ('in_progress', 'initialized')
         let row_opt = self
             .client
@@ -168,9 +187,55 @@ impl DatabaseManager {
 
         // Extract and return the slot ID
         if let Some(row) = row_opt {
-            Ok(Some(row.get::<_, i64>("slot")))
+            Ok(Some(row.get::<_, i64>("slot").to_u64().unwrap()))
         } else {
-            Ok(None)
+            Ok(Some(0))
+        }
+    }
+
+    pub async fn get_latest_epoch_in_progress(
+        &self,
+    ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
+        // Query the latest slot with job_status in ('in_progress', 'initialized')
+        let row_opt = self
+            .client
+            .query_opt(
+                "SELECT batch_range_end_epoch FROM jobs
+                 WHERE job_status IN ($1, $2)
+                 ORDER BY batch_range_end_epoch DESC
+                 LIMIT 1",
+                &[&"CREATED", &"PIE_GENERATED"],
+            )
+            .await?;
+
+        // Extract and return the slot ID
+        if let Some(row) = row_opt {
+            Ok(Some(
+                row.get::<_, i64>("batch_range_end_epoch").to_u64().unwrap(),
+            ))
+        } else {
+            Ok(Some(0))
+        }
+    }
+
+    pub async fn count_jobs_in_progress(
+        &self,
+    ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
+        // Query the latest slot with job_status in ('in_progress', 'initialized')
+        let row_opt = self
+            .client
+            .query_opt(
+                "SELECT COUNT(job_uuid) as count FROM jobs
+                 WHERE job_status IN ('PIE_GENERATED', 'CREATED')",
+                &[],
+            )
+            .await?;
+
+        // Extract and return the slot ID
+        if let Some(row) = row_opt {
+            Ok(Some(row.get::<_, i64>("count").to_u64().unwrap()))
+        } else {
+            Ok(Some(0))
         }
     }
 

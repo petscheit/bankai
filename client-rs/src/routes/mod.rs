@@ -20,9 +20,11 @@ pub async fn handle_get_status(State(state): State<AppState>) -> impl IntoRespon
         Ok(None) => 0,
         Err(e) => 0,
     };
+    let in_progress_jobs_count = state.db_manager.count_jobs_in_progress().await.unwrap();
 
     Json(json!({ "success": true, "details": {
-        "last_slot_in_progress": last_slot_in_progress
+        "last_slot_in_progress": last_slot_in_progress,
+        "jobs_in_progress_count": in_progress_jobs_count
     } }))
 }
 

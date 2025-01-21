@@ -126,7 +126,7 @@ impl StarknetClient {
         &self,
         slot: u64,
         config: &BankaiConfig,
-    ) -> Result<(), StarknetError> {
+    ) -> Result<Vec<Felt>, StarknetError> {
         let committee_id = slot / 0x2000_u64;
         let committee_hash = self
             .account
@@ -141,8 +141,8 @@ impl StarknetClient {
             )
             .await
             .map_err(StarknetError::ProviderError)?;
-        println!("committee_hash: {:?}", committee_hash);
-        Ok(())
+        //println!("committee_hash: {:?}", committee_hash);
+        Ok((committee_hash))
     }
 
     pub async fn get_epoch_proof(

@@ -16,6 +16,8 @@ pub struct Job {
     pub job_type: JobType,
     pub job_status: JobStatus,
     pub slot: u64,
+    pub batch_range_begin_epoch: Option<u64>,
+    pub batch_range_end_epoch: Option<u64>,
 }
 
 #[derive(Clone, Debug)]
