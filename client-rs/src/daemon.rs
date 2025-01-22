@@ -12,7 +12,7 @@ mod sync_committee;
 mod traits;
 mod utils;
 //use alloy_primitives::TxHash;
-use alloy_primitives::FixedBytes;
+//use alloy_primitives::FixedBytes;
 use alloy_rpc_types_beacon::events::HeadEvent;
 use axum::{
     extract::DefaultBodyLimit,
@@ -24,6 +24,7 @@ use bankai_client::BankaiClient;
 use config::BankaiConfig;
 //use constants::SLOTS_PER_EPOCH;
 use dotenv::from_filename;
+use helpers::{get_first_epoch_for_sync_committee, get_first_slot_for_epoch};
 use num_traits::cast::ToPrimitive;
 use reqwest;
 use starknet::core::types::Felt;
@@ -39,15 +40,16 @@ use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 use tracing::{debug, error, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
-use traits::Provable;
-use utils::{
-    cairo_runner::CairoRunner,
-    database_manager::{DatabaseManager, JobSchema},
-};
+use utils::{cairo_runner::CairoRunner, database_manager::DatabaseManager};
 //use std::error::Error as StdError;
 use epoch_batch::EpochUpdateBatch;
 use routes::{
-    handle_get_epoch_update, handle_get_latest_verified_slot, handle_get_merkle_paths_for_epoch,
+    handle_get_committee_hash,
+    handle_get_epoch_proof, // handle_get_epoch_update,
+    handle_get_job_status,
+    handle_get_latest_verified_committee,
+    handle_get_latest_verified_slot,
+    handle_get_merkle_paths_for_epoch,
     handle_get_status,
 };
 use std::net::SocketAddr;
@@ -55,19 +57,7 @@ use sync_committee::SyncCommitteeUpdate;
 use tokio::time::Duration;
 use uuid::Uuid;
 
-// Since beacon chain RPCs have different response structure (quicknode responds different than nidereal) we use this event extraction logic
-fn extract_json(event_text: &str) -> Option<String> {
-    for line in event_text.lines() {
-        if line.starts_with("data:") {
-            // Extract the JSON after "data:"
-            return Some(line.trim_start_matches("data:").trim().to_string());
-        }
-    }
-    None
-}
-
 #[tokio::main]
-//async fn main() {
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Load .env.sepolia file
     from_filename(".env.sepolia").ok();
@@ -89,7 +79,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     info!("Starting Bankai light-client daemon...");
 
-    //let database_host = env::var("DATABASE_HOST").expect("DATABASE_HOST must be set");
     let (tx, mut rx): (mpsc::Sender<Job>, mpsc::Receiver<Job>) = mpsc::channel(32);
 
     //let (tx, mut rx) = mpsc::channel(32);
@@ -149,21 +138,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let app = Router::new()
         .route("/status", get(handle_get_status))
-        //.route("/get-epoch-proof/:slot", get(handle_get_epoch_proof))
-        //.route("/get-committee-hash/:committee_id", get(handle_get_committee_hash))
+        .route(
+            "/get_verified_epoch_proof/:epoch",
+            get(handle_get_epoch_proof),
+        )
+        .route(
+            "/get_verified_committee_hash/:committee_id",
+            get(handle_get_committee_hash),
+        )
         .route(
             "/get_merkle_paths_for_epoch/:epoch_id",
             get(handle_get_merkle_paths_for_epoch),
         )
+        // .route(
+        //     "/debug/get_epoch_update/:slot",
+        //     get(handle_get_epoch_update),
+        // )
         .route(
-            "/debug/get-epoch-update/:slot",
-            get(handle_get_epoch_update),
-        )
-        .route(
-            "/debug/get-latest-verified-slot",
+            "/debug/get_latest_verified_epoch",
             get(handle_get_latest_verified_slot),
         )
-        // .route("/debug/get-job-status", get(handle_get_job_status))
+        .route(
+            "/debug/get_latest_verified_committee",
+            get(handle_get_latest_verified_committee),
+        )
+        .route("/debug/get_job_status", get(handle_get_job_status))
         // .route("/get-merkle-inclusion-proof", get(handle_get_merkle_inclusion_proof))
         .layer(DefaultBodyLimit::disable())
         .layer(
@@ -191,7 +190,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .await
         .unwrap();
 
-    //let db_client = Arc::new(&db_client);
     if slot_listener_toggle {
         task::spawn({
             async move {
@@ -210,7 +208,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         Ok(bytes) => {
                             if let Ok(event_text) = String::from_utf8(bytes.to_vec()) {
                                 // Preprocess the event text
-                                if let Some(json_data) = extract_json(&event_text) {
+                                if let Some(json_data) =
+                                    helpers::extract_json_from_event(&event_text)
+                                {
                                     match serde_json::from_str::<HeadEvent>(&json_data) {
                                         Ok(parsed_event) => {
                                             let epoch_id =
@@ -220,7 +220,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                                     parsed_event.slot,
                                                 );
                                             info!(
-                                                "New slot event detected: {} |  Block: {} | Epoch: {} | Sync committee: {} | Is epoch transition: {}",
+                                                "[EVENT] New beacon slot detected: {} |  Block: {} | Epoch: {} | Sync committee: {} | Is epoch transition: {}",
                                                 parsed_event.slot, parsed_event.block, epoch_id, sync_committee_id, parsed_event.epoch_transition
                                             );
 
@@ -265,7 +265,7 @@ async fn handle_beacon_chain_head_event(
     let epoch_id = helpers::slot_to_epoch_id(parsed_event.slot);
     let sync_committee_id = helpers::slot_to_sync_committee_id(parsed_event.slot);
 
-    let latest_epoch_slot = bankai
+    let latest_verified_epoch_slot = bankai
         .starknet_client
         .get_latest_epoch_slot(&bankai.config)
         .await
@@ -273,31 +273,21 @@ async fn handle_beacon_chain_head_event(
         .to_u64()
         .unwrap();
 
-    let latest_verified_epoch_id = helpers::slot_to_epoch_id(latest_epoch_slot);
+    let latest_verified_sync_committee_id = bankai
+        .starknet_client
+        .get_latest_committee_id(&bankai.config)
+        .await
+        .unwrap()
+        .to_u64()
+        .unwrap();
+
+    let latest_verified_epoch_id = helpers::slot_to_epoch_id(latest_verified_epoch_slot);
     let epochs_behind = epoch_id - latest_verified_epoch_id;
 
     // We getting the last slot in progress to determine next slots to prove
-    let mut last_slot_in_progress: u64 = 0;
+    //let mut last_slot_in_progress: u64 = 0;
     // /let mut last_epoch_in_progress: u64 = 0;
-    let mut last_sync_committee_in_progress: u64 = 0;
-    // match db_manager.get_latest_slot_id_in_progress().await {
-    //     Ok(Some(slot)) => {
-    //         last_slot_in_progress = slot.to_u64().unwrap();
-    //         last_epoch_in_progress = helpers::slot_to_epoch_id(last_slot_in_progress);
-    //         last_sync_committee_in_progress =
-    //             helpers::slot_to_sync_committee_id(last_slot_in_progress);
-    //         info!(
-    //             "Latest in progress slot: {}  Epoch: {} Sync committee: {}",
-    //             last_slot_in_progress, last_epoch_in_progress, last_sync_committee_in_progress
-    //         );
-    //     }
-    //     Ok(None) => {
-    //         warn!("No any in progress slot");
-    //     }
-    //     Err(e) => {
-    //         error!("Error while getting latest in progress slot ID: {}", e);
-    //     }
-    // }
+    // let mut last_sync_committee_in_progress: u64 = 0;
 
     let last_epoch_in_progress = db_manager
         .get_latest_epoch_in_progress()
@@ -305,39 +295,97 @@ async fn handle_beacon_chain_head_event(
         .unwrap()
         .unwrap();
 
-    let latest_verified_sync_committee_id = 1;
+    let last_sync_committee_in_progress = 1;
 
+    let mut latest_scheduled_epoch = last_epoch_in_progress;
+
+    if latest_verified_epoch_id > last_epoch_in_progress {
+        if last_epoch_in_progress == 0 {
+            info!("Starting daemon on clean jobs table");
+        } else {
+            warn!(
+                "Something may be wrong, last verified epoch is greather than last epoch in progress"
+            );
+        }
+
+        // So we should schedule the greater epoch, which id
+        latest_scheduled_epoch = latest_verified_epoch_id;
+    }
+
+    // Decide basing on actual state
     if epochs_behind > constants::TARGET_BATCH_SIZE {
         // is_node_in_sync = true;
 
         warn!(
-            "Bankai is out of sync now. Node is {} epochs behind network. Current Beacon Chain state: [Epoch: {} Sync Committee: {}] | Latest verified: [Epoch: {} Sync Committee: {}] | Sync in progress...",
-            epochs_behind, epoch_id, sync_committee_id, latest_verified_epoch_id, latest_verified_sync_committee_id
+            "Bankai is out of sync now. Node is {} epochs behind network. Current Beacon Chain state: [Slot: {} Epoch: {} Sync Committee: {}] | Latest verified: [Slot: {} Epoch: {} Sync Committee: {}] | Latest in progress: [Epoch: {} Sync Committee: {}] | Sync in progress...",
+            epochs_behind, parsed_event.slot, epoch_id, sync_committee_id, latest_verified_epoch_slot, latest_verified_epoch_id, latest_verified_sync_committee_id, last_epoch_in_progress, last_sync_committee_in_progress
         );
 
         // Check if we have in progress all epochs that need to be processed, if no, run job
-        if last_epoch_in_progress < (epoch_id - constants::TARGET_BATCH_SIZE) {
+        if latest_scheduled_epoch < (epoch_id - constants::TARGET_BATCH_SIZE) {
             // And chceck how many jobs are already in progress and if we fit in the limit
             let in_progress_jobs_count = db_manager.count_jobs_in_progress().await.unwrap();
-            if in_progress_jobs_count.unwrap().to_u64().unwrap()
-                >= constants::MAX_CONCURRENT_JOBS_IN_PROGRESS
-            {
+            if in_progress_jobs_count.unwrap() >= constants::MAX_CONCURRENT_JOBS_IN_PROGRESS {
                 info!(
-                    "Currently not starting new job, MAX_CONCURRENT_JOBS_IN_PROGRESS limit reached"
+                    "Currently not starting new job, MAX_CONCURRENT_JOBS_IN_PROGRESS limit reached, jobs in progress: {}",
+                    in_progress_jobs_count.unwrap()
                 );
                 return;
             }
 
+            let currently_processed_sync_committee_id =
+                helpers::get_sync_committee_id_by_epoch(latest_scheduled_epoch);
+
+            info!(
+                "Currently processed sync committee epochs ranges from {} to {}",
+                helpers::get_first_epoch_for_sync_committee(currently_processed_sync_committee_id),
+                helpers::get_last_epoch_for_sync_committee(currently_processed_sync_committee_id)
+            );
+
+            if helpers::get_last_epoch_for_sync_committee(currently_processed_sync_committee_id)
+                == latest_scheduled_epoch
+            {
+                // We reached end of current sync committee, need to schedule new sync committee proving
+                match run_sync_committee_update_job(
+                    db_manager.clone(),
+                    currently_processed_sync_committee_id + 1,
+                    tx.clone(),
+                )
+                .await
+                {
+                    Ok(()) => {}
+                    Err(e) => {
+                        error!("Error while creating job: {}", e);
+                    }
+                };
+            }
+
+            let epoch_to_start_from = latest_scheduled_epoch + 1;
+            let mut epoch_to_end_on = latest_scheduled_epoch + 1 + constants::TARGET_BATCH_SIZE;
+
+            // Iw we follow the betch size of 32 always, this souldnt happen, but if we have not same size batches, it can be trigerred
+            if epoch_to_end_on
+                > helpers::get_last_epoch_for_sync_committee(currently_processed_sync_committee_id)
+            {
+                // The end epoch is further that current sync committee
+                // In this case we can simply assingn sync commite latest epoch as epoch_to_end_on
+                epoch_to_end_on = helpers::get_last_epoch_for_sync_committee(
+                    currently_processed_sync_committee_id,
+                );
+            }
+
+            //info!("{} epochs let to proccess in associated sync committee term",);
+
             match run_batch_epoch_update_job(
                 db_manager.clone(),
-                last_slot_in_progress + (constants::SLOTS_PER_EPOCH * constants::TARGET_BATCH_SIZE),
-                last_epoch_in_progress,
-                last_epoch_in_progress + constants::TARGET_BATCH_SIZE,
+                get_first_slot_for_epoch(epoch_to_start_from)
+                    + (constants::SLOTS_PER_EPOCH * constants::TARGET_BATCH_SIZE),
+                epoch_to_start_from,
+                epoch_to_end_on,
                 tx.clone(),
             )
             .await
             {
-                // Insert new job record to DB
                 Ok(()) => {}
                 Err(e) => {
                     error!("Error while creating job: {}", e);
@@ -346,42 +394,33 @@ async fn handle_beacon_chain_head_event(
         } else {
             debug!("All reqired jobs are now queued and processing");
         }
-
-        // let epoch_update = EpochUpdateBatch::new_by_slot(
-        //     &bankai,
-        //     &db_client_for_listener.clone(),
-        //     last_slot_in_progress
-        //         + constants::SLOTS_PER_EPOCH,
-        // )
-        // .await?;
     } else if epochs_behind == constants::TARGET_BATCH_SIZE {
         // This is when we are synced properly and new epoch batch needs to be inserted
         info!(
-            "Starting provessing next epoch batch. Current Beacon Chain epoch: {} Latest verified epoch: {}",
+            "Starting processing next epoch batch. Current Beacon Chain epoch: {} Latest verified epoch: {}",
             epoch_id, latest_verified_epoch_id
         );
+    } else if epochs_behind < constants::TARGET_BATCH_SIZE {
+        // When we are in sync and not yet reached the TARGET_BATCH_SIZE epochs lagging behind actual beacon chian state
+        debug!("Target batch size not reached yet, daemon is in sync");
     }
 
     // Check if sync committee update is needed
-    //sync_committee_id
 
-    if latest_epoch_slot % constants::SLOTS_PER_SYNC_COMMITTEE == 0 {}
-
-    //return;
+    if latest_verified_epoch_slot % constants::SLOTS_PER_SYNC_COMMITTEE == 0 {}
 
     // When we doing EpochBatchUpdate the slot is latest_batch_output
     // So for each batch update we takin into account effectiviely the latest slot from given batch
 
     //let db_client = db_client.clone();
 
-    //evaluate_jobs_statuses(db_manager.clone()).await;
-    broadcast_onchain_ready_jobs(db_manager.clone(), bankai.clone()).await;
+    let _ = evaluate_jobs_statuses(db_manager.clone(), latest_verified_sync_committee_id).await;
+    let _ = broadcast_onchain_ready_jobs(db_manager.clone(), bankai.clone()).await;
 
     // We can do all circuit computations up to latest slot in advance, but the onchain broadcasts must be send in correct order
     // By correct order mean that within the same sync committe the epochs are not needed to be broadcasted in order
     // but the order of sync_commite_update->epoch_update must be correct, we firstly need to have correct sync committe veryfied
     // before we verify epoch "belonging" to this sync committee
-
     if parsed_event.epoch_transition {
         //info!("Beacon Chain epoch transition detected. New epoch: {} | Starting processing epoch proving...", epoch_id);
         info!(
@@ -396,31 +435,6 @@ async fn handle_beacon_chain_head_event(
                 parsed_event.slot, sync_committee_id
             );
         }
-
-        //     let job_id = Uuid::new_v4();
-        //     let job = Job {
-        //         job_id: job_id.clone(),evaluate_jobs_statuses
-        //         job_type: JobType::EpochBatchUpdate,
-        //         job_status: JobStatus::Created,
-        //         slot: parsed_event.slot, // It is the last slot for given batch
-        //     };
-
-        //     let db_client = db_client_for_listener.clone();
-        //     match create_job(db_client, job.clone()).await {
-        //         // Insert new job record to DB
-        //         Ok(()) => {
-        //             // Handle success
-        //             info!("Job created successfully with ID: {}", job_id);
-        //             if tx_for_task.send(job).await.is_err() {
-        //                 error!("Failed to send job.");
-        //             }
-        //             // If starting committee update job, first ensule that the corresponding slot is registered in contract
-        //         }
-        //         Err(e) => {
-        //             // Handle the error
-        //             error!("Error creating job: {}", e);
-        //         }
-        //     }
     }
 }
 
@@ -446,8 +460,8 @@ async fn run_batch_epoch_update_job(
         Ok(()) => {
             // Handle success
             info!(
-                "[EPOCH BATCH UPDATE] Job created successfully with ID: {}",
-                job_id
+                "[EPOCH BATCH UPDATE] Job created successfully with ID: {} Epochs range from {} to {}",
+                job_id, batch_range_begin_epoch, batch_range_end_epoch
             );
             if tx.send(job).await.is_err() {
                 return Err("Failed to send job".into());
@@ -498,37 +512,23 @@ async fn run_sync_committee_update_job(
     }
 }
 
-// async fn evaluate_jobs_statuses(
-//     db_manager: Arc<DatabaseManager>,
-//     last_verified_epoch: u64,
-// ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-//     // The purpose of this function is to manage the sequential nature of onchain verification of epochs and sync committees
-//     // Firstly we get all jobs with status OFFCHAIN_COMPUTATION_FINISHED
-//     let jobs = db_manager
-//         .get_compute_finsihed_jobs_to_proccess_onchain_call(last_verified_epoch)
-//         .await?;
+async fn evaluate_jobs_statuses(
+    db_manager: Arc<DatabaseManager>,
+    latest_verified_sync_committee_id: u64,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // The purpose of this function is to manage the sequential nature of onchain verification of epochs and sync committees
+    // Firstly we get all jobs with status OFFCHAIN_COMPUTATION_FINISHED
+    // We calculating the start and end epoch for provided last verified sync committe
+    // and setting READY_TO_BROADCAST status for epochs up to the last epoch belonging to provided latest_verified_sync_committee_id
+    let first_epoch = get_first_epoch_for_sync_committee(latest_verified_sync_committee_id);
+    let last_epoch = get_first_epoch_for_sync_committee(latest_verified_sync_committee_id);
 
-//     // Iterate through the jobs and process them
-//     for job in jobs {
-//         match job.job_type {
-//             JobType::EpochBatchUpdate => {
-//                 let update = EpochUpdateBatch::from_json::<EpochUpdateBatch>(
-//                     job.batch_range_begin_epoch.try_into().unwrap(),
-//                     job.batch_range_end_epoch.try_into().unwrap(),
-//                 )?;
+    db_manager
+        .set_ready_to_broadcast_for_batch_epochs(first_epoch, last_epoch) // Set READY_TO_BROADCAST when OFFCHAIN_COMPUTATION_FINISHED
+        .await?;
 
-//                 println!(
-//                     "Successfully submitted batch epoch update for job_uuid: {}",
-//                     job.job_uuid
-//                 );
-//             }
-//             JobType::EpochUpdate => {}
-//             JobType::SyncCommitteeUpdate => {}
-//         }
-//     }
-
-//     Ok(())
-// }
+    Ok(())
+}
 
 async fn broadcast_onchain_ready_jobs(
     db_manager: Arc<DatabaseManager>,
@@ -564,12 +564,21 @@ async fn broadcast_onchain_ready_jobs(
                     job.job_uuid, txhash
                 );
 
-                let epoch_proof = bankai
-                    .starknet_client
-                    .get_epoch_proof(job.slot.try_into().unwrap(), &bankai.config);
+                db_manager
+                    .update_job_status(job.job_uuid, JobStatus::Done)
+                    .await?;
+
+                // let epoch_proof = bankai
+                //     .starknet_client
+                //     .get_epoch_proof(job.slot.try_into().unwrap(), &bankai.config)
+                //     .await
+                //     .unwrap();
 
                 // db_manager
-                //     .insert_verified_epochs_batch(job.slot / 0x2000, epoch_proof)
+                //     .insert_verified_epoch(
+                //         job.batch_range_end_epoch.try_into().unwrap(),
+                //         epoch_proof,
+                //     )
                 //     .await?;
             }
             JobType::EpochUpdate => {}
@@ -595,6 +604,10 @@ async fn broadcast_onchain_ready_jobs(
 
                 db_manager.set_job_txhash(job.job_uuid, txhash).await?;
 
+                db_manager
+                    .update_job_status(job.job_uuid, JobStatus::Done)
+                    .await?;
+
                 // Insert data to DB after successful onchain sync committee verification
                 //let sync_committee_hash = update.expected_circuit_outputs.committee_hash;
                 let sync_committee_hash = match bankai
@@ -602,7 +615,7 @@ async fn broadcast_onchain_ready_jobs(
                     .get_committee_hash(job.slot.to_u64().unwrap(), &bankai.config)
                     .await
                 {
-                    Ok((sync_committee_hash)) => sync_committee_hash,
+                    Ok(sync_committee_hash) => sync_committee_hash,
                     Err(e) => {
                         // Handle the error
                         return Err(e.into());
@@ -663,160 +676,6 @@ async fn process_job(
     bankai: Arc<BankaiClient>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     match job.job_type {
-        JobType::EpochUpdate => {
-            // Epoch job
-            info!(
-                "[EPOCH JOB] Started processing epoch job: {} for epoch {}",
-                job.job_id, job.slot
-            );
-
-            //update_job_status(&db_client, job.job_id, JobStatus::Created).await?;
-
-            // 1) Fetch the latest on-chain verified epoch
-            // let latest_epoch_slot = bankai
-            //     .starknet_client
-            //     .get_latest_epoch_slot(&bankai.config)
-            //     .await?;
-
-            // info!(
-            //     "[EPOCH JOB] Latest onchain verified epoch slot: {}",
-            //     latest_epoch_slot
-            // );
-
-            //let latest_epoch_slot = ;
-
-            // make sure next_epoch % 32 == 0
-            let next_epoch = (u64::try_from(job.slot).unwrap() / constants::SLOTS_PER_EPOCH)
-                * constants::SLOTS_PER_EPOCH
-                + constants::SLOTS_PER_EPOCH;
-            info!(
-                "[EPOCH JOB] Fetching Inputs for next Epoch: {}...",
-                next_epoch
-            );
-
-            // 2) Fetch the proof
-            let proof = bankai.get_epoch_proof(next_epoch).await?;
-            info!(
-                "[EPOCH JOB] Fetched Inputs successfully for Epoch: {}",
-                next_epoch
-            );
-
-            db_manager
-                .update_job_status(job.job_id, JobStatus::ProgramInputsPrepared)
-                .await?;
-
-            // 3) Generate PIE
-            info!(
-                "[EPOCH JOB] Starting Cairo execution and PIE generation for Epoch: {}...",
-                next_epoch
-            );
-
-            CairoRunner::generate_pie(&proof, &bankai.config).await?;
-
-            info!(
-                "[EPOCH JOB] Pie generated successfully for Epoch: {}...",
-                next_epoch
-            );
-
-            db_manager
-                .update_job_status(job.job_id, JobStatus::PieGenerated)
-                .await?;
-
-            // // 4) Submit offchain proof-generation job to Atlantic
-            // info!("[EPOCH JOB] Sending proof generation query to Atlantic...");
-
-            // let batch_id = bankai.atlantic_client.submit_batch(proof).await?;
-
-            // info!(
-            //     "[EPOCH JOB] Proof generation batch submitted to Atlantic. QueryID: {}",
-            //     batch_id
-            // );
-
-            // update_job_status(&db_client, job.job_id, JobStatus::OffchainProofRequested).await?;
-            // set_atlantic_job_queryid(
-            //     &db_client,
-            //     job.job_id,
-            //     batch_id.clone(),
-            //     AtlanticJobType::ProofGeneration,
-            // )
-            // .await?;
-
-            // // Pool for Atlantic execution done
-            // bankai
-            //     .atlantic_client
-            //     .poll_batch_status_until_done(&batch_id, Duration::new(10, 0), usize::MAX)
-            //     .await?;
-
-            // info!(
-            //     "[EPOCH JOB] Proof generation done by Atlantic. QueryID: {}",
-            //     batch_id
-            // );
-
-            // let proof = bankai
-            //     .atlantic_client
-            //     .fetch_proof(batch_id.as_str())
-            //     .await?;
-
-            // info!(
-            //     "[EPOCH JOB] Proof retrieved from Atlantic. QueryID: {}",
-            //     batch_id
-            // );
-
-            // update_job_status(&db_client, job.job_id, JobStatus::OffchainProofRetrieved).await?;
-
-            // // 5) Submit wrapped proof request
-            // info!("[EPOCH JOB] Sending proof wrapping query to Atlantic..");
-            // let wrapping_batch_id = bankai.atlantic_client.submit_wrapped_proof(proof).await?;
-            // info!(
-            //     "[EPOCH JOB] Proof wrapping query submitted to Atlantic. Wrapping QueryID: {}",
-            //     wrapping_batch_id
-            // );
-
-            // update_job_status(&db_client, job.job_id, JobStatus::WrapProofRequested).await?;
-            // set_atlantic_job_queryid(
-            //     &db_client,
-            //     job.job_id,
-            //     wrapping_batch_id.clone(),
-            //     AtlanticJobType::ProofWrapping,
-            // )
-            // .await?;
-
-            // // Pool for Atlantic execution done
-            // bankai
-            //     .atlantic_client
-            //     .poll_batch_status_until_done(&wrapping_batch_id, Duration::new(10, 0), usize::MAX)
-            //     .await?;
-
-            // update_job_status(&db_client, job.job_id, JobStatus::WrappedProofDone).await?;
-
-            // info!("[EPOCH JOB] Proof wrapping done by Atlantic. Fact registered on Integrity. Wrapping QueryID: {}", wrapping_batch_id);
-
-            // update_job_status(&db_client, job.job_id, JobStatus::VerifiedFactRegistered).await?;
-
-            // // 6) Submit epoch update onchain
-            // info!("[EPOCH JOB] Calling epoch update onchain...");
-            // let update = EpochUpdate::from_json::<EpochUpdate>(next_epoch)?;
-
-            // let txhash = bankai
-            //     .starknet_client
-            //     .submit_update(update.expected_circuit_outputs, &bankai.config)
-            //     .await?;
-
-            // set_job_txhash(&db_client, job.job_id, txhash).await?;
-
-            // info!("[EPOCH JOB] Successfully submitted epoch update...");
-
-            // update_job_status(&db_client, job.job_id, JobStatus::ProofDecommitmentCalled).await?;
-
-            // Now we can get proof from contract?
-            // bankai.starknet_client.get_epoch_proof(
-            //     &self,
-            //     slot: u64,
-            //     config: &BankaiConfig)
-
-            // Insert data to DB after successful onchain epoch verification
-            // insert_verified_epoch(&db_client, job.slot / 0x2000, epoch_proof).await?;
-        }
         JobType::SyncCommitteeUpdate => {
             // Sync committee job
             info!(
@@ -947,7 +806,7 @@ async fn process_job(
             info!("[SYNC COMMITTEE JOB] Proof wrapping done by Atlantic. Fact registered on Integrity. Wrapping QueryID: {}", wrapping_batch_id);
 
             db_manager
-                .update_job_status(job.job_id, JobStatus::VerifiedFactRegistered)
+                .update_job_status(job.job_id, JobStatus::OffchainComputationFinished)
                 .await?;
         }
         JobType::EpochBatchUpdate => {
@@ -1052,6 +911,160 @@ async fn process_job(
             db_manager
                 .update_job_status(job.job_id, JobStatus::OffchainComputationFinished)
                 .await?;
+        }
+        JobType::EpochUpdate => {
+            // Epoch job
+            info!(
+                "[EPOCH JOB] Started processing epoch job: {} for epoch {}",
+                job.job_id, job.slot
+            );
+
+            //update_job_status(&db_client, job.job_id, JobStatus::Created).await?;
+
+            // 1) Fetch the latest on-chain verified epoch
+            // let latest_epoch_slot = bankai
+            //     .starknet_client
+            //     .get_latest_epoch_slot(&bankai.config)
+            //     .await?;
+
+            // info!(
+            //     "[EPOCH JOB] Latest onchain verified epoch slot: {}",
+            //     latest_epoch_slot
+            // );
+
+            //let latest_epoch_slot = ;
+
+            // make sure next_epoch % 32 == 0
+            // let next_epoch = (u64::try_from(job.slot).unwrap() / constants::SLOTS_PER_EPOCH)
+            //     * constants::SLOTS_PER_EPOCH
+            //     + constants::SLOTS_PER_EPOCH;
+            // info!(
+            //     "[EPOCH JOB] Fetching Inputs for next Epoch: {}...",
+            //     next_epoch
+            // );
+
+            // // 2) Fetch the proof
+            // let proof = bankai.get_epoch_proof(next_epoch).await?;
+            // info!(
+            //     "[EPOCH JOB] Fetched Inputs successfully for Epoch: {}",
+            //     next_epoch
+            // );
+
+            // db_manager
+            //     .update_job_status(job.job_id, JobStatus::ProgramInputsPrepared)
+            //     .await?;
+
+            // // 3) Generate PIE
+            // info!(
+            //     "[EPOCH JOB] Starting Cairo execution and PIE generation for Epoch: {}...",
+            //     next_epoch
+            // );
+
+            // CairoRunner::generate_pie(&proof, &bankai.config).await?;
+
+            // info!(
+            //     "[EPOCH JOB] Pie generated successfully for Epoch: {}...",
+            //     next_epoch
+            // );
+
+            // db_manager
+            //     .update_job_status(job.job_id, JobStatus::PieGenerated)
+            //     .await?;
+
+            // // 4) Submit offchain proof-generation job to Atlantic
+            // info!("[EPOCH JOB] Sending proof generation query to Atlantic...");
+
+            // let batch_id = bankai.atlantic_client.submit_batch(proof).await?;
+
+            // info!(
+            //     "[EPOCH JOB] Proof generation batch submitted to Atlantic. QueryID: {}",
+            //     batch_id
+            // );
+
+            // update_job_status(&db_client, job.job_id, JobStatus::OffchainProofRequested).await?;
+            // set_atlantic_job_queryid(
+            //     &db_client,
+            //     job.job_id,
+            //     batch_id.clone(),
+            //     AtlanticJobType::ProofGeneration,
+            // )
+            // .await?;
+
+            // // Pool for Atlantic execution done
+            // bankai
+            //     .atlantic_client
+            //     .poll_batch_status_until_done(&batch_id, Duration::new(10, 0), usize::MAX)
+            //     .await?;
+
+            // info!(
+            //     "[EPOCH JOB] Proof generation done by Atlantic. QueryID: {}",
+            //     batch_id
+            // );
+
+            // let proof = bankai
+            //     .atlantic_client
+            //     .fetch_proof(batch_id.as_str())
+            //     .await?;
+
+            // info!(
+            //     "[EPOCH JOB] Proof retrieved from Atlantic. QueryID: {}",
+            //     batch_id
+            // );
+
+            // update_job_status(&db_client, job.job_id, JobStatus::OffchainProofRetrieved).await?;
+
+            // // 5) Submit wrapped proof request
+            // info!("[EPOCH JOB] Sending proof wrapping query to Atlantic..");
+            // let wrapping_batch_id = bankai.atlantic_client.submit_wrapped_proof(proof).await?;
+            // info!(
+            //     "[EPOCH JOB] Proof wrapping query submitted to Atlantic. Wrapping QueryID: {}",
+            //     wrapping_batch_id
+            // );
+
+            // update_job_status(&db_client, job.job_id, JobStatus::WrapProofRequested).await?;
+            // set_atlantic_job_queryid(
+            //     &db_client,
+            //     job.job_id,
+            //     wrapping_batch_id.clone(),
+            //     AtlanticJobType::ProofWrapping,
+            // )
+            // .await?;
+
+            // // Pool for Atlantic execution done
+            // bankai
+            //     .atlantic_client
+            //     .poll_batch_status_until_done(&wrapping_batch_id, Duration::new(10, 0), usize::MAX)
+            //     .await?;
+
+            // update_job_status(&db_client, job.job_id, JobStatus::WrappedProofDone).await?;
+
+            // info!("[EPOCH JOB] Proof wrapping done by Atlantic. Fact registered on Integrity. Wrapping QueryID: {}", wrapping_batch_id);
+
+            // update_job_status(&db_client, job.job_id, JobStatus::VerifiedFactRegistered).await?;
+
+            // // 6) Submit epoch update onchain
+            // info!("[EPOCH JOB] Calling epoch update onchain...");
+            // let update = EpochUpdate::from_json::<EpochUpdate>(next_epoch)?;
+
+            // let txhash = bankai
+            //     .starknet_client
+            //     .submit_update(update.expected_circuit_outputs, &bankai.config)
+            //     .await?;
+
+            // set_job_txhash(&db_client, job.job_id, txhash).await?;
+
+            // info!("[EPOCH JOB] Successfully submitted epoch update...");
+
+            // update_job_status(&db_client, job.job_id, JobStatus::ProofDecommitmentCalled).await?;
+
+            // Now we can get proof from contract?
+            // bankai.starknet_client.get_epoch_proof(
+            //     &self,
+            //     slot: u64,
+            //     config: &BankaiConfig)
+
+            // Insert data to DB after successful onchain epoch verification
+            // insert_verified_epoch(&db_client, job.slot / 0x2000, epoch_proof).await?;
         }
     }
 

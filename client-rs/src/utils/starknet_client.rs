@@ -1,3 +1,5 @@
+use alloy_primitives::FixedBytes;
+use serde::{Deserialize, Serialize};
 use starknet::accounts::{Account, ConnectedAccount};
 use starknet::core::types::{Call, FunctionCall};
 use starknet::macros::selector;
@@ -21,6 +23,48 @@ use std::sync::Arc;
 use crate::contract_init::ContractInitializationData;
 use crate::traits::Submittable;
 use crate::BankaiConfig;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EpochProof {
+    pub header_root: FixedBytes<32>,
+    pub state_root: FixedBytes<32>,
+    pub n_signers: u64,
+    pub execution_hash: FixedBytes<32>,
+    pub execution_height: u64,
+}
+
+impl EpochProof {
+    pub fn from_contract_return_value(calldata: Vec<Felt>) -> Result<Self, String> {
+        if calldata.len() != 8 {
+            return Err("Invalid return value length. Expected 8 elements.".to_string());
+        }
+
+        let header_root = combine_to_fixed_bytes(calldata[0], calldata[1])?;
+        let state_root = combine_to_fixed_bytes(calldata[2], calldata[3])?;
+        let n_signers = calldata[4].try_into().unwrap();
+        let execution_hash = combine_to_fixed_bytes(calldata[5], calldata[6])?;
+        let execution_height = calldata[7].try_into().unwrap();
+
+        Ok(EpochProof {
+            header_root,
+            state_root,
+            n_signers,
+            execution_hash,
+            execution_height,
+        })
+    }
+}
+
+fn combine_to_fixed_bytes(high: Felt, low: Felt) -> Result<FixedBytes<32>, String> {
+    let mut bytes = [0u8; 32];
+    let high_bytes = high.to_bytes_le();
+    let low_bytes = low.to_bytes_le();
+
+    bytes[0..16].copy_from_slice(&high_bytes);
+    bytes[16..32].copy_from_slice(&low_bytes);
+
+    Ok(FixedBytes::from_slice(bytes.as_slice()))
+}
 
 #[derive(Debug)]
 pub struct StarknetClient {
@@ -141,15 +185,15 @@ impl StarknetClient {
             )
             .await
             .map_err(StarknetError::ProviderError)?;
-        //println!("committee_hash: {:?}", committee_hash);
-        Ok((committee_hash))
+        println!("committee_hash: {:?}", committee_hash);
+        Ok(committee_hash)
     }
 
     pub async fn get_epoch_proof(
         &self,
         slot: u64,
         config: &BankaiConfig,
-    ) -> Result<(), StarknetError> {
+    ) -> Result<EpochProof, StarknetError> {
         let epoch_proof = self
             .account
             .provider()
@@ -164,7 +208,7 @@ impl StarknetClient {
             .await
             .map_err(StarknetError::ProviderError)?;
         println!("epoch_proof: {:?}", epoch_proof);
-        Ok(())
+        Ok(EpochProof::from_contract_return_value(epoch_proof).unwrap())
     }
 
     pub async fn get_latest_epoch_slot(

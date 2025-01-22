@@ -1,5 +1,5 @@
-use crate::epoch_update::EpochProof;
 use crate::state::{AtlanticJobType, Error, Job, JobStatus, JobType};
+use crate::utils::starknet_client::EpochProof;
 use alloy_primitives::FixedBytes;
 use starknet::core::types::Felt;
 use std::str::FromStr;
@@ -201,7 +201,7 @@ impl DatabaseManager {
             .client
             .query_opt(
                 "SELECT batch_range_end_epoch FROM jobs
-                 WHERE job_status IN ($1, $2)
+                 WHERE job_status IN ($1, $2) AND batch_range_end_epoch != NULL
                  ORDER BY batch_range_end_epoch DESC
                  LIMIT 1",
                 &[&"CREATED", &"PIE_GENERATED"],
@@ -262,35 +262,35 @@ impl DatabaseManager {
         Ok(paths)
     }
 
-    pub async fn get_compute_finsihed_jobs_to_proccess_onchain_call(
-        &self,
-        last_epoch: JobStatus,
-    ) -> Result<Vec<JobSchema>, Box<dyn std::error::Error + Send + Sync>> {
-        let rows = self
-            .client
-            .query(
-                "SELECT * FROM jobs
-                 WHERE job_status = 'OFFCHAIN_COMPUTATION_FINISHED' AND job_type = 'EPOCH_BATCH_UPDATE'  AND batch_range_end_epoch <= $1",
-                &[&last_epoch],
-            )
-            .await?;
+    // pub async fn get_compute_finsihed_jobs_to_proccess_onchain_call(
+    //     &self,
+    //     last_epoch: JobStatus,
+    // ) -> Result<Vec<JobSchema>, Box<dyn std::error::Error + Send + Sync>> {
+    //     let rows = self
+    //         .client
+    //         .query(
+    //             "SELECT * FROM jobs
+    //              WHERE job_status = 'OFFCHAIN_COMPUTATION_FINISHED' AND job_type = 'EPOCH_BATCH_UPDATE'  AND batch_range_end_epoch <= $1",
+    //             &[&last_epoch],
+    //         )
+    //         .await?;
 
-        // Map rows into Job structs
-        let jobs: Vec<JobSchema> = rows
-            .into_iter()
-            .map(|row: Row| JobSchema {
-                job_uuid: row.get("job_uuid"),
-                job_status: row.get("job_status"),
-                slot: row.get("slot"),
-                batch_range_begin_epoch: row.get("batch_range_begin_epoch"),
-                batch_range_end_epoch: row.get("batch_range_end_epoch"),
-                job_type: row.get("type"),
-                updated_at: row.get("updated_at"),
-            })
-            .collect();
+    //     // Map rows into Job structs
+    //     let jobs: Vec<JobSchema> = rows
+    //         .into_iter()
+    //         .map(|row: Row| JobSchema {
+    //             job_uuid: row.get("job_uuid"),
+    //             job_status: row.get("job_status"),
+    //             slot: row.get("slot"),
+    //             batch_range_begin_epoch: row.get("batch_range_begin_epoch"),
+    //             batch_range_end_epoch: row.get("batch_range_end_epoch"),
+    //             job_type: row.get("type"),
+    //             updated_at: row.get("updated_at"),
+    //         })
+    //         .collect();
 
-        Ok(jobs)
-    }
+    //     Ok(jobs)
+    // }
 
     pub async fn get_jobs_with_status(
         &self,
@@ -349,6 +349,22 @@ impl DatabaseManager {
         Ok(())
     }
 
+    pub async fn set_ready_to_broadcast_for_batch_epochs(
+        &self,
+        first_epoch: u64,
+        last_epoch: u64,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.client
+            .execute(
+                "UPDATE jobs
+                SET job_status = 'READY_TO_BROADCAST', updated_at = NOW()
+                WHERE batch_range_begin_epoch >= $1 AND batch_range_end_epoch << $2 AND job_type = 'EPOCH_UPDATE_BATCH'",
+                &[&first_epoch.to_string(), &last_epoch.to_string()],
+            )
+            .await?;
+        Ok(())
+    }
+
     pub async fn set_job_txhash(
         &self,
         job_id: Uuid,
@@ -363,28 +379,28 @@ impl DatabaseManager {
         Ok(())
     }
 
-    pub async fn cancell_all_unfinished_jobs(
-        &self,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        self.client
-            .execute(
-                "UPDATE jobs SET status = $1, updated_at = NOW() WHERE status = 'FETCHING'",
-                &[&JobStatus::Cancelled.to_string()],
-            )
-            .await?;
-        Ok(())
-    }
+    // pub async fn cancell_all_unfinished_jobs(
+    //     &self,
+    // ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    //     self.client
+    //         .execute(
+    //             "UPDATE jobs SET status = $1, updated_at = NOW() WHERE status = 'FETCHING'",
+    //             &[&JobStatus::Cancelled.to_string()],
+    //         )
+    //         .await?;
+    //     Ok(())
+    // }
 
     pub async fn insert_merkle_path_for_epoch(
         &self,
-        epoch: i32,
-        path_index: i32,
+        epoch: u64,
+        path_index: u64,
         path: String,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         self.client
             .execute(
                 "INSERT INTO epoch_merkle_paths (epoch_id, path_index, merkle_path) VALUES ($1, $2, $3)",
-                &[&epoch, &path_index, &path],
+                &[&epoch.to_i64(), &path_index.to_i64(), &path],
             )
             .await?;
         Ok(())

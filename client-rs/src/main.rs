@@ -158,6 +158,10 @@ enum Commands {
         #[arg(long, short)]
         batch_id: String,
     },
+    GetEpochProof {
+        #[arg(long, short)]
+        epoch_id: u64,
+    },
     VerifyEpoch {
         #[arg(long, short)]
         batch_id: String,
@@ -391,6 +395,14 @@ async fn main() -> Result<(), Error> {
             } else {
                 println!("Batch not completed yet. Status: {}", status);
             }
+        }
+        Commands::GetEpochProof { epoch_id } => {
+            let epoch_proof = bankai
+                .starknet_client
+                .get_epoch_proof(epoch_id, &bankai.config)
+                .await?;
+
+            println!("Retrieved epoch proof from contract: {:?}", epoch_proof);
         }
     }
 

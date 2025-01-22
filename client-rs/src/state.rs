@@ -50,8 +50,8 @@ pub enum JobStatus {
     ReadyToBroadcastOnchain,
     #[postgres(name = "PROOF_VERIFY_CALLED_ONCHAIN")]
     ProofVerifyCalledOnchain,
-    #[postgres(name = "VERIFIED_FACT_REGISTERED")]
-    VerifiedFactRegistered,
+    #[postgres(name = "DONE")]
+    Done,
     #[postgres(name = "ERROR")]
     Error,
     #[postgres(name = "CANCELLED")]
@@ -71,7 +71,7 @@ impl ToString for JobStatus {
             JobStatus::OffchainComputationFinished => "OFFCHAIN_COMPUTATION_FINISHED".to_string(),
             JobStatus::ReadyToBroadcastOnchain => "READY_TO_BROADCAST_ONCHAIN".to_string(),
             JobStatus::ProofVerifyCalledOnchain => "PROOF_VERIFY_CALLED_ONCHAIN".to_string(),
-            JobStatus::VerifiedFactRegistered => "VERIFIED_FACT_REGISTERED".to_string(),
+            JobStatus::Done => "DONE".to_string(),
             JobStatus::Cancelled => "CANCELLED".to_string(),
             JobStatus::Error => "ERROR".to_string(),
         }
@@ -93,7 +93,7 @@ impl FromStr for JobStatus {
             "OFFCHAIN_COMPUTATION_FINISHED" => Ok(JobStatus::OffchainComputationFinished),
             "READY_TO_BROADCAST_ONCHAIN" => Ok(JobStatus::ReadyToBroadcastOnchain),
             "PROOF_VERIFY_CALLED_ONCHAIN" => Ok(JobStatus::ProofVerifyCalledOnchain),
-            "VERIFIED_FACT_REGISTERED" => Ok(JobStatus::VerifiedFactRegistered),
+            "DONE" => Ok(JobStatus::Done),
             "CANCELLED" => Ok(JobStatus::Cancelled),
             "ERROR" => Ok(JobStatus::Error),
             _ => Err(format!("Invalid job status: {}", s)),

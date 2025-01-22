@@ -4,6 +4,8 @@ use crate::{
     },
     Error,
 };
+use alloy_primitives::FixedBytes;
+use starknet::core::types::Felt;
 use tracing::info;
 
 pub fn slot_to_epoch_id(slot: u64) -> u64 {
@@ -61,4 +63,19 @@ pub fn get_first_slot_for_epoch(slot: u64) -> u64 {
 
 pub fn get_last_slot_for_epoch(slot: u64) -> u64 {
     (slot + 1) * SLOTS_PER_EPOCH - 1
+}
+
+pub fn get_sync_committee_id_by_epoch(epoch: u64) -> u64 {
+    epoch / EPOCHS_PER_SYNC_COMMITTEE
+}
+
+// Since beacon chain RPCs have different response structure (quicknode responds different than nidereal) we use this event extraction logic
+pub fn extract_json_from_event(event_text: &str) -> Option<String> {
+    for line in event_text.lines() {
+        if line.starts_with("data:") {
+            // Extract the JSON after "data:"
+            return Some(line.trim_start_matches("data:").trim().to_string());
+        }
+    }
+    None
 }
