@@ -13,10 +13,10 @@ use uuid::Uuid;
 
 // Handler for GET /status
 pub async fn handle_get_status(State(state): State<AppState>) -> impl IntoResponse {
-    let last_slot_in_progress = match state.db_manager.get_latest_slot_id_in_progress().await {
-        Ok(Some(slot)) => {
-            let last_slot_in_progress = slot.to_u64().unwrap();
-            last_slot_in_progress
+    let last_epoch_in_progress = match state.db_manager.get_latest_epoch_in_progress().await {
+        Ok(Some(epoch)) => {
+            let last_epoch_in_progress = epoch.to_u64().unwrap();
+            last_epoch_in_progress
         }
         Ok(None) => 0,
         Err(e) => 0,
@@ -24,31 +24,31 @@ pub async fn handle_get_status(State(state): State<AppState>) -> impl IntoRespon
     let in_progress_jobs_count = state.db_manager.count_jobs_in_progress().await.unwrap();
 
     Json(json!({ "success": true, "details": {
-        "last_slot_in_progress": last_slot_in_progress,
+        "last_epoch_in_progress": last_epoch_in_progress,
         "jobs_in_progress_count": in_progress_jobs_count
     } }))
 }
 
-// Handler for GET /epoch/:slot
-pub async fn handle_get_epoch_update(
-    Path(slot): Path<u64>,
-    State(state): State<AppState>,
-) -> impl IntoResponse {
-    match state.bankai.get_epoch_proof(slot).await {
-        Ok(epoch_update) => {
-            // Convert the data to `serde_json::Value`
-            let value: Value = serde_json::to_value(epoch_update).unwrap_or_else(|err| {
-                eprintln!("Failed to serialize EpochUpdate: {:?}", err);
-                json!({ "error": "Internal server error" })
-            });
-            Json(value)
-        }
-        Err(err) => {
-            eprintln!("Failed to fetch proof: {:?}", err);
-            Json(json!({ "error": "Failed to fetch proof" }))
-        }
-    }
-}
+// // Handler for GET /epoch/:slot
+// pub async fn handle_get_epoch_update(
+//     Path(slot): Path<u64>,
+//     State(state): State<AppState>,
+// ) -> impl IntoResponse {
+//     match state.bankai.get_epoch_proof(slot).await {
+//         Ok(epoch_update) => {
+//             // Convert the data to `serde_json::Value`
+//             let value: Value = serde_json::to_value(epoch_update).unwrap_or_else(|err| {
+//                 eprintln!("Failed to serialize EpochUpdate: {:?}", err);
+//                 json!({ "error": "Internal server error" })
+//             });
+//             Json(value)
+//         }
+//         Err(err) => {
+//             eprintln!("Failed to fetch proof: {:?}", err);
+//             Json(json!({ "error": "Failed to fetch proof" }))
+//         }
+//     }
+// }
 
 pub async fn handle_get_epoch_proof(
     Path(slot): Path<u64>,

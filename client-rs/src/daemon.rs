@@ -295,7 +295,11 @@ async fn handle_beacon_chain_head_event(
         .unwrap()
         .unwrap();
 
-    let last_sync_committee_in_progress = 1;
+    let last_sync_committee_in_progress = db_manager
+        .get_latest_sync_committee_in_progress()
+        .await
+        .unwrap()
+        .unwrap();
 
     let mut latest_scheduled_epoch = last_epoch_in_progress;
 

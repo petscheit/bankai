@@ -1,3 +1,4 @@
+use crate::helpers;
 use crate::state::{AtlanticJobType, Error, Job, JobStatus, JobType};
 use crate::utils::starknet_client::EpochProof;
 use alloy_primitives::FixedBytes;
@@ -170,28 +171,28 @@ impl DatabaseManager {
         Ok(row_opt.map(|row| row.get("status")))
     }
 
-    pub async fn get_latest_slot_id_in_progress(
-        &self,
-    ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
-        // Query the latest slot with job_status in ('in_progress', 'initialized')
-        let row_opt = self
-            .client
-            .query_opt(
-                "SELECT slot FROM jobs
-                 WHERE job_status IN ($1, $2)
-                 ORDER BY slot DESC
-                 LIMIT 1",
-                &[&"CREATED", &"PIE_GENERATED"],
-            )
-            .await?;
+    // pub async fn get_latest_slot_id_in_progress(
+    //     &self,
+    // ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
+    //     // Query the latest slot with job_status in ('in_progress', 'initialized')
+    //     let row_opt = self
+    //         .client
+    //         .query_opt(
+    //             "SELECT slot FROM jobs
+    //              WHERE job_status NOT IN ('DONE', 'CANCELLED', 'ERROR')
+    //              ORDER BY slot DESC
+    //              LIMIT 1",
+    //             &[],
+    //         )
+    //         .await?;
 
-        // Extract and return the slot ID
-        if let Some(row) = row_opt {
-            Ok(Some(row.get::<_, i64>("slot").to_u64().unwrap()))
-        } else {
-            Ok(Some(0))
-        }
-    }
+    //     // Extract and return the slot ID
+    //     if let Some(row) = row_opt {
+    //         Ok(Some(row.get::<_, i64>("slot").to_u64().unwrap()))
+    //     } else {
+    //         Ok(Some(0))
+    //     }
+    // }
 
     pub async fn get_latest_epoch_in_progress(
         &self,
@@ -201,10 +202,12 @@ impl DatabaseManager {
             .client
             .query_opt(
                 "SELECT batch_range_end_epoch FROM jobs
-                 WHERE job_status IN ($1, $2) AND batch_range_end_epoch != NULL
+                 WHERE job_status NOT IN ('DONE', 'CANCELLED', 'ERROR')
+                        AND batch_range_end_epoch != 0
+                        AND type = 'EPOCH_BATCH_UPDATE'
                  ORDER BY batch_range_end_epoch DESC
                  LIMIT 1",
-                &[&"CREATED", &"PIE_GENERATED"],
+                &[],
             )
             .await?;
 
@@ -218,6 +221,32 @@ impl DatabaseManager {
         }
     }
 
+    pub async fn get_latest_sync_committee_in_progress(
+        &self,
+    ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
+        // Query the latest slot with job_status in ('in_progress', 'initialized')
+        let row_opt = self
+            .client
+            .query_opt(
+                "SELECT slot FROM jobs
+                 WHERE job_status NOT IN ('DONE', 'CANCELLED', 'ERROR')
+                        AND type = 'SYNC_COMMITTEE_UPDATE'
+                 ORDER BY slot DESC
+                 LIMIT 1",
+                &[],
+            )
+            .await?;
+
+        // Extract and return the slot ID
+        if let Some(row) = row_opt {
+            Ok(Some(helpers::slot_to_sync_committee_id(
+                row.get::<_, i64>("batch_range_end_epoch").to_u64().unwrap(),
+            )))
+        } else {
+            Ok(Some(0))
+        }
+    }
+
     pub async fn count_jobs_in_progress(
         &self,
     ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
@@ -226,7 +255,9 @@ impl DatabaseManager {
             .client
             .query_opt(
                 "SELECT COUNT(job_uuid) as count FROM jobs
-                 WHERE job_status IN ('PIE_GENERATED', 'CREATED')",
+                 WHERE job_status NOT IN ('DONE', 'CANCELLED', 'ERROR')
+                        AND type = 'EPOCH_BATCH_UPDATE'
+                ",
                 &[],
             )
             .await?;
