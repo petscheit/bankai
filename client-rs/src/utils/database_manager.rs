@@ -19,7 +19,7 @@ pub struct JobSchema {
     pub batch_range_begin_epoch: i64,
     pub batch_range_end_epoch: i64,
     pub job_type: JobType,
-    pub updated_at: i64,
+    //pub updated_at: i64,
 }
 
 #[derive(Debug)]
@@ -143,7 +143,7 @@ impl DatabaseManager {
             JobType::SyncCommitteeUpdate => {
                 self.client
                     .execute(
-                        "INSERT INTO jobs (job_uuid, job_status, slot, type) VALUES ($1, $2, $3, $4, $5, $6)",
+                        "INSERT INTO jobs (job_uuid, job_status, slot, type) VALUES ($1, $2, $3, $4)",
                         &[
                             &job.job_id,
                             &job.job_status.to_string(),
@@ -333,7 +333,7 @@ impl DatabaseManager {
             .query(
                 "SELECT * FROM jobs
                  WHERE job_status = $1",
-                &[&desired_status],
+                &[&desired_status.to_string()],
             )
             .await?;
 
@@ -357,7 +357,7 @@ impl DatabaseManager {
                         batch_range_begin_epoch: row.get("batch_range_begin_epoch"),
                         batch_range_end_epoch: row.get("batch_range_end_epoch"),
                         job_type,
-                        updated_at: row.get("updated_at"),
+                        //updated_at: row.get("updated_at"),
                     })
                 },
             )
@@ -388,9 +388,10 @@ impl DatabaseManager {
         self.client
             .execute(
                 "UPDATE jobs
-                SET job_status = 'READY_TO_BROADCAST', updated_at = NOW()
-                WHERE batch_range_begin_epoch >= $1 AND batch_range_end_epoch << $2 AND job_type = 'EPOCH_UPDATE_BATCH'",
-                &[&first_epoch.to_string(), &last_epoch.to_string()],
+                SET job_status = 'READY_TO_BROADCAST_ONCHAIN', updated_at = NOW()
+                WHERE batch_range_begin_epoch >= $1 AND batch_range_end_epoch <= $2 AND type = 'EPOCH_BATCH_UPDATE'
+                      AND job_status = 'OFFCHAIN_COMPUTATION_FINISHED'",
+                &[&first_epoch.to_i64(), &last_epoch.to_i64()],
             )
             .await?;
         Ok(())

@@ -284,6 +284,10 @@ impl EpochUpdateBatch {
     where
         T: serde::de::DeserializeOwned,
     {
+        info!(
+            "Trying to read file batches/epoch_batch/{}_to_{}/input_batch_{}_to_{}.json",
+            first_slot, last_slot, first_slot, last_slot
+        );
         // Pattern match for files like: batches/epoch_batch/6709248_to_6710272/input_batch_6709248_to_6710272.json
         let path = format!(
             "batches/epoch_batch/{}_to_{}/input_batch_{}_to_{}.json",

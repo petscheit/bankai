@@ -31,7 +31,7 @@ pub struct AppState {
 #[postgres(name = "job_status")]
 pub enum JobStatus {
     #[postgres(name = "CREATED")]
-    Created,
+    Created, // Can act as queued and be picked up by worker to proccess
     #[postgres(name = "PROGRAM_INPUTS_PREPARED")]
     ProgramInputsPrepared,
     #[postgres(name = "PIE_GENERATED")]

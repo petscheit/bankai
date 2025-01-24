@@ -61,8 +61,8 @@ pub fn get_first_slot_for_epoch(slot: u64) -> u64 {
     slot * SLOTS_PER_EPOCH
 }
 
-pub fn get_last_slot_for_epoch(slot: u64) -> u64 {
-    (slot + 1) * SLOTS_PER_EPOCH - 1
+pub fn get_last_slot_for_epoch(epoch: u64) -> u64 {
+    (epoch + 1) * SLOTS_PER_EPOCH - 1
 }
 
 pub fn get_sync_committee_id_by_epoch(epoch: u64) -> u64 {

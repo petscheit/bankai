@@ -190,6 +190,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .await
         .unwrap();
 
+    //enqueue_sync_committee_jobs();
+    //enqueue_batch_epochs_jobs();
+
     if slot_listener_toggle {
         task::spawn({
             async move {
@@ -262,8 +265,29 @@ async fn handle_beacon_chain_head_event(
     db_manager: Arc<DatabaseManager>,
     tx: mpsc::Sender<Job>,
 ) -> () {
-    let epoch_id = helpers::slot_to_epoch_id(parsed_event.slot);
+    let current_epoch_id = helpers::slot_to_epoch_id(parsed_event.slot);
     let sync_committee_id = helpers::slot_to_sync_committee_id(parsed_event.slot);
+
+    if parsed_event.epoch_transition {
+        //info!("Beacon Chain epoch transition detected. New epoch: {} | Starting processing epoch proving...", epoch_id);
+        info!(
+            "Beacon Chain epoch transition detected. New epoch: {}",
+            current_epoch_id
+        );
+
+        // Check also now if slot is the moment of switch to new sync committee set
+        if parsed_event.slot % constants::SLOTS_PER_SYNC_COMMITTEE == 0 {
+            info!(
+                "Beacon Chain sync committee rotation occured. Slot {} | Sync committee id: {}",
+                parsed_event.slot, sync_committee_id
+            );
+        }
+    }
+
+    // We can do all circuit computations up to latest slot in advance, but the onchain broadcasts must be send in correct order
+    // By correct order mean that within the same sync committe the epochs are not needed to be broadcasted in order
+    // but the order of sync_commite_update->epoch_update must be correct, we firstly need to have correct sync committe veryfied
+    // before we verify epoch "belonging" to this sync committee
 
     let latest_verified_epoch_slot = bankai
         .starknet_client
@@ -282,12 +306,24 @@ async fn handle_beacon_chain_head_event(
         .unwrap();
 
     let latest_verified_epoch_id = helpers::slot_to_epoch_id(latest_verified_epoch_slot);
-    let epochs_behind = epoch_id - latest_verified_epoch_id;
+    let epochs_behind = current_epoch_id - latest_verified_epoch_id;
+
+    let _ = evaluate_jobs_statuses(db_manager.clone(), latest_verified_sync_committee_id)
+        .await
+        .map_err(|e| {
+            error!("Error evaluating jobs statuses: {}", e);
+        });
+    let _ = broadcast_onchain_ready_jobs(db_manager.clone(), bankai.clone())
+        .await
+        .map_err(|e| {
+            error!("Error executing broadcast onchain ready jobs: {}", e);
+        });
 
     // We getting the last slot in progress to determine next slots to prove
     //let mut last_slot_in_progress: u64 = 0;
     // /let mut last_epoch_in_progress: u64 = 0;
     // let mut last_sync_committee_in_progress: u64 = 0;
+    //
 
     let last_epoch_in_progress = db_manager
         .get_latest_epoch_in_progress()
@@ -322,16 +358,16 @@ async fn handle_beacon_chain_head_event(
 
         warn!(
             "Bankai is out of sync now. Node is {} epochs behind network. Current Beacon Chain state: [Slot: {} Epoch: {} Sync Committee: {}] | Latest verified: [Slot: {} Epoch: {} Sync Committee: {}] | Latest in progress: [Epoch: {} Sync Committee: {}] | Sync in progress...",
-            epochs_behind, parsed_event.slot, epoch_id, sync_committee_id, latest_verified_epoch_slot, latest_verified_epoch_id, latest_verified_sync_committee_id, last_epoch_in_progress, last_sync_committee_in_progress
+            epochs_behind, parsed_event.slot, current_epoch_id, sync_committee_id, latest_verified_epoch_slot, latest_verified_epoch_id, latest_verified_sync_committee_id, last_epoch_in_progress, last_sync_committee_in_progress
         );
 
         // Check if we have in progress all epochs that need to be processed, if no, run job
-        if latest_scheduled_epoch < (epoch_id - constants::TARGET_BATCH_SIZE) {
+        if latest_scheduled_epoch < (current_epoch_id - constants::TARGET_BATCH_SIZE) {
             // And chceck how many jobs are already in progress and if we fit in the limit
             let in_progress_jobs_count = db_manager.count_jobs_in_progress().await.unwrap();
             if in_progress_jobs_count.unwrap() >= constants::MAX_CONCURRENT_JOBS_IN_PROGRESS {
                 info!(
-                    "Currently not starting new job, MAX_CONCURRENT_JOBS_IN_PROGRESS limit reached, jobs in progress: {}",
+                    "Currently not starting new batch epoch job, MAX_CONCURRENT_JOBS_IN_PROGRESS limit reached, jobs in progress: {}",
                     in_progress_jobs_count.unwrap()
                 );
                 return;
@@ -341,45 +377,60 @@ async fn handle_beacon_chain_head_event(
                 helpers::get_sync_committee_id_by_epoch(latest_scheduled_epoch);
 
             info!(
-                "Currently processed sync committee epochs ranges from {} to {}",
+                "Currently processed sync committee epochs ranges from {} to {}. Next sync committee epochs ranges: {} to {}",
                 helpers::get_first_epoch_for_sync_committee(currently_processed_sync_committee_id),
-                helpers::get_last_epoch_for_sync_committee(currently_processed_sync_committee_id)
+                helpers::get_last_epoch_for_sync_committee(currently_processed_sync_committee_id),
+                helpers::get_first_epoch_for_sync_committee(currently_processed_sync_committee_id + 1),
+                helpers::get_last_epoch_for_sync_committee(currently_processed_sync_committee_id + 1)
             );
 
             if helpers::get_last_epoch_for_sync_committee(currently_processed_sync_committee_id)
                 == latest_scheduled_epoch
             {
                 // We reached end of current sync committee, need to schedule new sync committee proving
-                match run_sync_committee_update_job(
-                    db_manager.clone(),
-                    currently_processed_sync_committee_id + 1,
-                    tx.clone(),
-                )
-                .await
-                {
-                    Ok(()) => {}
-                    Err(e) => {
-                        error!("Error while creating job: {}", e);
-                    }
-                };
+                // match run_sync_committee_update_job(
+                //     db_manager.clone(),
+                //     currently_processed_sync_committee_id + 1,
+                //     tx.clone(),
+                // )
+                // .await
+                // {
+                //     Ok(()) => {}
+                //     Err(e) => {
+                //         error!("Error while creating sync committee update job: {}", e);
+                //     }
+                // };
             }
 
             let epoch_to_start_from = latest_scheduled_epoch + 1;
-            let mut epoch_to_end_on = latest_scheduled_epoch + 1 + constants::TARGET_BATCH_SIZE;
+            let mut epoch_to_end_on = latest_scheduled_epoch + 1 + constants::TARGET_BATCH_SIZE; // To create batch with size of constants::TARGET_BATCH_SIZE epochs
 
-            // Iw we follow the betch size of 32 always, this souldnt happen, but if we have not same size batches, it can be trigerred
-            if epoch_to_end_on
+            // Edge cases handling //
+            // Handle the edge case where there is only one epoch in batch left to proccess and this epoch is last epoch in sync committee, if we follow the betch size of 32 always, this souldnt happen:
+            if latest_scheduled_epoch
+                == helpers::get_last_epoch_for_sync_committee(currently_processed_sync_committee_id)
+            {
+                warn!("edge case: only one epoch left to proccess in batch in this sync committee");
+                epoch_to_end_on = epoch_to_start_from;
+            }
+            // Same, if we follow the betch size of 32 always, this souldnt happen, but if we have not same size batches, it can be trigerred also:
+            else if epoch_to_end_on
                 > helpers::get_last_epoch_for_sync_committee(currently_processed_sync_committee_id)
             {
+                warn!("edge case: batch end epoch {} overlaps with the next sync committee, truncating to the last epoch: {} of corresponding sync committee: {}",
+                    epoch_to_end_on, helpers::get_last_epoch_for_sync_committee(currently_processed_sync_committee_id), currently_processed_sync_committee_id);
                 // The end epoch is further that current sync committee
                 // In this case we can simply assingn sync commite latest epoch as epoch_to_end_on
                 epoch_to_end_on = helpers::get_last_epoch_for_sync_committee(
                     currently_processed_sync_committee_id,
                 );
             }
-
-            //info!("{} epochs let to proccess in associated sync committee term",);
-
+            //
+            // info!(
+            //     "{} epochs left to proccess in associated sync committee term",
+            //     helpers::get_last_epoch_for_sync_committee(currently_processed_sync_committee_id)
+            //         - latest_scheduled_epoch
+            // );
             match run_batch_epoch_update_job(
                 db_manager.clone(),
                 get_first_slot_for_epoch(epoch_to_start_from)
@@ -402,8 +453,26 @@ async fn handle_beacon_chain_head_event(
         // This is when we are synced properly and new epoch batch needs to be inserted
         info!(
             "Starting processing next epoch batch. Current Beacon Chain epoch: {} Latest verified epoch: {}",
-            epoch_id, latest_verified_epoch_id
+            current_epoch_id, latest_verified_epoch_id
         );
+
+        let epoch_to_start_from = latest_scheduled_epoch + 1;
+        let epoch_to_end_on = latest_scheduled_epoch + 1 + constants::TARGET_BATCH_SIZE;
+        match run_batch_epoch_update_job(
+            db_manager.clone(),
+            get_first_slot_for_epoch(epoch_to_start_from)
+                + (constants::SLOTS_PER_EPOCH * constants::TARGET_BATCH_SIZE),
+            epoch_to_start_from,
+            epoch_to_end_on,
+            tx.clone(),
+        )
+        .await
+        {
+            Ok(()) => {}
+            Err(e) => {
+                error!("Error while creating job: {}", e);
+            }
+        };
     } else if epochs_behind < constants::TARGET_BATCH_SIZE {
         // When we are in sync and not yet reached the TARGET_BATCH_SIZE epochs lagging behind actual beacon chian state
         debug!("Target batch size not reached yet, daemon is in sync");
@@ -417,30 +486,21 @@ async fn handle_beacon_chain_head_event(
     // So for each batch update we takin into account effectiviely the latest slot from given batch
 
     //let db_client = db_client.clone();
-
-    let _ = evaluate_jobs_statuses(db_manager.clone(), latest_verified_sync_committee_id).await;
-    let _ = broadcast_onchain_ready_jobs(db_manager.clone(), bankai.clone()).await;
-
-    // We can do all circuit computations up to latest slot in advance, but the onchain broadcasts must be send in correct order
-    // By correct order mean that within the same sync committe the epochs are not needed to be broadcasted in order
-    // but the order of sync_commite_update->epoch_update must be correct, we firstly need to have correct sync committe veryfied
-    // before we verify epoch "belonging" to this sync committee
-    if parsed_event.epoch_transition {
-        //info!("Beacon Chain epoch transition detected. New epoch: {} | Starting processing epoch proving...", epoch_id);
-        info!(
-            "Beacon Chain epoch transition detected. New epoch: {}",
-            epoch_id
-        );
-
-        // Check also now if slot is the moment of switch to new sync committee set
-        if parsed_event.slot % constants::SLOTS_PER_SYNC_COMMITTEE == 0 {
-            info!(
-                "Beacon Chain sync committee rotation occured. Slot {} | Sync committee id: {}",
-                parsed_event.slot, sync_committee_id
-            );
-        }
-    }
 }
+
+// // This function will enqueue sync committee jobs in database with status CREATED up to the latest sync committee
+// async fn enqueue_sync_committee_jobs(
+//     db_manager: Arc<DatabaseManager>,
+//     bankai: Arc<BankaiClient>,
+// ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+// }
+
+// // This function will enqueue epoch batch update jobs in database with status CREATED up to the latest able to prove epoch batch
+// async fn enqueue_batch_epochs_jobs(
+//     db_manager: Arc<DatabaseManager>,
+//     bankai: Arc<BankaiClient>,
+// ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+// }
 
 async fn run_batch_epoch_update_job(
     db_manager: Arc<DatabaseManager>,
@@ -459,13 +519,23 @@ async fn run_batch_epoch_update_job(
         batch_range_end_epoch: Some(batch_range_end_epoch),
     };
 
+    // Check to ensure if both epochs belongs to same sync committee
+    if helpers::get_sync_committee_id_by_epoch(batch_range_begin_epoch)
+        != helpers::get_sync_committee_id_by_epoch(batch_range_end_epoch)
+    {
+        return Err(
+            "Batch range start epoch belongs to different committee than batch range end epoch"
+                .into(),
+        );
+    }
+
     match db_manager.create_job(job.clone()).await {
         // Insert new job record to DB
         Ok(()) => {
             // Handle success
             info!(
-                "[EPOCH BATCH UPDATE] Job created successfully with ID: {} Epochs range from {} to {}",
-                job_id, batch_range_begin_epoch, batch_range_end_epoch
+                "[EPOCH BATCH UPDATE] Job created successfully with ID: {} Epochs range from {} to {} | Sync committee involved: {}",
+                job_id, batch_range_begin_epoch, batch_range_end_epoch, helpers::get_sync_committee_id_by_epoch(batch_range_end_epoch)
             );
             if tx.send(job).await.is_err() {
                 return Err("Failed to send job".into());
@@ -548,8 +618,12 @@ async fn broadcast_onchain_ready_jobs(
         match job.job_type {
             JobType::EpochBatchUpdate => {
                 let update = EpochUpdateBatch::from_json::<EpochUpdateBatch>(
-                    job.batch_range_begin_epoch.try_into().unwrap(),
-                    job.batch_range_end_epoch.try_into().unwrap(),
+                    helpers::get_first_slot_for_epoch(
+                        job.batch_range_begin_epoch.try_into().unwrap(),
+                    ),
+                    helpers::get_first_slot_for_epoch(
+                        job.batch_range_end_epoch.try_into().unwrap(),
+                    ),
                 )?;
 
                 info!(
@@ -563,9 +637,9 @@ async fn broadcast_onchain_ready_jobs(
                     .submit_update(update.expected_circuit_outputs, &bankai.config)
                     .await?;
 
-                println!(
+                info!(
                     "[EPOCH BATCH JOB] Successfully called batch epoch update onchain for job_uuid: {}, txhash: {}",
-                    job.job_uuid, txhash
+                    job.job_uuid, txhash.to_hex_string()
                 );
 
                 db_manager
@@ -703,9 +777,12 @@ async fn process_job(
                 .await?;
 
             let lowest_committee_update_slot = (latest_committee_id) * Felt::from(0x2000);
+            let new_sync_committee_id = latest_committee_id + 1;
 
+            // This should be triggered on the final stage of onchain call submission TODO?//
             if latest_epoch < lowest_committee_update_slot {
-                error!("[SYNC COMMITTEE JOB] Sync committee update requires newer epoch verified. The lowest needed slot is {}", lowest_committee_update_slot);
+                error!("[SYNC COMMITTEE JOB] Sync committee update to sync committee {} requires newer epoch verified. The lowest needed slot is {} which corresponds to epoch {} and sync committee {}",
+                    new_sync_committee_id, lowest_committee_update_slot, helpers::slot_to_epoch_id(lowest_committee_update_slot.to_u64().unwrap()), helpers::slot_to_sync_committee_id(lowest_committee_update_slot.to_u64().unwrap()));
                 //return Err(Error::RequiresNewerEpoch(latest_epoch));
             }
 
@@ -719,7 +796,7 @@ async fn process_job(
             );
 
             info!(
-                "[SYNC COMMITTEE JOB] Starting Cairo execution and PIE generation for Sync Committee: {:?}...",
+                "[SYNC COMMITTEE JOB] Starting Cairo execution and PIE generation for Sync Committee: {}...",
                 latest_committee_id
             );
 
