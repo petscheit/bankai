@@ -33,6 +33,8 @@ pub enum JobStatus {
     #[postgres(name = "CREATED")]
     Created, // Can act as queued and be picked up by worker to proccess
     #[postgres(name = "PROGRAM_INPUTS_PREPARED")]
+    StartedTraceGeneration,
+    #[postgres(name = "STARTED_TRACE_GENERATION")]
     ProgramInputsPrepared,
     #[postgres(name = "PIE_GENERATED")]
     PieGenerated,
@@ -63,6 +65,7 @@ impl ToString for JobStatus {
         match self {
             JobStatus::Created => "CREATED".to_string(),
             JobStatus::ProgramInputsPrepared => "PROGRAM_INPUTS_PREPARED".to_string(),
+            JobStatus::StartedTraceGeneration => "STARTED_TRACE_GENERATION".to_string(),
             JobStatus::PieGenerated => "PIE_GENERATED".to_string(),
             JobStatus::OffchainProofRequested => "OFFCHAIN_PROOF_REQUESTED".to_string(),
             JobStatus::OffchainProofRetrieved => "OFFCHAIN_PROOF_RETRIEVED".to_string(),
@@ -103,7 +106,7 @@ impl FromStr for JobStatus {
 
 #[derive(Debug, FromSql, ToSql, Clone)]
 pub enum JobType {
-    EpochUpdate,
+    //EpochUpdate,
     EpochBatchUpdate,
     SyncCommitteeUpdate,
 }
@@ -113,7 +116,7 @@ impl FromStr for JobType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "EPOCH_UPDATE" => Ok(JobType::EpochUpdate),
+            //"EPOCH_UPDATE" => Ok(JobType::EpochUpdate),
             "EPOCH_BATCH_UPDATE" => Ok(JobType::EpochBatchUpdate),
             "SYNC_COMMITTEE_UPDATE" => Ok(JobType::SyncCommitteeUpdate),
             _ => Err(format!("Invalid job type: {}", s)),
@@ -124,7 +127,7 @@ impl FromStr for JobType {
 impl fmt::Display for JobType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = match self {
-            JobType::EpochUpdate => "EPOCH_UPDATE",
+            //JobType::EpochUpdate => "EPOCH_UPDATE",
             JobType::EpochBatchUpdate => "EPOCH_BATCH_UPDATE",
             JobType::SyncCommitteeUpdate => "SYNC_COMMITTEE_UPDATE",
         };

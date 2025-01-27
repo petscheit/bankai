@@ -8,7 +8,7 @@ use std::str::FromStr;
 use chrono::NaiveDateTime;
 use num_traits::ToPrimitive;
 use tokio_postgres::{Client, Row};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -139,7 +139,7 @@ impl DatabaseManager {
                     .await
                     .map_err(|e| Error::DatabaseError(e.to_string()))?;
             }
-            JobType::EpochUpdate => {}
+            //JobType::EpochUpdate => {}
             JobType::SyncCommitteeUpdate => {
                 self.client
                     .execute(
@@ -385,7 +385,7 @@ impl DatabaseManager {
         first_epoch: u64,
         last_epoch: u64,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        self.client
+        let rows_affected = self.client
             .execute(
                 "UPDATE jobs
                 SET job_status = 'READY_TO_BROADCAST_ONCHAIN', updated_at = NOW()
@@ -394,6 +394,13 @@ impl DatabaseManager {
                 &[&first_epoch.to_i64(), &last_epoch.to_i64()],
             )
             .await?;
+
+        if rows_affected > 0 {
+            info!(
+                "{} jobs changed state to READY_TO_BROADCAST_ONCHAIN",
+                rows_affected
+            );
+        }
         Ok(())
     }
 
@@ -429,12 +436,17 @@ impl DatabaseManager {
         path_index: u64,
         path: String,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        self.client
+        let rows_affected =self.client
             .execute(
-                "INSERT INTO epoch_merkle_paths (epoch_id, path_index, merkle_path) VALUES ($1, $2, $3)",
+                "INSERT INTO epoch_merkle_paths (epoch_id, path_index, merkle_path) VALUES ($1, $2, $3)
+                 ON CONFLICT (epoch_id, path_index) DO NOTHING",
                 &[&epoch.to_i64(), &path_index.to_i64(), &path],
             )
             .await?;
+
+        if rows_affected == 0 {
+            warn!("Combination of epoch_id and path_index already exists, skipping insertion of epoch merkle patch for epoch {} and index {}", epoch, path_index);
+        }
         Ok(())
     }
 

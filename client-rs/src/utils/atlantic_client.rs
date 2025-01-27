@@ -1,10 +1,14 @@
-use std::{env, fs};
-
 use crate::traits::{ProofType, Provable};
 use crate::Error;
+use futures::{StreamExt, TryStreamExt};
 use reqwest::multipart::{Form, Part};
+use reqwest::Body;
 use serde::{Deserialize, Serialize};
+use std::env;
+use std::path::{Path, PathBuf};
+use tokio::fs;
 use tokio::time::{sleep, Duration};
+use tokio_util::io::ReaderStream;
 use tracing::{debug, error, info, trace};
 
 #[derive(Debug)]
@@ -29,13 +33,61 @@ impl AtlanticClient {
     }
 
     pub async fn submit_batch(&self, batch: impl Provable) -> Result<String, Error> {
-        let pie_path = batch.pie_path();
+        let pie_path: PathBuf = batch.pie_path().into();
+
+        let meta = fs::metadata(pie_path.clone())
+            .await
+            .map_err(Error::IoError)?;
+        let total_bytes = meta.len();
+
+        let file = fs::File::open(pie_path.clone())
+            .await
+            .map_err(Error::IoError)?;
+
+        let stream = ReaderStream::new(file);
+
+        let progress_stream = stream.scan(
+            (0_u64, 10_u64),
+            move |(uploaded, next_threshold), chunk_result| {
+                match chunk_result {
+                    Ok(chunk) => {
+                        *uploaded += chunk.len() as u64;
+                        let percent = (*uploaded as f64 / total_bytes as f64) * 100.0;
+
+                        if percent >= *next_threshold as f64 && *next_threshold <= 100 {
+                            println!(
+                                "Uploaded {}% of the file to Atlantic API...",
+                                *next_threshold
+                            );
+                            *next_threshold += 10;
+                        }
+
+                        // Pass the chunk further down the stream
+                        futures::future::ready(Some(Ok(chunk)))
+                    }
+                    Err(e) => {
+                        // Forward the error
+                        futures::future::ready(Some(Err(e)))
+                    }
+                }
+            },
+        );
 
         // Read the file as bytes
-        let file_bytes = fs::read(&pie_path).map_err(Error::IoError)?;
-        let file_part = Part::bytes(file_bytes)
-            .file_name(pie_path) // Provide a filename
-            .mime_str("application/zip") // Specify MIME type
+        // let file_bytes = fs::read(&pie_path).map_err(Error::IoError)?;
+        // let file_part = Part::bytes(file_bytes)
+        //     .file_name(pie_path) // Provide a filename
+        //     .mime_str("application/zip") // Specify MIME type
+        //     .map_err(Error::AtlanticError)?;
+        let file_part = Part::stream(Body::wrap_stream(progress_stream))
+            .file_name(
+                pie_path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string(),
+            )
+            .mime_str("application/zip")
             .map_err(Error::AtlanticError)?;
 
         let external_id = format!(

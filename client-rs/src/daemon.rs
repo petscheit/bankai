@@ -54,7 +54,7 @@ use routes::{
 };
 use std::net::SocketAddr;
 use sync_committee::SyncCommitteeUpdate;
-use tokio::time::Duration;
+use tokio::time::{timeout, Duration};
 use uuid::Uuid;
 
 #[tokio::main]
@@ -113,6 +113,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tx,
         bankai: bankai.clone(),
     };
+
+    tokio::spawn(async move {
+        loop {
+            info!("[HEARTBEAT] Daemon is alive");
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+        }
+    });
 
     //Spawn a background task to process jobs
     tokio::spawn(async move {
@@ -183,75 +190,159 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Create an HTTP client
     let http_stream_client = reqwest::Client::new();
 
-    // Send the request to the Beacon node
-    let response = http_stream_client
-        .get(&events_endpoint)
-        .send()
-        .await
-        .unwrap();
-
-    //enqueue_sync_committee_jobs();
-    //enqueue_batch_epochs_jobs();
-
-    if slot_listener_toggle {
-        task::spawn({
-            async move {
-                // Check if response is successful; if not, bail out early
-                // TODO: need to implement resilience and potentialy use multiple providers (implement something like fallbackprovider functionality in ethers), handle reconnection if connection is lost for various reasons
-                if !response.status().is_success() {
-                    error!("Failed to connect: HTTP {}", response.status());
-                    return;
+    tokio::spawn(async move {
+        loop {
+            let response = match http_stream_client
+                .get(&events_endpoint)
+                //.timeout(std::time::Duration::from_secs(30)) - cannot do this because this will give timeout after evach duration since we ussing HTTP Pooling here
+                .send()
+                .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    error!("Failed to connect: {}", e);
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    continue; // retry
                 }
+            };
 
-                info!("Listening for new slots, epochs and sync committee updates...");
-                let mut stream = response.bytes_stream();
+            if !response.status().is_success() {
+                error!("Got non-200: {}", response.status());
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                continue; // retry
+            }
 
-                while let Some(chunk) = stream.next().await {
-                    match chunk {
-                        Ok(bytes) => {
-                            if let Ok(event_text) = String::from_utf8(bytes.to_vec()) {
-                                // Preprocess the event text
-                                if let Some(json_data) =
-                                    helpers::extract_json_from_event(&event_text)
-                                {
-                                    match serde_json::from_str::<HeadEvent>(&json_data) {
-                                        Ok(parsed_event) => {
-                                            let epoch_id =
-                                                helpers::slot_to_epoch_id(parsed_event.slot);
-                                            let sync_committee_id =
-                                                helpers::slot_to_sync_committee_id(
-                                                    parsed_event.slot,
-                                                );
-                                            info!(
+            info!("Listening for new slots...");
+
+            let mut stream = response.bytes_stream();
+
+            while let chunk_result = timeout(Duration::from_secs(30), stream.next()).await {
+                match chunk_result {
+                    // Timed out; handle it locally
+                    Err(_elapsed) => {
+                        warn!(
+                            "Timed out waiting for new slot beacon chain event chunk. Maybe some slots was skipped. Will reconnect..."
+                        );
+                        break;
+                    }
+                    Ok(Some(Ok(bytes))) => {
+                        if let Ok(event_text) = String::from_utf8(bytes.to_vec()) {
+                            // Preprocess the event text
+                            if let Some(json_data) = helpers::extract_json_from_event(&event_text) {
+                                match serde_json::from_str::<HeadEvent>(&json_data) {
+                                    Ok(parsed_event) => {
+                                        let epoch_id = helpers::slot_to_epoch_id(parsed_event.slot);
+                                        let sync_committee_id =
+                                            helpers::slot_to_sync_committee_id(parsed_event.slot);
+                                        info!(
                                                 "[EVENT] New beacon slot detected: {} |  Block: {} | Epoch: {} | Sync committee: {} | Is epoch transition: {}",
                                                 parsed_event.slot, parsed_event.block, epoch_id, sync_committee_id, parsed_event.epoch_transition
                                             );
 
-                                            handle_beacon_chain_head_event(
-                                                parsed_event,
-                                                bankai_for_listener.clone(),
-                                                db_manager_for_listener.clone(),
-                                                tx_for_listener.clone(),
-                                            )
-                                            .await;
-                                        }
-                                        Err(err) => {
-                                            warn!("Failed to parse JSON data: {}", err);
-                                        }
+                                        handle_beacon_chain_head_event(
+                                            parsed_event,
+                                            bankai_for_listener.clone(),
+                                            db_manager_for_listener.clone(),
+                                            tx_for_listener.clone(),
+                                        )
+                                        .await;
                                     }
-                                } else {
-                                    warn!("No valid JSON data found in event: {}", event_text);
+                                    Err(err) => {
+                                        warn!("Failed to parse JSON data: {}", err);
+                                    }
                                 }
+                            } else {
+                                warn!("No valid JSON data found in event: {}", event_text);
                             }
                         }
-                        Err(err) => {
-                            warn!("Error reading event stream: {}", err);
-                        }
+                    }
+                    Ok(Some(Err(e))) => {
+                        warn!("Beacon chain client stream error: {}", e);
+                        break; // break the while, then reconnect
+                    }
+                    Ok(None) => {
+                        warn!("Beacon chain client stream ended");
+                        // Stream ended
+                        break;
                     }
                 }
             }
-        });
-    }
+            // If we got here because of `timeout` returning `Err(_)`, that means 30s
+            // passed without a single chunk of data arriving or
+            // the RPC server has closed connection or some other unknown network error occured
+
+            // If we exit the while, we reconnect in the outer loop
+            info!("Reconnecting to beacon node...");
+        }
+    });
+
+    // // Send the request to the Beacon node
+    // let response = http_stream_client
+    //     .get(&events_endpoint)
+    //     .send()
+    //     .await
+    //     .unwrap();
+
+    // //enqueue_sync_committee_jobs();
+    // //enqueue_batch_epochs_jobs();
+
+    // if slot_listener_toggle {
+    //     tokio::spawn(async move {
+    //         let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+    //         loop {
+    //             interval.tick().await;
+    //             info!("[HEARTBEAT] Slot listener is alive");
+    //         }
+    //     });
+    //     // Check if response is successful; if not, bail out early
+    //     // TODO: need to implement resilience and potentialy use multiple providers (implement something like fallbackprovider functionality in ethers), handle reconnection if connection is lost for various reasons
+    //     if !response.status().is_success() {
+    //         error!("Failed to connect: HTTP {}", response.status());
+    //         return;
+    //     }
+
+    //     info!("Listening for new slots, epochs and sync committee updates...");
+    //     let mut stream = response.bytes_stream();
+
+    //     while let Some(chunk) = stream.next().await {
+    //         match chunk {
+    //             Ok(bytes) => {
+    //                 if let Ok(event_text) = String::from_utf8(bytes.to_vec()) {
+    //                     // Preprocess the event text
+    //                     if let Some(json_data) = helpers::extract_json_from_event(&event_text) {
+    //                         match serde_json::from_str::<HeadEvent>(&json_data) {
+    //                             Ok(parsed_event) => {
+    //                                 let epoch_id = helpers::slot_to_epoch_id(parsed_event.slot);
+    //                                 let sync_committee_id =
+    //                                     helpers::slot_to_sync_committee_id(parsed_event.slot);
+    //                                 info!(
+    //                                             "[EVENT] New beacon slot detected: {} |  Block: {} | Epoch: {} | Sync committee: {} | Is epoch transition: {}",
+    //                                             parsed_event.slot, parsed_event.block, epoch_id, sync_committee_id, parsed_event.epoch_transition
+    //                                         );
+
+    //                                 handle_beacon_chain_head_event(
+    //                                     parsed_event,
+    //                                     bankai_for_listener.clone(),
+    //                                     db_manager_for_listener.clone(),
+    //                                     tx_for_listener.clone(),
+    //                                 )
+    //                                 .await;
+    //                             }
+    //                             Err(err) => {
+    //                                 warn!("Failed to parse JSON data: {}", err);
+    //                             }
+    //                         }
+    //                     } else {
+    //                         warn!("No valid JSON data found in event: {}", event_text);
+    //                     }
+    //                 }
+    //             }
+    //             Err(err) => {
+    //                 warn!("Error reading event stream: {}", err);
+    //             }
+    //         }
+    //     }
+    // }
 
     // Wait for the server task to finish
     server_task.await?;
@@ -388,22 +479,22 @@ async fn handle_beacon_chain_head_event(
                 == latest_scheduled_epoch
             {
                 // We reached end of current sync committee, need to schedule new sync committee proving
-                // match run_sync_committee_update_job(
-                //     db_manager.clone(),
-                //     currently_processed_sync_committee_id + 1,
-                //     tx.clone(),
-                // )
-                // .await
-                // {
-                //     Ok(()) => {}
-                //     Err(e) => {
-                //         error!("Error while creating sync committee update job: {}", e);
-                //     }
-                // };
+                match run_sync_committee_update_job(
+                    db_manager.clone(),
+                    currently_processed_sync_committee_id + 1,
+                    tx.clone(),
+                )
+                .await
+                {
+                    Ok(()) => {}
+                    Err(e) => {
+                        error!("Error while creating sync committee update job: {}", e);
+                    }
+                };
             }
 
             let epoch_to_start_from = latest_scheduled_epoch + 1;
-            let mut epoch_to_end_on = latest_scheduled_epoch + 1 + constants::TARGET_BATCH_SIZE; // To create batch with size of constants::TARGET_BATCH_SIZE epochs
+            let mut epoch_to_end_on = latest_scheduled_epoch + constants::TARGET_BATCH_SIZE; // To create batch with size of constants::TARGET_BATCH_SIZE epochs
 
             // Edge cases handling //
             // Handle the edge case where there is only one epoch in batch left to proccess and this epoch is last epoch in sync committee, if we follow the betch size of 32 always, this souldnt happen:
@@ -457,7 +548,7 @@ async fn handle_beacon_chain_head_event(
         );
 
         let epoch_to_start_from = latest_scheduled_epoch + 1;
-        let epoch_to_end_on = latest_scheduled_epoch + 1 + constants::TARGET_BATCH_SIZE;
+        let epoch_to_end_on = latest_scheduled_epoch + constants::TARGET_BATCH_SIZE;
         match run_batch_epoch_update_job(
             db_manager.clone(),
             get_first_slot_for_epoch(epoch_to_start_from)
@@ -659,7 +750,7 @@ async fn broadcast_onchain_ready_jobs(
                 //     )
                 //     .await?;
             }
-            JobType::EpochUpdate => {}
+            //JobType::EpochUpdate => {}
             JobType::SyncCommitteeUpdate => {
                 let update = SyncCommitteeUpdate::from_json::<SyncCommitteeUpdate>(
                     job.slot.to_u64().unwrap(),
@@ -992,160 +1083,6 @@ async fn process_job(
             db_manager
                 .update_job_status(job.job_id, JobStatus::OffchainComputationFinished)
                 .await?;
-        }
-        JobType::EpochUpdate => {
-            // Epoch job
-            info!(
-                "[EPOCH JOB] Started processing epoch job: {} for epoch {}",
-                job.job_id, job.slot
-            );
-
-            //update_job_status(&db_client, job.job_id, JobStatus::Created).await?;
-
-            // 1) Fetch the latest on-chain verified epoch
-            // let latest_epoch_slot = bankai
-            //     .starknet_client
-            //     .get_latest_epoch_slot(&bankai.config)
-            //     .await?;
-
-            // info!(
-            //     "[EPOCH JOB] Latest onchain verified epoch slot: {}",
-            //     latest_epoch_slot
-            // );
-
-            //let latest_epoch_slot = ;
-
-            // make sure next_epoch % 32 == 0
-            // let next_epoch = (u64::try_from(job.slot).unwrap() / constants::SLOTS_PER_EPOCH)
-            //     * constants::SLOTS_PER_EPOCH
-            //     + constants::SLOTS_PER_EPOCH;
-            // info!(
-            //     "[EPOCH JOB] Fetching Inputs for next Epoch: {}...",
-            //     next_epoch
-            // );
-
-            // // 2) Fetch the proof
-            // let proof = bankai.get_epoch_proof(next_epoch).await?;
-            // info!(
-            //     "[EPOCH JOB] Fetched Inputs successfully for Epoch: {}",
-            //     next_epoch
-            // );
-
-            // db_manager
-            //     .update_job_status(job.job_id, JobStatus::ProgramInputsPrepared)
-            //     .await?;
-
-            // // 3) Generate PIE
-            // info!(
-            //     "[EPOCH JOB] Starting Cairo execution and PIE generation for Epoch: {}...",
-            //     next_epoch
-            // );
-
-            // CairoRunner::generate_pie(&proof, &bankai.config).await?;
-
-            // info!(
-            //     "[EPOCH JOB] Pie generated successfully for Epoch: {}...",
-            //     next_epoch
-            // );
-
-            // db_manager
-            //     .update_job_status(job.job_id, JobStatus::PieGenerated)
-            //     .await?;
-
-            // // 4) Submit offchain proof-generation job to Atlantic
-            // info!("[EPOCH JOB] Sending proof generation query to Atlantic...");
-
-            // let batch_id = bankai.atlantic_client.submit_batch(proof).await?;
-
-            // info!(
-            //     "[EPOCH JOB] Proof generation batch submitted to Atlantic. QueryID: {}",
-            //     batch_id
-            // );
-
-            // update_job_status(&db_client, job.job_id, JobStatus::OffchainProofRequested).await?;
-            // set_atlantic_job_queryid(
-            //     &db_client,
-            //     job.job_id,
-            //     batch_id.clone(),
-            //     AtlanticJobType::ProofGeneration,
-            // )
-            // .await?;
-
-            // // Pool for Atlantic execution done
-            // bankai
-            //     .atlantic_client
-            //     .poll_batch_status_until_done(&batch_id, Duration::new(10, 0), usize::MAX)
-            //     .await?;
-
-            // info!(
-            //     "[EPOCH JOB] Proof generation done by Atlantic. QueryID: {}",
-            //     batch_id
-            // );
-
-            // let proof = bankai
-            //     .atlantic_client
-            //     .fetch_proof(batch_id.as_str())
-            //     .await?;
-
-            // info!(
-            //     "[EPOCH JOB] Proof retrieved from Atlantic. QueryID: {}",
-            //     batch_id
-            // );
-
-            // update_job_status(&db_client, job.job_id, JobStatus::OffchainProofRetrieved).await?;
-
-            // // 5) Submit wrapped proof request
-            // info!("[EPOCH JOB] Sending proof wrapping query to Atlantic..");
-            // let wrapping_batch_id = bankai.atlantic_client.submit_wrapped_proof(proof).await?;
-            // info!(
-            //     "[EPOCH JOB] Proof wrapping query submitted to Atlantic. Wrapping QueryID: {}",
-            //     wrapping_batch_id
-            // );
-
-            // update_job_status(&db_client, job.job_id, JobStatus::WrapProofRequested).await?;
-            // set_atlantic_job_queryid(
-            //     &db_client,
-            //     job.job_id,
-            //     wrapping_batch_id.clone(),
-            //     AtlanticJobType::ProofWrapping,
-            // )
-            // .await?;
-
-            // // Pool for Atlantic execution done
-            // bankai
-            //     .atlantic_client
-            //     .poll_batch_status_until_done(&wrapping_batch_id, Duration::new(10, 0), usize::MAX)
-            //     .await?;
-
-            // update_job_status(&db_client, job.job_id, JobStatus::WrappedProofDone).await?;
-
-            // info!("[EPOCH JOB] Proof wrapping done by Atlantic. Fact registered on Integrity. Wrapping QueryID: {}", wrapping_batch_id);
-
-            // update_job_status(&db_client, job.job_id, JobStatus::VerifiedFactRegistered).await?;
-
-            // // 6) Submit epoch update onchain
-            // info!("[EPOCH JOB] Calling epoch update onchain...");
-            // let update = EpochUpdate::from_json::<EpochUpdate>(next_epoch)?;
-
-            // let txhash = bankai
-            //     .starknet_client
-            //     .submit_update(update.expected_circuit_outputs, &bankai.config)
-            //     .await?;
-
-            // set_job_txhash(&db_client, job.job_id, txhash).await?;
-
-            // info!("[EPOCH JOB] Successfully submitted epoch update...");
-
-            // update_job_status(&db_client, job.job_id, JobStatus::ProofDecommitmentCalled).await?;
-
-            // Now we can get proof from contract?
-            // bankai.starknet_client.get_epoch_proof(
-            //     &self,
-            //     slot: u64,
-            //     config: &BankaiConfig)
-
-            // Insert data to DB after successful onchain epoch verification
-            // insert_verified_epoch(&db_client, job.slot / 0x2000, epoch_proof).await?;
         }
     }
 
