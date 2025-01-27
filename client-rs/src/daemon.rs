@@ -24,7 +24,9 @@ use bankai_client::BankaiClient;
 use config::BankaiConfig;
 //use constants::SLOTS_PER_EPOCH;
 use dotenv::from_filename;
-use helpers::{get_first_epoch_for_sync_committee, get_first_slot_for_epoch};
+use helpers::{
+    get_first_epoch_for_sync_committee, get_first_slot_for_epoch, get_last_epoch_for_sync_committee,
+};
 use num_traits::cast::ToPrimitive;
 use reqwest;
 use starknet::core::types::Felt;
@@ -34,10 +36,10 @@ use state::{AtlanticJobType, Error, JobStatus, JobType};
 use std::env;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tokio::task;
+use tokio::{signal, task};
 use tokio_stream::StreamExt;
 use tower::ServiceBuilder;
-use tower_http::trace::TraceLayer;
+use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 use tracing::{debug, error, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 use utils::{cairo_runner::CairoRunner, database_manager::DatabaseManager};
@@ -57,7 +59,7 @@ use sync_committee::SyncCommitteeUpdate;
 use tokio::time::{timeout, Duration};
 use uuid::Uuid;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Load .env.sepolia file
     from_filename(".env.sepolia").ok();
@@ -175,6 +177,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .layer(
             ServiceBuilder::new().layer(TraceLayer::new_for_http()), // Example: for logging/tracing
         )
+        .layer((
+            // Graceful shutdown will wait for outstanding requests to complete
+            // Because of this timeourt setting, requests don't hang forever
+            TimeoutLayer::new(Duration::from_secs(10)),
+        ))
         .with_state(app_state);
 
     let addr = "0.0.0.0:3000".parse::<SocketAddr>()?;
@@ -183,8 +190,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Bankai RPC HTTP server is listening on http://{}", addr);
 
     let server_task = tokio::spawn(async move {
-        let _ = axum::serve(listener, app).await;
+        let _ = axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown_signal())
+            .await
+            .unwrap();
     });
+
+    //enqueue_sync_committee_jobs();
+    //enqueue_batch_epochs_jobs();
+    //
 
     // Listen for the new slots on BeaconChain
     // Create an HTTP client
@@ -192,9 +206,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     tokio::spawn(async move {
         loop {
+            // Send the request to the Beacon node
             let response = match http_stream_client
                 .get(&events_endpoint)
-                //.timeout(std::time::Duration::from_secs(30)) - cannot do this because this will give timeout after evach duration since we ussing HTTP Pooling here
+                //.timeout(std::time::Duration::from_secs(30)) - cannot do this because this will give timeout after evach duration since we not using HTTP Pooling here but HTTP streaming
                 .send()
                 .await
             {
@@ -212,7 +227,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 continue; // retry
             }
 
-            info!("Listening for new slots...");
+            info!("Listening for new slots, epochs and sync committee updates...");
 
             let mut stream = response.bytes_stream();
 
@@ -275,74 +290,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             info!("Reconnecting to beacon node...");
         }
     });
-
-    // // Send the request to the Beacon node
-    // let response = http_stream_client
-    //     .get(&events_endpoint)
-    //     .send()
-    //     .await
-    //     .unwrap();
-
-    // //enqueue_sync_committee_jobs();
-    // //enqueue_batch_epochs_jobs();
-
-    // if slot_listener_toggle {
-    //     tokio::spawn(async move {
-    //         let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
-    //         loop {
-    //             interval.tick().await;
-    //             info!("[HEARTBEAT] Slot listener is alive");
-    //         }
-    //     });
-    //     // Check if response is successful; if not, bail out early
-    //     // TODO: need to implement resilience and potentialy use multiple providers (implement something like fallbackprovider functionality in ethers), handle reconnection if connection is lost for various reasons
-    //     if !response.status().is_success() {
-    //         error!("Failed to connect: HTTP {}", response.status());
-    //         return;
-    //     }
-
-    //     info!("Listening for new slots, epochs and sync committee updates...");
-    //     let mut stream = response.bytes_stream();
-
-    //     while let Some(chunk) = stream.next().await {
-    //         match chunk {
-    //             Ok(bytes) => {
-    //                 if let Ok(event_text) = String::from_utf8(bytes.to_vec()) {
-    //                     // Preprocess the event text
-    //                     if let Some(json_data) = helpers::extract_json_from_event(&event_text) {
-    //                         match serde_json::from_str::<HeadEvent>(&json_data) {
-    //                             Ok(parsed_event) => {
-    //                                 let epoch_id = helpers::slot_to_epoch_id(parsed_event.slot);
-    //                                 let sync_committee_id =
-    //                                     helpers::slot_to_sync_committee_id(parsed_event.slot);
-    //                                 info!(
-    //                                             "[EVENT] New beacon slot detected: {} |  Block: {} | Epoch: {} | Sync committee: {} | Is epoch transition: {}",
-    //                                             parsed_event.slot, parsed_event.block, epoch_id, sync_committee_id, parsed_event.epoch_transition
-    //                                         );
-
-    //                                 handle_beacon_chain_head_event(
-    //                                     parsed_event,
-    //                                     bankai_for_listener.clone(),
-    //                                     db_manager_for_listener.clone(),
-    //                                     tx_for_listener.clone(),
-    //                                 )
-    //                                 .await;
-    //                             }
-    //                             Err(err) => {
-    //                                 warn!("Failed to parse JSON data: {}", err);
-    //                             }
-    //                         }
-    //                     } else {
-    //                         warn!("No valid JSON data found in event: {}", event_text);
-    //                     }
-    //                 }
-    //             }
-    //             Err(err) => {
-    //                 warn!("Error reading event stream: {}", err);
-    //             }
-    //         }
-    //     }
-    // }
 
     // Wait for the server task to finish
     server_task.await?;
@@ -686,7 +633,12 @@ async fn evaluate_jobs_statuses(
     // We calculating the start and end epoch for provided last verified sync committe
     // and setting READY_TO_BROADCAST status for epochs up to the last epoch belonging to provided latest_verified_sync_committee_id
     let first_epoch = get_first_epoch_for_sync_committee(latest_verified_sync_committee_id);
-    let last_epoch = get_first_epoch_for_sync_committee(latest_verified_sync_committee_id);
+    let last_epoch = get_last_epoch_for_sync_committee(latest_verified_sync_committee_id);
+
+    info!(
+        "Evaluating jobs for epochs range from {} to {}, for sync committee {}",
+        first_epoch, last_epoch, latest_verified_sync_committee_id
+    );
 
     db_manager
         .set_ready_to_broadcast_for_batch_epochs(first_epoch, last_epoch) // Set READY_TO_BROADCAST when OFFCHAIN_COMPUTATION_FINISHED
@@ -1087,4 +1039,32 @@ async fn process_job(
     }
 
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            info!("Gracefully shutting down...");
+        },
+        _ = terminate => {
+            info!("Gracefully shutting down...");
+        },
+    }
 }
