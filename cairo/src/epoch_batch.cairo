@@ -9,6 +9,7 @@ from starkware.cairo.common.builtin_poseidon.poseidon import (
 )
 from starkware.cairo.common.memcpy import memcpy
 from starkware.cairo.common.memset import memset
+from starkware.cairo.common.math import assert_lt
 from cairo.src.merkle import PoseidonMerkleTree
 from cairo.src.verify_epoch import run_epoch_update
 
@@ -44,7 +45,7 @@ func main{
         let (epoch_outputs: felt*) = alloc();
         let (latest_batch_output: felt*) = run_epoch_batches{
             output_ptr=epoch_outputs,
-        }(0, batch_len, committee_hash);
+        }(0, batch_len, committee_hash, 0);
 
         // ToDo: ensure this can stay unvalidated
         local next_power_of_2: felt; // Unvalidated hint.
@@ -95,7 +96,7 @@ func run_epoch_batches{
     mul_mod_ptr: ModBuiltin*,
     pow2_array: felt*,
     sha256_ptr: felt*,
-}(index: felt, batch_len: felt, committee_hash: Uint256) -> (latest_batch_output: felt*) {
+}(index: felt, batch_len: felt, committee_hash: Uint256, previous_epoch_slot: felt) -> (latest_batch_output: felt*) {
     alloc_locals;
 
     %{ vm_enter_scope({'program_input': program_input["circuit_inputs"]["epochs"][ids.index]}) %}
@@ -110,10 +111,12 @@ func run_epoch_batches{
     let epoch_output = epoch_output - 11;
     %{ vm_exit_scope() %}
 
+    // Verify the slot number matches what we expect
+    let current_slot = epoch_output[4];
+    assert_lt(previous_epoch_slot, current_slot);
+
     // Ensure we only process batches using the predetermined committee hash
     // This is important to ensure we dont batch epochs that use an unknown committee
-    // ToDo: it can be argued that this is underconstrained. We never enforce the order of the slots. 
-    // Personally, I think in the context of the sync committee this is fine.
     assert committee_hash.low = epoch_output[5];
     assert committee_hash.high = epoch_output[6];
 
@@ -126,7 +129,7 @@ func run_epoch_batches{
     }
 
     // Otherwise, run the next batch
-    return run_epoch_batches(index=index + 1, batch_len=batch_len, committee_hash=committee_hash);
+    return run_epoch_batches(index=index + 1, batch_len=batch_len, committee_hash=committee_hash, previous_epoch_slot=current_slot);
 }
 
 // The when batching, we want to compute one hash per epoch update.
