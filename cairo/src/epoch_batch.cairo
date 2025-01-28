@@ -57,8 +57,6 @@ func main{
                 return power
                 
             ids.next_power_of_2 = next_power_of_2(ids.batch_len)
-
-            print("next power of 2", ids.next_power_of_2)
         %}
 
         // Pad the epoch outputs with zeros to the next power of 2

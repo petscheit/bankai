@@ -221,6 +221,10 @@ pub mod BankaiContract {
             execution_hash: u256,
             execution_height: u64,
         ) {
+            // Add slot validation
+            let latest_epoch = self.latest_epoch.read();
+            assert(slot > latest_epoch, 'Slot must be higher!');
+            
             // println!("verify_epoch_update");
             let signing_committee_id = (slot / 0x2000);
             let valid_committee_hash = self.committee.read(signing_committee_id);
@@ -254,6 +258,10 @@ pub mod BankaiContract {
             execution_hash: u256,
             execution_height: u64,
         ) {
+            // Add slot validation
+            let latest_epoch = self.latest_epoch.read();
+            assert(slot > latest_epoch, 'Slot must be higher!');
+            
             let signing_committee_id = (slot / 0x2000);
             let valid_committee_hash = self.committee.read(signing_committee_id);
             assert(committee_hash == valid_committee_hash, 'Invalid Committee Hash!');
@@ -299,13 +307,10 @@ pub mod BankaiContract {
             let computed_root = hash_path(leaf, merkle_path, merkle_index);
             assert(computed_root == batch_root, 'Invalid Batch Merkle Root!');
 
-
             let epoch_proof = EpochProof {
                 header_root: header_root, beacon_state_root: beacon_state_root, n_signers: n_signers, execution_hash: execution_hash, execution_height: execution_height,
             };
             self.epochs.write(slot, epoch_proof);
-
-            self.latest_epoch.write(slot);
             self.emit(Event::EpochDecommitted(EpochDecommitted {
                 batch_root: batch_root, slot: slot, execution_hash: execution_hash, execution_height: execution_height,
             }));
@@ -313,7 +318,6 @@ pub mod BankaiContract {
 
     }
 
-   
     fn compute_committee_proof_fact_hash(
         self: @ContractState, beacon_state_root: u256, committee_hash: u256, slot: u64,
     ) -> felt252 {
@@ -395,183 +399,3 @@ pub mod BankaiContract {
         integrity.is_fact_hash_valid(fact_hash)
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::{BankaiContract, IBankaiContract};
-//     use starknet::testing::{set_caller_address};
-//     use starknet::ContractAddress;
-
-//     // Add this struct and function before your test functions
-//     #[derive(Drop, Clone)]
-//     struct TestFixture {
-//         committee_id: u64,
-//         committee_hash: u256,
-//         committee_update_program_hash: felt252,
-//         epoch_update_program_hash: felt252,
-//         owner: ContractAddress,
-//     }
-
-//     #[derive(Drop, Clone)]
-//     struct EpochUpdateFixture {
-//         header_root: u256,
-//         state_root: u256,
-//         committee_hash: u256,
-//         n_signers: u64,
-//         slot: u64,
-//     }
-
-//     #[derive(Drop, Clone)]
-//     struct CommitteeUpdateFixture {
-//         slot: u64,
-//         state_root: u256,
-//         new_committee_hash: u256,
-//         expected_committee_id: u64,
-//     }
-
-//     fn setup_fixture() -> TestFixture {
-//         TestFixture {
-//             committee_id: 1,
-//             committee_hash: 0x111_u256,
-//             committee_update_program_hash: 0xdead_felt252,
-//             epoch_update_program_hash: 0xbeef_felt252,
-//             owner: starknet::contract_address_const::<0x123>(),
-//         }
-//     }
-
-//     fn get_epoch_update_fixture(index: u8) -> EpochUpdateFixture {
-//         match index {
-//             0 => EpochUpdateFixture {
-//                 header_root: 0xbbb_u256,
-//                 state_root: 0xbbb_u256,
-//                 committee_hash: 0x111_u256, // Matches initial committee hash from setup_fixture
-//                 n_signers: 512,
-//                 slot: 8192 // First term
-//             },
-//             1 => EpochUpdateFixture {
-//                 header_root: 0xccc_u256,
-//                 state_root: 0xccc_u256,
-//                 committee_hash: 0x222_u256, // Matches new committee hash from committee update fixture
-//                 n_signers: 384,
-//                 slot: 16384 // Second term
-//             },
-//             _ => EpochUpdateFixture {
-//                 header_root: 0xddd_u256,
-//                 state_root: 0xddd_u256,
-//                 committee_hash: 0x333_u256,
-//                 n_signers: 256,
-//                 slot: 24576 // Third term
-//             },
-//         }
-//     }
-
-//     fn get_committee_update_fixture(index: u8) -> CommitteeUpdateFixture {
-//         match index {
-//             0 => CommitteeUpdateFixture {
-//                 slot: 8192, // First term
-//                 state_root: 0xbbb_u256,
-//                 new_committee_hash: 0x222_u256,
-//                 expected_committee_id: 2 // slot/0x2000 + 1
-//             },
-//             _ => CommitteeUpdateFixture {
-//                 slot: 16384, // Second term
-//                 state_root: 0xccc_u256,
-//                 new_committee_hash: 0x333_u256,
-//                 expected_committee_id: 3 // slot/0x2000 + 1
-//             },
-//         }
-//     }
-
-//     // Helper function to deploy the contract
-//     fn deploy(fixture: TestFixture) -> BankaiContract::ContractState {
-//         let mut state = BankaiContract::contract_state_for_testing();
-//         BankaiContract::constructor(
-//             ref state,
-//             fixture.committee_id,
-//             fixture.committee_hash,
-//             fixture.committee_update_program_hash,
-//             fixture.epoch_update_program_hash,
-//             // fixture.init_slot,
-//         // fixture.init_header_root,
-//         // fixture.init_state_root,
-//         // fixture.init_n_signers,
-//         );
-//         state
-//     }
-
-//     // Example of how to update your test to use the fixture
-//     #[test]
-//     fn test_deploy() {
-//         let fixture = setup_fixture();
-//         set_caller_address(fixture.owner);
-
-//         let state = deploy(fixture.clone());
-
-//         assert_eq!(state.get_committee_hash(fixture.committee_id), fixture.committee_hash);
-//         assert_eq!(state.get_latest_epoch(), 0);
-//         assert_eq!(
-//             state.get_committee_update_program_hash(), fixture.committee_update_program_hash,
-//         );
-//         assert_eq!(state.get_epoch_update_program_hash(), fixture.epoch_update_program_hash);
-//     }
-
-//     #[test]
-//     fn test_epoch_update_with_fixtures() {
-//         let fixture = setup_fixture();
-//         let epoch_fixture = get_epoch_update_fixture(0); // Use first fixture
-//         set_caller_address(fixture.owner);
-
-//         let mut state = deploy(fixture.clone());
-//         println!("deploy success");
-
-//         // First update should succeed
-//         state
-//             .verify_epoch_update(
-//                 epoch_fixture.header_root,
-//                 epoch_fixture.state_root,
-//                 epoch_fixture.committee_hash,
-//                 epoch_fixture.n_signers,
-//                 epoch_fixture.slot,
-//             );
-
-//         // Verify the epoch was stored correctly
-//         let stored_epoch = state.get_epoch_proof(epoch_fixture.slot);
-//         assert_eq!(stored_epoch.header_root, epoch_fixture.header_root);
-//         assert_eq!(stored_epoch.state_root, epoch_fixture.state_root);
-//         assert_eq!(stored_epoch.n_signers, epoch_fixture.n_signers);
-
-//         println!("first epoch update success");
-
-//         let committee_update = get_committee_update_fixture(0);
-//         state
-//             .verify_committee_update(
-//                 committee_update.state_root,
-//                 committee_update.new_committee_hash,
-//                 committee_update.slot,
-//             );
-
-//         println!("committee update success");
-
-//         assert_eq!(
-//             state.get_committee_hash(committee_update.expected_committee_id),
-//             committee_update.new_committee_hash,
-//         );
-
-//         let epoch_fixture = get_epoch_update_fixture(1);
-//         state
-//             .verify_epoch_update(
-//                 epoch_fixture.header_root,
-//                 epoch_fixture.state_root,
-//                 epoch_fixture.committee_hash,
-//                 epoch_fixture.n_signers,
-//                 epoch_fixture.slot,
-//             );
-
-//         println!("second epoch update success");
-
-//         assert_eq!(
-//             state.get_committee_hash(committee_update.expected_committee_id),
-//             committee_update.new_committee_hash,
-//         );
-//     }
-// }
