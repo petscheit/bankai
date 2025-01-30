@@ -55,9 +55,8 @@ impl EpochUpdateBatch {
 
         // Fetch epochs sequentially from start_slot to end_slot, incrementing by 32 each time
         let mut current_slot = start_slot;
-        while current_slot <= end_slot {
+        while current_slot < end_slot {
             let epoch_update = EpochUpdate::new(&bankai.client, current_slot).await?;
-
             epochs.push(epoch_update);
             current_slot += 32;
         }
