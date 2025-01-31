@@ -5,3 +5,5 @@ pub const EPOCHS_PER_SYNC_COMMITTEE: u64 = 256; // For mainnet
 pub const MAX_CONCURRENT_JOBS_IN_PROGRESS: u64 = 3; // Define the limit of how many jobs can be in state "in progress" concurrently
 pub const MAX_CONCURRENT_PIE_GENERATIONS: usize = 1; // Define how many concurrent trace (pie file) generation jobs are allowed to not exhaust resources
 pub const MAX_CONCURRENT_RPC_DATA_FETCH_JOBS: usize = 1; // Define how many data fetching jobs can be performed concurrently to not overload RPC
+pub const STARKNET_SEPOLIA: &str = "0x534e5f5345504f4c4941";
+pub const STARKNET_MAINNET: &str = "0x534e5f4d41494e";

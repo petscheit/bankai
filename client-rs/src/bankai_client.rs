@@ -5,6 +5,7 @@ use crate::{
     sync_committee::SyncCommitteeUpdate,
     utils::{
         atlantic_client::AtlanticClient, rpc::BeaconRpcClient, starknet_client::StarknetClient,
+        transactor_client::TransactorClient,
     },
     BankaiConfig,
 };
@@ -18,6 +19,7 @@ pub struct BankaiClient {
     pub starknet_client: StarknetClient,
     pub config: BankaiConfig,
     pub atlantic_client: AtlanticClient,
+    pub transactor_client: TransactorClient,
 }
 
 impl BankaiClient {
@@ -36,6 +38,10 @@ impl BankaiClient {
             atlantic_client: AtlanticClient::new(
                 config.atlantic_endpoint.clone(),
                 env::var("ATLANTIC_API_KEY").unwrap(),
+            ),
+            transactor_client: TransactorClient::new(
+                config.transactor_endpoint.clone(),
+                env::var("TRANSACTOR_API_KEY").unwrap(),
             ),
             config,
         }

@@ -1,4 +1,6 @@
-use crate::constants::{MAX_CONCURRENT_PIE_GENERATIONS, MAX_CONCURRENT_RPC_DATA_FETCH_JOBS};
+use crate::constants::{
+    MAX_CONCURRENT_PIE_GENERATIONS, MAX_CONCURRENT_RPC_DATA_FETCH_JOBS, STARKNET_SEPOLIA,
+};
 use starknet::core::types::Felt;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
@@ -15,8 +17,10 @@ pub struct BankaiConfig {
     pub epoch_batch_circuit_path: String,
     pub committee_circuit_path: String,
     pub atlantic_endpoint: String,
+    pub transactor_endpoint: String,
     pub pie_generation_semaphore: Arc<Semaphore>,
     pub epoch_data_fetching_semaphore: Arc<Semaphore>,
+    pub proof_settlement_chain_id: Felt,
 }
 
 impl Default for BankaiConfig {
@@ -48,11 +52,13 @@ impl Default for BankaiConfig {
             epoch_batch_circuit_path: "../cairo/build/epoch_batch.json".to_string(),
             committee_circuit_path: "../cairo/build/committee_update.json".to_string(),
             atlantic_endpoint: "https://atlantic.api.herodotus.cloud".to_string(),
+            transactor_endpoint: "https://staging.api.herodotus.cloud".to_string(),
             // Set how many concurrent pie generation (trace generation) tasks are allowed
             pie_generation_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_PIE_GENERATIONS)), // 3 at once
             epoch_data_fetching_semaphore: Arc::new(Semaphore::new(
                 MAX_CONCURRENT_RPC_DATA_FETCH_JOBS,
             )), // 2 at once
+            proof_settlement_chain_id: Felt::from_hex(STARKNET_SEPOLIA).unwrap(),
         }
     }
 }

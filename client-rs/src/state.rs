@@ -156,6 +156,7 @@ pub fn check_env_vars() -> Result<(), String> {
         "POSTGRESQL_DB_NAME",
         "RPC_LISTEN_HOST",
         "RPC_LISTEN_PORT",
+        "TRANSACTOR_API_KEY",
     ];
 
     for &var in &required_vars {
@@ -201,6 +202,7 @@ pub enum Error {
     PoolingTimeout(String),
     InvalidMerkleTree,
     DatabaseError(String),
+    TransactorError(reqwest::Error),
 }
 
 impl fmt::Display for Error {
@@ -224,6 +226,7 @@ impl fmt::Display for Error {
             Error::PoolingTimeout(msg) => write!(f, "Pooling timeout: {}", msg),
             Error::InvalidMerkleTree => write!(f, "Invalid Merkle Tree"),
             Error::DatabaseError(msg) => write!(f, "Database error: {}", msg),
+            Error::TransactorError(msg) => write!(f, "Transactor error: {}", msg),
         }
     }
 }
