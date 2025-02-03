@@ -166,8 +166,6 @@ mod tests {
             index
         );
 
-        println!("Computed root: {:?}", computed_root);
-
         // Expected root is the first value in the JSON array (0x0)
         let expected_root = 3014209719831846118507369742452047831482182187060364606511726060971609846063;
         

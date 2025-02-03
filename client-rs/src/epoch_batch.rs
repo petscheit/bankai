@@ -77,7 +77,6 @@ impl EpochUpdateBatch {
                 TARGET_BATCH_SIZE
             );
             let epoch_update = EpochUpdate::new(&bankai.client, current_slot).await?;
-
             epochs.push(epoch_update);
             current_slot += 32;
             //info!("epochspush");

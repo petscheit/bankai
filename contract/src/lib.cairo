@@ -59,6 +59,17 @@ pub trait IBankaiContract<TContractState> {
         execution_hash: u256,
         execution_height: u64,
     );
+
+    fn propose_program_hash_update(
+        ref self: TContractState,
+        new_committee_hash: felt252,
+        new_epoch_hash: felt252,
+        new_batch_hash: felt252
+    );
+    fn execute_program_hash_update(ref self: TContractState);
+    fn pause(ref self: TContractState);
+    fn unpause(ref self: TContractState);
+    fn is_paused(self: @TContractState) -> bool;
 }
 
 pub mod utils;
@@ -69,7 +80,7 @@ pub mod BankaiContract {
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
     };
-    use starknet::{ContractAddress, get_caller_address};
+    use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
     use integrity::{
         Integrity, IntegrityWithConfig, SHARP_BOOTLOADER_PROGRAM_HASH, VerifierConfiguration,
     };
@@ -80,7 +91,9 @@ pub mod BankaiContract {
         CommitteeUpdated: CommitteeUpdated,
         EpochUpdated: EpochUpdated,
         EpochBatch: EpochBatch,
-        EpochDecommitted: EpochDecommitted
+        EpochDecommitted: EpochDecommitted,
+        Paused: Paused,
+        Unpaused: Unpaused,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -118,20 +131,43 @@ pub mod BankaiContract {
         execution_height: u64
     }
 
+    /// Emitted when the contract is paused
+    #[derive(Drop, starknet::Event)]
+    pub struct Paused {}
+
+    /// Emitted when the contract is unpaused
+    #[derive(Drop, starknet::Event)]
+    pub struct Unpaused {}
+
+    /// Time delay required for program hash updates (48 hours in seconds)
+    const UPDATE_DELAY: u64 = 172800;
+
     #[storage]
     struct Storage {
-        committee: Map::<
-            u64, u256,
-        >, // maps committee index to committee hash (sha256(x || y)) of aggregate key
-        epochs: Map::<u64, EpochProof>, // maps beacon slot to header root and state root
-        batches: Map::<felt252, bool>, // Available batch roots
-        owner: ContractAddress,
-        latest_epoch_slot: u64,
+        // Committee Management
+        committee: Map::<u64, u256>, // Maps committee index to committee hash (sha256(x || y)) of aggregate key
         latest_committee_id: u64,
         initialization_committee: u64,
+
+        // Epoch Management
+        epochs: Map::<u64, EpochProof>, // Maps beacon slot to header root and state root
+        latest_epoch_slot: u64,
+        
+        // Batch Management
+        batches: Map::<felt252, bool>, // Tracks verified batch roots
+        
+        // Program Hash Management
         committee_update_program_hash: felt252,
         epoch_update_program_hash: felt252,
         epoch_batch_program_hash: felt252,
+        pending_committee_program_hash: felt252,
+        pending_epoch_program_hash: felt252,
+        pending_batch_program_hash: felt252,
+        pending_update_timestamp: u64,
+        
+        // Access Control
+        owner: ContractAddress,
+        paused: bool,
     }
 
     #[constructor]
@@ -186,14 +222,13 @@ pub mod BankaiContract {
         fn verify_committee_update(
             ref self: ContractState, beacon_state_root: u256, committee_hash: u256, slot: u64,
         ) {
+            assert(!self.paused.read(), 'Contract is paused');
             let epoch_proof = self.epochs.read(slot);
             assert(beacon_state_root == epoch_proof.beacon_state_root, 'Invalid State Root!');
 
-            // for now we dont ensure the fact hash is valid
             let fact_hash = compute_committee_proof_fact_hash(
                 @self, beacon_state_root, committee_hash, slot,
             );
-            // println!("fact_hash: {:?}", fact_hash);
             assert(is_valid_fact_hash(fact_hash), 'Invalid Fact Hash!');
 
             // The new committee is always assigned at the start of the previous committee
@@ -221,7 +256,7 @@ pub mod BankaiContract {
             execution_hash: u256,
             execution_height: u64,
         ) {
-            // println!("verify_epoch_update");
+            assert(!self.paused.read(), 'Contract is paused');
             let signing_committee_id = (slot / 0x2000);
             let valid_committee_hash = self.committee.read(signing_committee_id);
             assert(committee_hash == valid_committee_hash, 'Invalid Committee Hash!');
@@ -237,7 +272,11 @@ pub mod BankaiContract {
             };
             self.epochs.write(slot, epoch_proof);
 
-            self.latest_epoch_slot.write(slot);
+            let latest_epoch = self.latest_epoch_slot.read();
+            if slot > latest_epoch {
+                self.latest_epoch_slot.write(slot);
+            }
+
             self.emit(Event::EpochUpdated(EpochUpdated {
                 beacon_root: header_root, slot: slot, execution_hash: execution_hash, execution_height: execution_height,
             }));
@@ -253,7 +292,8 @@ pub mod BankaiContract {
             n_signers: u64,
             execution_hash: u256,
             execution_height: u64,
-        ) {
+        ) { 
+            assert(!self.paused.read(), 'Contract is paused');
             let signing_committee_id = (slot / 0x2000);
             let valid_committee_hash = self.committee.read(signing_committee_id);
             assert(committee_hash == valid_committee_hash, 'Invalid Committee Hash!');
@@ -269,12 +309,16 @@ pub mod BankaiContract {
             };
             self.epochs.write(slot, epoch_proof);
 
-            self.latest_epoch_slot.write(slot);
             self.emit(Event::EpochBatch(EpochBatch {
                 batch_root: batch_root, beacon_root: header_root, slot: slot, execution_hash: execution_hash, execution_height: execution_height,
             }));
 
             self.batches.write(batch_root, true);
+
+            let latest_epoch = self.latest_epoch_slot.read();
+            if slot > latest_epoch {
+                self.latest_epoch.write(slot);
+            }
         }
 
         fn decommit_batched_epoch(
@@ -290,7 +334,7 @@ pub mod BankaiContract {
             execution_hash: u256,
             execution_height: u64,
         ) {
-
+            assert(!self.paused.read(), 'Contract is paused');
             let known_batch_root = self.batches.read(batch_root);
             assert(known_batch_root, 'Batch root not known!');
 
@@ -299,21 +343,67 @@ pub mod BankaiContract {
             let computed_root = hash_path(leaf, merkle_path, merkle_index);
             assert(computed_root == batch_root, 'Invalid Batch Merkle Root!');
 
-
             let epoch_proof = EpochProof {
                 header_root: header_root, beacon_state_root: beacon_state_root, n_signers: n_signers, execution_hash: execution_hash, execution_height: execution_height,
             };
             self.epochs.write(slot, epoch_proof);
-
-            self.latest_epoch_slot.write(slot);
+            
             self.emit(Event::EpochDecommitted(EpochDecommitted {
                 batch_root: batch_root, slot: slot, execution_hash: execution_hash, execution_height: execution_height,
             }));
         }
+        
+        fn propose_program_hash_update(
+            ref self: ContractState,
+            new_committee_hash: felt252,
+            new_epoch_hash: felt252,
+            new_batch_hash: felt252
+        ) {
+            assert(!self.paused.read(), 'Contract is paused');
+            assert(get_caller_address() == self.owner.read(), 'Caller is not owner');
+            
+            self.pending_committee_program_hash.write(new_committee_hash);
+            self.pending_epoch_program_hash.write(new_epoch_hash);
+            self.pending_batch_program_hash.write(new_batch_hash);
+            self.pending_update_timestamp.write(get_block_timestamp() + UPDATE_DELAY);
+        }
 
+        fn execute_program_hash_update(ref self: ContractState) {
+            assert(get_caller_address() == self.owner.read(), 'Caller is not owner');
+            assert(get_block_timestamp() >= self.pending_update_timestamp.read(), 'Delay not elapsed');
+            
+            // Update program hashes
+            self.committee_update_program_hash.write(self.pending_committee_program_hash.read());
+            self.epoch_update_program_hash.write(self.pending_epoch_program_hash.read());
+            self.epoch_batch_program_hash.write(self.pending_batch_program_hash.read());
+
+            // Clear pending updates
+            self.pending_committee_program_hash.write(0);
+            self.pending_epoch_program_hash.write(0);
+            self.pending_batch_program_hash.write(0);
+            self.pending_update_timestamp.write(0);
+        }
+
+        fn pause(ref self: ContractState) {
+            assert(get_caller_address() == self.owner.read(), 'Caller is not owner');
+            assert(!self.paused.read(), 'Contract is already paused');
+            self.paused.write(true);
+            self.emit(Event::Paused(Paused {}));
+        }
+
+        fn unpause(ref self: ContractState) {
+            assert(get_caller_address() == self.owner.read(), 'Caller is not owner');
+            assert(self.paused.read(), 'Contract is not paused');
+            self.paused.write(false);
+            self.emit(Event::Unpaused(Unpaused {}));
+        }
+
+        fn is_paused(self: @ContractState) -> bool {
+            self.paused.read()
+        }
     }
 
-
+    /// Internal helper functions for computing fact hashes
     fn compute_committee_proof_fact_hash(
         self: @ContractState, beacon_state_root: u256, committee_hash: u256, slot: u64,
     ) -> felt252 {
@@ -330,6 +420,7 @@ pub mod BankaiContract {
         return fact_hash;
     }
 
+    /// Computes fact hash for epoch proof verification
     fn compute_epoch_proof_fact_hash(
         self: @ContractState,
         header_root: u256,
@@ -355,6 +446,7 @@ pub mod BankaiContract {
         return fact_hash;
     }
 
+    /// Computes fact hash for epoch batch verification
     fn compute_epoch_batch_fact_hash(
         self: @ContractState,
         batch_root: felt252,
@@ -396,182 +488,132 @@ pub mod BankaiContract {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::{BankaiContract, IBankaiContract};
-//     use starknet::testing::{set_caller_address};
-//     use starknet::ContractAddress;
+#[cfg(test)]
+mod tests {
+    use super::BankaiContract;
+    use super::IBankaiContract;
+    use starknet::contract_address_const;
+    use starknet::testing::set_caller_address;
+    use starknet::testing::set_block_timestamp;
 
-//     // Add this struct and function before your test functions
-//     #[derive(Drop, Clone)]
-//     struct TestFixture {
-//         committee_id: u64,
-//         committee_hash: u256,
-//         committee_update_program_hash: felt252,
-//         epoch_update_program_hash: felt252,
-//         owner: ContractAddress,
-//     }
+    // Helper function to deploy the contract for testing
+    fn deploy_contract() -> BankaiContract::ContractState {
+        let mut state = BankaiContract::contract_state_for_testing();
+        
+        // Set caller as contract deployer
+        set_caller_address(contract_address_const::<0x123>());
+        
+        // Initialize with some test values
+        BankaiContract::constructor(
+            ref state,
+            1, // committee_id
+            1234.into(), // committee_hash
+            111.into(), // committee_update_program_hash
+            222.into(), // epoch_update_program_hash
+            333.into() // epoch_batch_program_hash
+        );
+        
+        state
+    }
 
-//     #[derive(Drop, Clone)]
-//     struct EpochUpdateFixture {
-//         header_root: u256,
-//         state_root: u256,
-//         committee_hash: u256,
-//         n_signers: u64,
-//         slot: u64,
-//     }
+    #[test]
+    fn test_constructor() {
+        let state = deploy_contract();
+        
+        assert!(!IBankaiContract::is_paused(@state));
+        assert_eq!(IBankaiContract::get_latest_epoch(@state), 0);
+        assert_eq!(IBankaiContract::get_latest_committee_id(@state), 1);
+        assert_eq!(IBankaiContract::get_committee_hash(@state, 1), 1234.into());
+        assert_eq!(IBankaiContract::get_committee_update_program_hash(@state), 111);
+        assert_eq!(IBankaiContract::get_epoch_update_program_hash(@state), 222);
+    }
 
-//     #[derive(Drop, Clone)]
-//     struct CommitteeUpdateFixture {
-//         slot: u64,
-//         state_root: u256,
-//         new_committee_hash: u256,
-//         expected_committee_id: u64,
-//     }
+    #[test]
+    fn test_pause_unpause() {
+        let mut state = deploy_contract();
+        let owner = contract_address_const::<0x123>();
+        set_caller_address(owner);
+        
+        // Test initial state
+        assert!(!IBankaiContract::is_paused(@state));
+        
+        // Test pause
+        IBankaiContract::pause(ref state);
+        assert!(IBankaiContract::is_paused(@state));
+        
+        // Test unpause
+        IBankaiContract::unpause(ref state);
+        assert!(!IBankaiContract::is_paused(@state));
+    }
 
-//     fn setup_fixture() -> TestFixture {
-//         TestFixture {
-//             committee_id: 1,
-//             committee_hash: 0x111_u256,
-//             committee_update_program_hash: 0xdead_felt252,
-//             epoch_update_program_hash: 0xbeef_felt252,
-//             owner: starknet::contract_address_const::<0x123>(),
-//         }
-//     }
+    #[test]
+    #[should_panic(expected: ('Caller is not owner',))]
+    fn test_pause_unauthorized() {
+        let mut state = deploy_contract();
+        
+        // Try to pause from different address
+        let other = contract_address_const::<0x456>();
+        set_caller_address(other);
+        IBankaiContract::pause(ref state);
+    }
 
-//     fn get_epoch_update_fixture(index: u8) -> EpochUpdateFixture {
-//         match index {
-//             0 => EpochUpdateFixture {
-//                 header_root: 0xbbb_u256,
-//                 state_root: 0xbbb_u256,
-//                 committee_hash: 0x111_u256, // Matches initial committee hash from setup_fixture
-//                 n_signers: 512,
-//                 slot: 8192 // First term
-//             },
-//             1 => EpochUpdateFixture {
-//                 header_root: 0xccc_u256,
-//                 state_root: 0xccc_u256,
-//                 committee_hash: 0x222_u256, // Matches new committee hash from committee update fixture
-//                 n_signers: 384,
-//                 slot: 16384 // Second term
-//             },
-//             _ => EpochUpdateFixture {
-//                 header_root: 0xddd_u256,
-//                 state_root: 0xddd_u256,
-//                 committee_hash: 0x333_u256,
-//                 n_signers: 256,
-//                 slot: 24576 // Third term
-//             },
-//         }
-//     }
+    #[test]
+    fn test_program_hash_update() {
+        let mut state = deploy_contract();
+        let owner = contract_address_const::<0x123>();
+        set_caller_address(owner);
+        
+        // Set initial timestamp
+        set_block_timestamp(1000);
+        
+        // Propose update
+        IBankaiContract::propose_program_hash_update(
+            ref state,
+            444.into(), // new_committee_hash
+            555.into(), // new_epoch_hash
+            666.into()  // new_batch_hash
+        );
+        
+        // Execute after delay
+        set_block_timestamp(1000 + 172800); // After delay
+        IBankaiContract::execute_program_hash_update(ref state);
+        
+        // Verify updates
+        assert_eq!(IBankaiContract::get_committee_update_program_hash(@state), 444);
+        assert_eq!(IBankaiContract::get_epoch_update_program_hash(@state), 555);
+    }
 
-//     fn get_committee_update_fixture(index: u8) -> CommitteeUpdateFixture {
-//         match index {
-//             0 => CommitteeUpdateFixture {
-//                 slot: 8192, // First term
-//                 state_root: 0xbbb_u256,
-//                 new_committee_hash: 0x222_u256,
-//                 expected_committee_id: 2 // slot/0x2000 + 1
-//             },
-//             _ => CommitteeUpdateFixture {
-//                 slot: 16384, // Second term
-//                 state_root: 0xccc_u256,
-//                 new_committee_hash: 0x333_u256,
-//                 expected_committee_id: 3 // slot/0x2000 + 1
-//             },
-//         }
-//     }
+    #[test]
+    #[should_panic(expected: ('Delay not elapsed',))]
+    fn test_program_hash_update_too_early() {
+        let mut state = deploy_contract();
+        let owner = contract_address_const::<0x123>();
+        set_caller_address(owner);
+        
+        // Set initial timestamp
+        set_block_timestamp(1000);
+        
+        // Propose update
+        IBankaiContract::propose_program_hash_update(
+            ref state,
+            444.into(), // new_committee_hash
+            555.into(), // new_epoch_hash
+            666.into()  // new_batch_hash
+        );
+        
+        // Try to execute before delay
+        set_block_timestamp(1000 + 172799); // Just before delay
+        IBankaiContract::execute_program_hash_update(ref state);
+    }
 
-//     // Helper function to deploy the contract
-//     fn deploy(fixture: TestFixture) -> BankaiContract::ContractState {
-//         let mut state = BankaiContract::contract_state_for_testing();
-//         BankaiContract::constructor(
-//             ref state,
-//             fixture.committee_id,
-//             fixture.committee_hash,
-//             fixture.committee_update_program_hash,
-//             fixture.epoch_update_program_hash,
-//             // fixture.init_slot,
-//         // fixture.init_header_root,
-//         // fixture.init_state_root,
-//         // fixture.init_n_signers,
-//         );
-//         state
-//     }
-
-//     // Example of how to update your test to use the fixture
-//     #[test]
-//     fn test_deploy() {
-//         let fixture = setup_fixture();
-//         set_caller_address(fixture.owner);
-
-//         let state = deploy(fixture.clone());
-
-//         assert_eq!(state.get_committee_hash(fixture.committee_id), fixture.committee_hash);
-//         assert_eq!(state.get_latest_epoch(), 0);
-//         assert_eq!(
-//             state.get_committee_update_program_hash(), fixture.committee_update_program_hash,
-//         );
-//         assert_eq!(state.get_epoch_update_program_hash(), fixture.epoch_update_program_hash);
-//     }
-
-//     #[test]
-//     fn test_epoch_update_with_fixtures() {
-//         let fixture = setup_fixture();
-//         let epoch_fixture = get_epoch_update_fixture(0); // Use first fixture
-//         set_caller_address(fixture.owner);
-
-//         let mut state = deploy(fixture.clone());
-//         println!("deploy success");
-
-//         // First update should succeed
-//         state
-//             .verify_epoch_update(
-//                 epoch_fixture.header_root,
-//                 epoch_fixture.state_root,
-//                 epoch_fixture.committee_hash,
-//                 epoch_fixture.n_signers,
-//                 epoch_fixture.slot,
-//             );
-
-//         // Verify the epoch was stored correctly
-//         let stored_epoch = state.get_epoch_proof(epoch_fixture.slot);
-//         assert_eq!(stored_epoch.header_root, epoch_fixture.header_root);
-//         assert_eq!(stored_epoch.state_root, epoch_fixture.state_root);
-//         assert_eq!(stored_epoch.n_signers, epoch_fixture.n_signers);
-
-//         println!("first epoch update success");
-
-//         let committee_update = get_committee_update_fixture(0);
-//         state
-//             .verify_committee_update(
-//                 committee_update.state_root,
-//                 committee_update.new_committee_hash,
-//                 committee_update.slot,
-//             );
-
-//         println!("committee update success");
-
-//         assert_eq!(
-//             state.get_committee_hash(committee_update.expected_committee_id),
-//             committee_update.new_committee_hash,
-//         );
-
-//         let epoch_fixture = get_epoch_update_fixture(1);
-//         state
-//             .verify_epoch_update(
-//                 epoch_fixture.header_root,
-//                 epoch_fixture.state_root,
-//                 epoch_fixture.committee_hash,
-//                 epoch_fixture.n_signers,
-//                 epoch_fixture.slot,
-//             );
-
-//         println!("second epoch update success");
-
-//         assert_eq!(
-//             state.get_committee_hash(committee_update.expected_committee_id),
-//             committee_update.new_committee_hash,
-//         );
-//     }
-// }
+    #[test]
+    fn test_getters() {
+        let state = deploy_contract();
+        
+        assert_eq!(IBankaiContract::get_committee_hash(@state, 1), 1234.into());
+        assert_eq!(IBankaiContract::get_latest_epoch(@state), 0);
+        assert_eq!(IBankaiContract::get_latest_committee_id(@state), 1);
+        assert_eq!(IBankaiContract::get_committee_update_program_hash(@state), 111);
+        assert_eq!(IBankaiContract::get_epoch_update_program_hash(@state), 222);
+    }
+}
