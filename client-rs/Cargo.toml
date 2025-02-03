@@ -3,19 +3,13 @@ name = "client-rs"
 version = "0.1.0"
 edition = "2021"
 
-[features]
-daemon = []
-cli = []
-
 [[bin]]
-name = "daemon"        # Binary name (used with `cargo run --bin bin1`)
-path = "src/daemon.rs" # Path to the source file for this binary
+name = "daemon"
+path = "src/daemon.rs"
 
 [[bin]]
 name = "cli"
 path = "src/main.rs"
-required-features = ["cli"]
-
 
 [dependencies]
 alloy-primitives = "0.8.13"

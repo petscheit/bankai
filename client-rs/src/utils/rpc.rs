@@ -104,7 +104,7 @@ impl BeaconRpcClient {
 
         let json = self
             .get_json(&format!("eth/v2/beacon/blocks/{}", slot))
-            .await?;
+                .await?;
 
         serde_json::from_value(json["data"]["message"]["body"]["sync_aggregate"].clone())
             .map_err(|e| Error::DeserializeError(e.to_string()))

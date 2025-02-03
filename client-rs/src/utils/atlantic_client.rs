@@ -93,7 +93,7 @@ impl AtlanticClient {
         let external_id = format!(
             "update_{}",
             match batch.proof_type() {
-                //ProofType::Epoch => "epoch",
+                ProofType::Epoch => "epoch",
                 ProofType::SyncCommittee => "sync_committee",
                 ProofType::EpochBatch => "epoch_batch",
             }

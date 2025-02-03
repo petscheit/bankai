@@ -42,7 +42,6 @@ pub struct ExpectedEpochBatchOutputs {
 }
 
 impl EpochUpdateBatch {
-    #[cfg(feature = "cli")]
     pub(crate) async fn new(bankai: &BankaiClient) -> Result<EpochUpdateBatch, Error> {
         let (start_slot, mut end_slot) = bankai
             .starknet_client

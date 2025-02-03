@@ -47,37 +47,44 @@ impl EpochUpdate {
     }
 }
 
-// impl Provable for EpochUpdate {
-//     fn id(&self) -> String {
-//         let mut hasher = Sha256::new();
-//         hasher.update(b"epoch_update");
-//         hasher.update(self.circuit_inputs.header.tree_hash_root().as_slice());
-//         hex::encode(hasher.finalize().as_slice())
-//     }
+impl Provable for EpochUpdate {
+    fn id(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"epoch_update");
+        hasher.update(self.circuit_inputs.header.tree_hash_root().as_slice());
+        hex::encode(hasher.finalize().as_slice())
+    }
 
-//     fn export(&self) -> Result<String, Error> {
-//         let json = serde_json::to_string_pretty(&self).unwrap();
-//         let dir_path = format!("batches/epoch/{}", self.circuit_inputs.header.slot);
-//         fs::create_dir_all(dir_path.clone()).map_err(Error::IoError)?;
-//         let path = format!(
-//             "{}/input_{}.json",
-//             dir_path, self.circuit_inputs.header.slot
-//         );
-//         fs::write(path.clone(), json).map_err(Error::IoError)?;
-//         Ok(path)
-//     }
+    fn export(&self) -> Result<String, Error> {
+        let json = serde_json::to_string_pretty(&self).unwrap();
+        let dir_path = format!("batches/epoch/{}", self.circuit_inputs.header.slot);
+        fs::create_dir_all(dir_path.clone()).map_err(Error::IoError)?;
+        let path = format!(
+            "{}/input_{}.json",
+            dir_path, self.circuit_inputs.header.slot
+        );
+        fs::write(path.clone(), json).map_err(Error::IoError)?;
+        Ok(path)
+    }
 
-//     fn pie_path(&self) -> String {
-//         format!(
-//             "batches/epoch/{}/pie_{}.zip",
-//             self.circuit_inputs.header.slot, self.circuit_inputs.header.slot
-//         )
-//     }
+    fn pie_path(&self) -> String {
+        format!(
+            "batches/epoch/{}/pie_{}.zip",
+            self.circuit_inputs.header.slot, self.circuit_inputs.header.slot
+        )
+    }
 
-//     fn proof_type(&self) -> ProofType {
-//         ProofType::Epoch
-//     }
-// }
+    fn proof_type(&self) -> ProofType {
+        ProofType::Epoch
+    }
+    
+    fn inputs_path(&self) -> String {
+        format!(
+            "batches/epoch/{}/input_{}.json",
+            self.circuit_inputs.header.slot, self.circuit_inputs.header.slot
+        )
+    }
+}
 
 /// Contains all necessary inputs for generating and verifying epoch proofs
 #[derive(Debug, Serialize, Deserialize)]
@@ -188,7 +195,6 @@ impl EpochCircuitInputs {
 
         let sync_agg = client.get_sync_aggregate(slot).await?;
         let validator_pubs = client.get_sync_committee_validator_pubs(slot).await?;
-
         // Process the sync committee data
         let signature_point = Self::extract_signature_point(&sync_agg)?;
         let non_signers = Self::derive_non_signers(&sync_agg, &validator_pubs);
