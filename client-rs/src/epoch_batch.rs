@@ -20,7 +20,7 @@ use std::fs;
 
 use crate::utils::database_manager::DatabaseManager;
 use std::sync::Arc;
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdateBatch {
@@ -212,7 +212,7 @@ impl EpochUpdateBatch {
         let mut epochs = vec![];
 
         // Fetch epochs sequentially from start_slot to end_slot, incrementing by 32 each time
-        let calculated_batch_size = end_epoch - start_epoch;
+        let calculated_batch_size = end_epoch - start_epoch + 1;
         let mut current_epoch = start_epoch;
         while current_epoch <= end_epoch {
             info!(
@@ -267,7 +267,7 @@ impl EpochUpdateBatch {
             current_epoch += 1;
         }
 
-        info!("Paths {:?}", paths);
+        trace!("Paths for epochs {:?}", paths);
 
         let batch = EpochUpdateBatch {
             circuit_inputs,
@@ -369,6 +369,29 @@ impl Provable for EpochUpdateBatch {
             .slot;
         format!(
             "batches/epoch_batch/{}_to_{}/pie_batch_{}_to_{}.zip",
+            first_slot, last_slot, first_slot, last_slot
+        )
+    }
+
+    fn inputs_path(&self) -> String {
+        let first_slot = self
+            .circuit_inputs
+            .epochs
+            .first()
+            .unwrap()
+            .circuit_inputs
+            .header
+            .slot;
+        let last_slot = self
+            .circuit_inputs
+            .epochs
+            .last()
+            .unwrap()
+            .circuit_inputs
+            .header
+            .slot;
+        format!(
+            "batches/epoch_batch/{}_to_{}/input_batch_{}_to_{}.json",
             first_slot, last_slot, first_slot, last_slot
         )
     }

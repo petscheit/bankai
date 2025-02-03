@@ -47,37 +47,37 @@ impl EpochUpdate {
     }
 }
 
-impl Provable for EpochUpdate {
-    fn id(&self) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(b"epoch_update");
-        hasher.update(self.circuit_inputs.header.tree_hash_root().as_slice());
-        hex::encode(hasher.finalize().as_slice())
-    }
+// impl Provable for EpochUpdate {
+//     fn id(&self) -> String {
+//         let mut hasher = Sha256::new();
+//         hasher.update(b"epoch_update");
+//         hasher.update(self.circuit_inputs.header.tree_hash_root().as_slice());
+//         hex::encode(hasher.finalize().as_slice())
+//     }
 
-    fn export(&self) -> Result<String, Error> {
-        let json = serde_json::to_string_pretty(&self).unwrap();
-        let dir_path = format!("batches/epoch/{}", self.circuit_inputs.header.slot);
-        fs::create_dir_all(dir_path.clone()).map_err(Error::IoError)?;
-        let path = format!(
-            "{}/input_{}.json",
-            dir_path, self.circuit_inputs.header.slot
-        );
-        fs::write(path.clone(), json).map_err(Error::IoError)?;
-        Ok(path)
-    }
+//     fn export(&self) -> Result<String, Error> {
+//         let json = serde_json::to_string_pretty(&self).unwrap();
+//         let dir_path = format!("batches/epoch/{}", self.circuit_inputs.header.slot);
+//         fs::create_dir_all(dir_path.clone()).map_err(Error::IoError)?;
+//         let path = format!(
+//             "{}/input_{}.json",
+//             dir_path, self.circuit_inputs.header.slot
+//         );
+//         fs::write(path.clone(), json).map_err(Error::IoError)?;
+//         Ok(path)
+//     }
 
-    fn pie_path(&self) -> String {
-        format!(
-            "batches/epoch/{}/pie_{}.zip",
-            self.circuit_inputs.header.slot, self.circuit_inputs.header.slot
-        )
-    }
+//     fn pie_path(&self) -> String {
+//         format!(
+//             "batches/epoch/{}/pie_{}.zip",
+//             self.circuit_inputs.header.slot, self.circuit_inputs.header.slot
+//         )
+//     }
 
-    fn proof_type(&self) -> ProofType {
-        ProofType::Epoch
-    }
-}
+//     fn proof_type(&self) -> ProofType {
+//         ProofType::Epoch
+//     }
+// }
 
 /// Contains all necessary inputs for generating and verifying epoch proofs
 #[derive(Debug, Serialize, Deserialize)]

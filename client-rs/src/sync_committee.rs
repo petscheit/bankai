@@ -80,6 +80,13 @@ impl Provable for SyncCommitteeUpdate {
         )
     }
 
+    fn inputs_path(&self) -> String {
+        format!(
+            "batches/committee/{}/input_{}.json",
+            self.circuit_inputs.beacon_slot, self.circuit_inputs.beacon_slot,
+        )
+    }
+
     fn proof_type(&self) -> ProofType {
         ProofType::SyncCommittee
     }

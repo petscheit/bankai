@@ -15,7 +15,7 @@ pub struct Job {
     pub job_id: Uuid,
     pub job_type: JobType,
     pub job_status: JobStatus,
-    pub slot: u64,
+    pub slot: Option<u64>,
     pub batch_range_begin_epoch: Option<u64>,
     pub batch_range_end_epoch: Option<u64>,
 }
@@ -39,9 +39,9 @@ pub enum JobStatus {
     #[postgres(name = "PIE_GENERATED")]
     PieGenerated,
     #[postgres(name = "OFFCHAIN_PROOF_REQUESTED")]
-    OffchainProofRequested,
+    AtlanticProofRequested,
     #[postgres(name = "OFFCHAIN_PROOF_RETRIEVED")]
-    OffchainProofRetrieved,
+    AtlanticProofRetrieved,
     #[postgres(name = "WRAP_PROOF_REQUESTED")]
     WrapProofRequested,
     #[postgres(name = "WRAPPED_PROOF_DONE")]
@@ -67,8 +67,8 @@ impl ToString for JobStatus {
             JobStatus::ProgramInputsPrepared => "PROGRAM_INPUTS_PREPARED".to_string(),
             JobStatus::StartedTraceGeneration => "STARTED_TRACE_GENERATION".to_string(),
             JobStatus::PieGenerated => "PIE_GENERATED".to_string(),
-            JobStatus::OffchainProofRequested => "OFFCHAIN_PROOF_REQUESTED".to_string(),
-            JobStatus::OffchainProofRetrieved => "OFFCHAIN_PROOF_RETRIEVED".to_string(),
+            JobStatus::AtlanticProofRequested => "OFFCHAIN_PROOF_REQUESTED".to_string(),
+            JobStatus::AtlanticProofRetrieved => "OFFCHAIN_PROOF_RETRIEVED".to_string(),
             JobStatus::WrapProofRequested => "WRAP_PROOF_REQUESTED".to_string(),
             JobStatus::WrappedProofDone => "WRAPPED_PROOF_DONE".to_string(),
             JobStatus::OffchainComputationFinished => "OFFCHAIN_COMPUTATION_FINISHED".to_string(),
@@ -89,8 +89,8 @@ impl FromStr for JobStatus {
             "CREATED" => Ok(JobStatus::Created),
             "PROGRAM_INPUTS_PREPARED" => Ok(JobStatus::ProgramInputsPrepared),
             "PIE_GENERATED" => Ok(JobStatus::PieGenerated),
-            "OFFCHAIN_PROOF_REQUESTED" => Ok(JobStatus::OffchainProofRequested),
-            "OFFCHAIN_PROOF_RETRIEVED" => Ok(JobStatus::OffchainProofRetrieved),
+            "OFFCHAIN_PROOF_REQUESTED" => Ok(JobStatus::AtlanticProofRequested),
+            "OFFCHAIN_PROOF_RETRIEVED" => Ok(JobStatus::AtlanticProofRetrieved),
             "WRAP_PROOF_REQUESTED" => Ok(JobStatus::WrapProofRequested),
             "WRAPPED_PROOF_DONE" => Ok(JobStatus::WrappedProofDone),
             "OFFCHAIN_COMPUTATION_FINISHED" => Ok(JobStatus::OffchainComputationFinished),
@@ -175,6 +175,10 @@ impl std::fmt::Display for StarknetError {
         match self {
             StarknetError::ProviderError(err) => write!(f, "Provider error: {}", err),
             StarknetError::AccountError(msg) => write!(f, "Account error: {}", msg),
+            StarknetError::TransactionError(msg) => write!(f, "Transaction error: {}", msg),
+            StarknetError::TimeoutError => {
+                write!(f, "Waiting for transaction timeout error")
+            }
         }
     }
 }

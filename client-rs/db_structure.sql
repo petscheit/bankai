@@ -7,6 +7,7 @@ CREATE TABLE jobs (
     batch_range_begin_epoch BIGINT NOT NULL,
     batch_range_end_epoch BIGINT NOT NULL,
     type TEXT NOT NULL,
+    tx_hash TEXT NULL,
     updated_at TIMESTAMP DEFAULT NOW (),
     created_at TIMESTAMP DEFAULT NOW ()
 );

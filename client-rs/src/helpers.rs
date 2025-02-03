@@ -69,6 +69,14 @@ pub fn get_sync_committee_id_by_epoch(epoch: u64) -> u64 {
     epoch / EPOCHS_PER_SYNC_COMMITTEE
 }
 
+pub fn get_sync_committee_id_by_slot(epoch: u64) -> u64 {
+    epoch / SLOTS_PER_SYNC_COMMITTEE
+}
+
+pub fn get_first_slot_for_sync_committee(slot: u64) -> u64 {
+    slot * SLOTS_PER_SYNC_COMMITTEE
+}
+
 // Since beacon chain RPCs have different response structure (quicknode responds different than nidereal) we use this event extraction logic
 pub fn extract_json_from_event(event_text: &str) -> Option<String> {
     for line in event_text.lines() {

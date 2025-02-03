@@ -4,12 +4,17 @@ use starknet::accounts::{Account, ConnectedAccount};
 use starknet::core::types::{Call, FunctionCall};
 use starknet::macros::selector;
 use starknet::providers::{Provider, ProviderError};
+use tracing::{debug, error, info, trace};
+
 use starknet::{
     accounts::{ExecutionEncoding, SingleOwnerAccount},
     contract::ContractFactory,
     core::{
         chain_id,
-        types::{contract::SierraClass, BlockId, BlockTag, Felt},
+        types::{
+            contract::SierraClass, BlockId, BlockTag, Felt, TransactionExecutionStatus,
+            TransactionStatus,
+        },
     },
     macros::felt,
     providers::{
@@ -19,6 +24,7 @@ use starknet::{
     signers::{LocalWallet, SigningKey},
 };
 use std::sync::Arc;
+use tokio::time::{sleep, Duration};
 
 use crate::contract_init::ContractInitializationData;
 use crate::traits::Submittable;
@@ -76,6 +82,8 @@ pub struct StarknetClient {
 pub enum StarknetError {
     ProviderError(ProviderError),
     AccountError(String),
+    TransactionError(String),
+    TimeoutError,
 }
 
 impl StarknetClient {
@@ -149,7 +157,7 @@ impl StarknetClient {
                 calldata: update.to_calldata(),
             }]
         );
-        let result = self
+        let send_result = self
             .account
             .execute_v1(vec![Call {
                 to: config.contract_address,
@@ -157,13 +165,30 @@ impl StarknetClient {
                 calldata: update.to_calldata(),
             }])
             .send()
-            .await
-            .map_err(|e| StarknetError::AccountError(e.to_string()))?;
+            .await;
+        //.map_err(|e| StarknetError::TransactionError(e.to_string()))?;
 
-        println!("tx_hash: {:?}", result.transaction_hash);
+        match send_result {
+            Ok(tx_response) => {
+                let tx_hash = tx_response.transaction_hash;
+                info!("Transaction sent successfully! Hash: {:#x}", tx_hash);
+                Ok(tx_hash)
+            }
+            Err(e) => {
+                //error!("Transaction execution error: {:#?}", e);
 
-        // Return the transaction hash
-        Ok(result.transaction_hash)
+                // Return a more descriptive error
+                Err(StarknetError::TransactionError(format!(
+                    "TransactionExecutionError: {:#?}",
+                    e
+                )))
+            }
+        }
+
+        // println!("tx_hash: {:?}", result.transaction_hash);
+
+        // // Return the transaction hash
+        // Ok(result.transaction_hash)
     }
 
     pub async fn get_committee_hash(
@@ -262,5 +287,48 @@ impl StarknetClient {
             .map_err(StarknetError::ProviderError)?;
         println!("latest_committee_id: {:?}", latest_committee_id);
         Ok(*latest_committee_id.first().unwrap())
+    }
+
+    pub async fn wait_for_confirmation(&self, tx_hash: Felt) -> Result<(), StarknetError> {
+        let max_retries = 20;
+        let delay = Duration::from_secs(5);
+
+        for _ in 0..max_retries {
+            let status = self.get_transaction_status(tx_hash).await?;
+
+            info!("Starknet transaction status: {:?}", status);
+
+            match status {
+                TransactionStatus::AcceptedOnL1(TransactionExecutionStatus::Succeeded)
+                | TransactionStatus::AcceptedOnL2(TransactionExecutionStatus::Succeeded) => {
+                    info!("Starknet transaction confirmed: {:?}", tx_hash);
+                    return Ok(());
+                }
+                TransactionStatus::Rejected => {
+                    return Err(StarknetError::TransactionError(
+                        "Transaction rejected".to_string(),
+                    ));
+                }
+                _ => {
+                    // Still pending, wait and retry
+                    sleep(delay).await;
+                }
+            }
+        }
+
+        Err(StarknetError::TimeoutError)
+    }
+
+    pub async fn get_transaction_status(
+        &self,
+        tx_hash: Felt,
+    ) -> Result<TransactionStatus, StarknetError> {
+        let provider = self.account.provider();
+        let tx_status = provider
+            .get_transaction_status(tx_hash)
+            .await
+            .map_err(StarknetError::ProviderError)?;
+
+        Ok(tx_status)
     }
 }

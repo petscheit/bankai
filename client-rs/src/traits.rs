@@ -11,7 +11,7 @@ pub trait Submittable<T> {
 }
 
 pub enum ProofType {
-    Epoch,
+    //Epoch,
     EpochBatch,
     SyncCommittee,
 }
@@ -24,4 +24,5 @@ pub trait Provable: Serialize {
     //     T: serde::de::DeserializeOwned;
     fn proof_type(&self) -> ProofType;
     fn pie_path(&self) -> String;
+    fn inputs_path(&self) -> String;
 }

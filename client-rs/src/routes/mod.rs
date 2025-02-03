@@ -22,10 +22,24 @@ pub async fn handle_get_status(State(state): State<AppState>) -> impl IntoRespon
         Err(e) => 0,
     };
     let in_progress_jobs_count = state.db_manager.count_jobs_in_progress().await.unwrap();
+    let last_sync_committee_in_progress = state
+        .db_manager
+        .get_latest_sync_committee_in_progress()
+        .await
+        .unwrap()
+        .unwrap();
+
+    // let beacon_chain_state = state
+    //     .db_manager
+    //     .get_latest_known_beacon_chain_state()
+    //     .await
+    //     .unwrap();
 
     Json(json!({ "success": true, "details": {
         "last_epoch_in_progress": last_epoch_in_progress,
-        "jobs_in_progress_count": in_progress_jobs_count
+        "last_sync_committee_in_progress": last_sync_committee_in_progress,
+        "jobs_in_progress_count": in_progress_jobs_count,
+
     } }))
 }
 

@@ -1,11 +1,11 @@
 use crate::traits::{ProofType, Provable};
 use crate::Error;
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use reqwest::multipart::{Form, Part};
 use reqwest::Body;
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tokio::fs;
 use tokio::time::{sleep, Duration};
 use tokio_util::io::ReaderStream;
@@ -55,8 +55,8 @@ impl AtlanticClient {
                         let percent = (*uploaded as f64 / total_bytes as f64) * 100.0;
 
                         if percent >= *next_threshold as f64 && *next_threshold <= 100 {
-                            println!(
-                                "Uploaded {}% of the file to Atlantic API...",
+                            info!(
+                                "Uploaded {}% of the PIE file to Atlantic API...",
                                 *next_threshold
                             );
                             *next_threshold += 10;
@@ -93,7 +93,7 @@ impl AtlanticClient {
         let external_id = format!(
             "update_{}",
             match batch.proof_type() {
-                ProofType::Epoch => "epoch",
+                //ProofType::Epoch => "epoch",
                 ProofType::SyncCommittee => "sync_committee",
                 ProofType::EpochBatch => "epoch_batch",
             }

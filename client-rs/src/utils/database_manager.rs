@@ -19,6 +19,8 @@ pub struct JobSchema {
     pub batch_range_begin_epoch: i64,
     pub batch_range_end_epoch: i64,
     pub job_type: JobType,
+    pub atlantic_proof_generate_batch_id: Option<String>,
+    pub atlantic_proof_wrapper_batch_id: Option<String>,
     //pub updated_at: i64,
 }
 
@@ -130,7 +132,7 @@ impl DatabaseManager {
                         &[
                             &job.job_id,
                             &job.job_status.to_string(),
-                            &(job.slot as i64),
+                            &(job.slot.unwrap() as i64),
                             &"EPOCH_BATCH_UPDATE",
                             &(job.batch_range_begin_epoch.unwrap() as i64),
                             &(job.batch_range_end_epoch.unwrap() as i64),
@@ -147,7 +149,7 @@ impl DatabaseManager {
                         &[
                             &job.job_id,
                             &job.job_status.to_string(),
-                            &(job.slot as i64),
+                            &(job.slot.unwrap() as i64),
                             &"SYNC_COMMITTEE_UPDATE",
                         ],
                     )
@@ -165,12 +167,48 @@ impl DatabaseManager {
     ) -> Result<Option<JobStatus>, Box<dyn std::error::Error + Send + Sync>> {
         let row_opt = self
             .client
-            .query_opt("SELECT status FROM jobs WHERE job_id = $1", &[&job_id])
+            .query_opt("SELECT status FROM jobs WHERE job_uuid = $1", &[&job_id])
             .await?;
 
         Ok(row_opt.map(|row| row.get("status")))
     }
 
+    pub async fn get_job_by_id(
+        &self,
+        job_id: Uuid,
+    ) -> Result<Option<JobSchema>, Box<dyn std::error::Error + Send + Sync>> {
+        let row_opt = self
+            .client
+            .query_opt("SELECT * FROM jobs WHERE job_uuid = $1", &[&job_id])
+            .await?;
+
+        Ok(row_opt.map(|row| {
+            let job_status_str: String = row.get("job_status");
+            let job_status = job_status_str
+                .parse::<JobStatus>()
+                .expect("Unknown job status from DB");
+
+            let job_type_str: String = row.get("type");
+            let job_type = job_type_str
+                .parse::<JobType>()
+                .expect("Unknown job type from DB");
+
+            JobSchema {
+                job_uuid: row.get("job_uuid"),
+                job_status,
+                slot: row.get("slot"),
+                batch_range_begin_epoch: row
+                    .get::<&str, Option<i64>>("batch_range_begin_epoch")
+                    .unwrap_or(0),
+                batch_range_end_epoch: row
+                    .get::<&str, Option<i64>>("batch_range_end_epoch")
+                    .unwrap_or(0),
+                job_type,
+                atlantic_proof_generate_batch_id: row.get("atlantic_proof_generate_batch_id"),
+                atlantic_proof_wrapper_batch_id: row.get("atlantic_proof_wrapper_batch_id"),
+            }
+        }))
+    }
     // pub async fn get_latest_slot_id_in_progress(
     //     &self,
     // ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
@@ -198,11 +236,12 @@ impl DatabaseManager {
         &self,
     ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
         // Query the latest slot with job_status in ('in_progress', 'initialized')
+        // //, 'CANCELLED', 'ERROR'
         let row_opt = self
             .client
             .query_opt(
                 "SELECT batch_range_end_epoch FROM jobs
-                 WHERE job_status NOT IN ('DONE', 'CANCELLED', 'ERROR')
+                 WHERE job_status NOT IN ('DONE')
                         AND batch_range_end_epoch != 0
                         AND type = 'EPOCH_BATCH_UPDATE'
                  ORDER BY batch_range_end_epoch DESC
@@ -240,7 +279,7 @@ impl DatabaseManager {
         // Extract and return the slot ID
         if let Some(row) = row_opt {
             Ok(Some(helpers::slot_to_sync_committee_id(
-                row.get::<_, i64>("batch_range_end_epoch").to_u64().unwrap(),
+                row.get::<_, i64>("slot").to_u64().unwrap(),
             )))
         } else {
             Ok(Some(0))
@@ -354,9 +393,16 @@ impl DatabaseManager {
                         job_uuid: row.get("job_uuid"),
                         job_status,
                         slot: row.get("slot"),
-                        batch_range_begin_epoch: row.get("batch_range_begin_epoch"),
-                        batch_range_end_epoch: row.get("batch_range_end_epoch"),
+                        batch_range_begin_epoch: row
+                            .get::<&str, Option<i64>>("batch_range_begin_epoch")
+                            .unwrap_or(0),
+                        batch_range_end_epoch: row
+                            .get::<&str, Option<i64>>("batch_range_end_epoch")
+                            .unwrap_or(0),
                         job_type,
+                        atlantic_proof_generate_batch_id: row
+                            .get("atlantic_proof_generate_batch_id"),
+                        atlantic_proof_wrapper_batch_id: row.get("atlantic_proof_wrapper_batch_id"),
                         //updated_at: row.get("updated_at"),
                     })
                 },
@@ -448,6 +494,66 @@ impl DatabaseManager {
             warn!("Combination of epoch_id and path_index already exists, skipping insertion of epoch merkle patch for epoch {} and index {}", epoch, path_index);
         }
         Ok(())
+    }
+
+    pub async fn get_jobs_with_statuses(
+        &self,
+        desired_statuses: Vec<JobStatus>,
+    ) -> Result<Vec<JobSchema>, Box<dyn std::error::Error + Send + Sync>> {
+        if desired_statuses.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let status_strings: Vec<String> = desired_statuses.iter().map(|s| s.to_string()).collect();
+
+        let placeholders: Vec<String> = (1..=status_strings.len())
+            .map(|i| format!("${}", i))
+            .collect();
+        let query = format!(
+            "SELECT * FROM jobs WHERE job_status IN ({})",
+            placeholders.join(", ")
+        );
+
+        let params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = status_strings
+            .iter()
+            .map(|s| s as &(dyn tokio_postgres::types::ToSql + Sync))
+            .collect();
+
+        let rows = self.client.query(&query, &params).await?;
+
+        let jobs: Vec<JobSchema> = rows
+            .into_iter()
+            .map(
+                |row: Row| -> Result<JobSchema, Box<dyn std::error::Error + Send + Sync>> {
+                    let job_type_str: String = row.get("type");
+                    let job_status_str: String = row.get("job_status");
+
+                    let job_type = JobType::from_str(&job_type_str)
+                        .map_err(|err| format!("Failed to parse job type: {}", err))?;
+                    let job_status = JobStatus::from_str(&job_status_str)
+                        .map_err(|err| format!("Failed to parse job status: {}", err))?;
+
+                    Ok(JobSchema {
+                        job_uuid: row.get("job_uuid"),
+                        job_status,
+                        slot: row.get("slot"),
+                        batch_range_begin_epoch: row
+                            .get::<&str, Option<i64>>("batch_range_begin_epoch")
+                            .unwrap_or(0),
+                        batch_range_end_epoch: row
+                            .get::<&str, Option<i64>>("batch_range_end_epoch")
+                            .unwrap_or(0),
+                        job_type,
+                        atlantic_proof_generate_batch_id: row
+                            .get("atlantic_proof_generate_batch_id"),
+                        atlantic_proof_wrapper_batch_id: row.get("atlantic_proof_wrapper_batch_id"),
+                        //updated_at: row.get("updated_at"),
+                    })
+                },
+            )
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(jobs)
     }
 
     // async fn fetch_job_by_status(

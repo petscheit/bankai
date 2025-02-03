@@ -3,7 +3,7 @@ use crate::BankaiConfig;
 use crate::{traits::Provable, Error};
 use tokio::task;
 use tokio::task::JoinError;
-use tracing::info;
+use tracing::{debug, info};
 
 pub struct CairoRunner();
 
@@ -18,10 +18,11 @@ impl CairoRunner {
             .await
             .map_err(|e| Error::CairoRunError(format!("Semaphore error: {}", e)))?;
 
-        let input_path = input.export()?;
+        let input_path = input.inputs_path();
+        info!("Cairo Input path: {}", input_path);
 
         let program_path = match input.proof_type() {
-            ProofType::Epoch => config.epoch_circuit_path.clone(),
+            //ProofType::Epoch => config.epoch_circuit_path.clone(),
             ProofType::SyncCommittee => config.committee_circuit_path.clone(),
             ProofType::EpochBatch => config.epoch_batch_circuit_path.clone(),
         };
