@@ -205,8 +205,8 @@ async fn main() -> Result<(), Error> {
     from_filename(".env.sepolia").ok();
 
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
-        //.with_max_level(Level::INFO)
+        // .with_max_level(Level::TRACE)
+        .with_max_level(Level::INFO)
         .finish();
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
@@ -302,6 +302,7 @@ async fn main() -> Result<(), Error> {
             let update = bankai
                 .get_sync_committee_update(latest_epoch.try_into().unwrap())
                 .await?;
+            let _ = update.export()?;
             CairoRunner::generate_pie(&update, &bankai.config).await?;
             let batch_id = bankai.atlantic_client.submit_batch(update).await?;
             println!("Batch Submitted: {}", batch_id);
@@ -315,14 +316,17 @@ async fn main() -> Result<(), Error> {
             // make sure next_epoch % 32 == 0
             let next_epoch = (u64::try_from(latest_epoch).unwrap() / 32) * 32 + 32;
             println!("Fetching Inputs for Epoch: {}", next_epoch);
-            let proof = bankai.get_epoch_proof(next_epoch).await?;
-            CairoRunner::generate_pie(&proof, &bankai.config).await?;
-            let batch_id = bankai.atlantic_client.submit_batch(proof).await?;
+            // let proof = bankai.get_epoch_proof(next_epoch).await?;
+            let epoch_update = EpochUpdate::new(&bankai.client, next_epoch).await?;
+            let _ = epoch_update.export()?;
+            CairoRunner::generate_pie(&epoch_update, &bankai.config).await?;
+            let batch_id = bankai.atlantic_client.submit_batch(epoch_update).await?;
             println!("Batch Submitted: {}", batch_id);
         }
         Commands::ProveNextEpochBatch => {
             let epoch_update = EpochUpdateBatch::new(&bankai).await?;
             println!("Update contents: {:?}", epoch_update);
+            let _ = epoch_update.export()?;
             CairoRunner::generate_pie(&epoch_update, &bankai.config).await?;
             let batch_id = bankai.atlantic_client.submit_batch(epoch_update).await?;
             println!("Batch Submitted: {}", batch_id);

@@ -109,7 +109,6 @@ impl StarknetClient {
         })
     }
 
-    #[cfg(feature = "cli")]
     pub async fn deploy_contract(
         &self,
         init_data: ContractInitializationData,
@@ -136,12 +135,19 @@ impl StarknetClient {
             contract_address
         );
 
-        deploy_tx
-            .send()
-            .await
-            .map_err(|e| StarknetError::AccountError(e.to_string()))?;
-
-        Ok(contract_address)
+        match deploy_tx.send().await {
+            Ok(_result) => {
+                info!("Deployment transaction sent successfully");
+                Ok(contract_address)
+            }
+            Err(e) => {
+                error!("Deployment failed with error: {:#?}", e);
+                Err(StarknetError::AccountError(format!(
+                    "Deployment failed: {:#?}",
+                    e
+                )))
+            }
+        }
     }
 
     pub async fn submit_update<T>(
@@ -149,24 +155,20 @@ impl StarknetClient {
         update: impl Submittable<T>,
         config: &BankaiConfig,
     ) -> Result<Felt, StarknetError> {
-        println!(
-            "{:?}",
-            vec![Call {
-                to: config.contract_address,
-                selector: update.get_contract_selector(),
-                calldata: update.to_calldata(),
-            }]
-        );
+        let selector = update.get_contract_selector();
+        let calldata = update.to_calldata();
+
+        let call = Call {
+            to: config.contract_address,
+            selector,
+            calldata,
+        };
+        
         let send_result = self
             .account
-            .execute_v1(vec![Call {
-                to: config.contract_address,
-                selector: update.get_contract_selector(),
-                calldata: update.to_calldata(),
-            }])
+            .execute_v1(vec![call])
             .send()
             .await;
-        //.map_err(|e| StarknetError::TransactionError(e.to_string()))?;
 
         match send_result {
             Ok(tx_response) => {
@@ -175,20 +177,13 @@ impl StarknetClient {
                 Ok(tx_hash)
             }
             Err(e) => {
-                //error!("Transaction execution error: {:#?}", e);
-
-                // Return a more descriptive error
+                error!("Transaction execution error: {:#?}", e);
                 Err(StarknetError::TransactionError(format!(
                     "TransactionExecutionError: {:#?}",
                     e
                 )))
             }
         }
-
-        // println!("tx_hash: {:?}", result.transaction_hash);
-
-        // // Return the transaction hash
-        // Ok(result.transaction_hash)
     }
 
     pub async fn get_committee_hash(
@@ -246,7 +241,7 @@ impl StarknetClient {
             .call(
                 FunctionCall {
                     contract_address: config.contract_address,
-                    entry_point_selector: selector!("get_latest_epoch"),
+                    entry_point_selector: selector!("get_latest_epoch_slot"),
                     calldata: vec![],
                 },
                 BlockId::Tag(BlockTag::Latest),

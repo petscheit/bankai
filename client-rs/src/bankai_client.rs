@@ -83,7 +83,6 @@ impl BankaiClient {
         Ok(epoch_proof)
     }
 
-    #[cfg(feature = "cli")]
     pub async fn get_contract_initialization_data(
         &self,
         slot: u64,

@@ -42,7 +42,6 @@ pub struct ExpectedEpochBatchOutputs {
 }
 
 impl EpochUpdateBatch {
-    #[cfg(feature = "cli")]
     pub(crate) async fn new(bankai: &BankaiClient) -> Result<EpochUpdateBatch, Error> {
         let (start_slot, mut end_slot) = bankai
             .starknet_client
@@ -77,7 +76,6 @@ impl EpochUpdateBatch {
                 TARGET_BATCH_SIZE
             );
             let epoch_update = EpochUpdate::new(&bankai.client, current_slot).await?;
-
             epochs.push(epoch_update);
             current_slot += 32;
             //info!("epochspush");
