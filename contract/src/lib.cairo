@@ -294,6 +294,7 @@ pub mod BankaiContract {
             execution_height: u64,
         ) { 
             assert(!self.paused.read(), 'Contract is paused');
+
             let signing_committee_id = (slot / 0x2000);
             let valid_committee_hash = self.committee.read(signing_committee_id);
             assert(committee_hash == valid_committee_hash, 'Invalid Committee Hash!');
@@ -317,7 +318,7 @@ pub mod BankaiContract {
 
             let latest_epoch = self.latest_epoch_slot.read();
             if slot > latest_epoch {
-                self.latest_epoch.write(slot);
+                self.latest_epoch_slot.write(slot);
             }
         }
 
@@ -521,7 +522,7 @@ mod tests {
         let state = deploy_contract();
         
         assert!(!IBankaiContract::is_paused(@state));
-        assert_eq!(IBankaiContract::get_latest_epoch(@state), 0);
+        assert_eq!(IBankaiContract::get_latest_epoch_slot(@state), 0);
         assert_eq!(IBankaiContract::get_latest_committee_id(@state), 1);
         assert_eq!(IBankaiContract::get_committee_hash(@state, 1), 1234.into());
         assert_eq!(IBankaiContract::get_committee_update_program_hash(@state), 111);
@@ -611,7 +612,7 @@ mod tests {
         let state = deploy_contract();
         
         assert_eq!(IBankaiContract::get_committee_hash(@state, 1), 1234.into());
-        assert_eq!(IBankaiContract::get_latest_epoch(@state), 0);
+        assert_eq!(IBankaiContract::get_latest_epoch_slot(@state), 0);
         assert_eq!(IBankaiContract::get_latest_committee_id(@state), 1);
         assert_eq!(IBankaiContract::get_committee_update_program_hash(@state), 111);
         assert_eq!(IBankaiContract::get_epoch_update_program_hash(@state), 222);
