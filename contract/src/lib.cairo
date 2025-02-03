@@ -221,11 +221,7 @@ pub mod BankaiContract {
             execution_hash: u256,
             execution_height: u64,
         ) {
-            // Add slot validation
-            let latest_epoch = self.latest_epoch.read();
-            assert(slot > latest_epoch, 'Slot must be higher!');
             
-            // println!("verify_epoch_update");
             let signing_committee_id = (slot / 0x2000);
             let valid_committee_hash = self.committee.read(signing_committee_id);
             assert(committee_hash == valid_committee_hash, 'Invalid Committee Hash!');
@@ -241,7 +237,11 @@ pub mod BankaiContract {
             };
             self.epochs.write(slot, epoch_proof);
 
-            self.latest_epoch.write(slot);
+            let latest_epoch = self.latest_epoch.read();
+            if slot > latest_epoch {
+                self.latest_epoch.write(slot);
+            }
+
             self.emit(Event::EpochUpdated(EpochUpdated {
                 beacon_root: header_root, slot: slot, execution_hash: execution_hash, execution_height: execution_height,
             }));
@@ -257,11 +257,7 @@ pub mod BankaiContract {
             n_signers: u64,
             execution_hash: u256,
             execution_height: u64,
-        ) {
-            // Add slot validation
-            let latest_epoch = self.latest_epoch.read();
-            assert(slot > latest_epoch, 'Slot must be higher!');
-            
+        ) { 
             let signing_committee_id = (slot / 0x2000);
             let valid_committee_hash = self.committee.read(signing_committee_id);
             assert(committee_hash == valid_committee_hash, 'Invalid Committee Hash!');
@@ -277,12 +273,16 @@ pub mod BankaiContract {
             };
             self.epochs.write(slot, epoch_proof);
 
-            self.latest_epoch.write(slot);
             self.emit(Event::EpochBatch(EpochBatch {
                 batch_root: batch_root, beacon_root: header_root, slot: slot, execution_hash: execution_hash, execution_height: execution_height,
             }));
 
             self.batches.write(batch_root, true);
+
+            let latest_epoch = self.latest_epoch.read();
+            if slot > latest_epoch {
+                self.latest_epoch.write(slot);
+            }
         }
 
         fn decommit_batched_epoch(
