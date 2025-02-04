@@ -200,4 +200,20 @@ impl BeaconRpcClient {
         let pubkeys = self.fetch_validator_pubkeys(&indexes).await?;
         Ok(pubkeys.into())
     }
+
+    /// Fetches the current head slot of the beacon chain.
+    ///
+    /// # Returns
+    /// The current slot number of the beacon chain head.
+    pub async fn get_head_slot(&self) -> Result<u64, Error> {
+        let json = self.get_json("eth/v1/beacon/headers/head").await?;
+        
+        let slot = json["data"]["header"]["message"]["slot"]
+            .as_str()
+            .ok_or(Error::DeserializeError("Missing slot field".into()))?
+            .parse()
+            .map_err(|e: std::num::ParseIntError| Error::DeserializeError(e.to_string()))?;
+
+        Ok(slot)
+    }
 }
