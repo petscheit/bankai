@@ -421,6 +421,33 @@ async fn handle_beacon_chain_head_event(
     );
 
     // Decide basing on actual state
+    if helpers::get_sync_committee_id_by_epoch(latest_scheduled_epoch + 1)
+        > latest_scheduled_sync_committee
+    {
+        // We reached end of current sync committee, need to schedule new sync committee proving
+        match run_sync_committee_update_job(
+            db_manager.clone(),
+            latest_scheduled_sync_committee + 1,
+            tx.clone(),
+        )
+        .await
+        {
+            Ok(()) => {}
+            Err(e) => {
+                error!("Error while creating sync committee update job: {}", e);
+            }
+        };
+    }
+
+    let current_sync_committee_epochs_left = helpers::get_last_epoch_for_sync_committee(
+        helpers::get_sync_committee_id_by_epoch(latest_scheduled_epoch + 1),
+    ) - current_epoch_id;
+    info!(
+        "{} epochs left in current sync committee",
+        current_sync_committee_epochs_left
+    );
+
+    // Decide basing on actual state
     if epochs_behind > constants::TARGET_BATCH_SIZE {
         // is_node_in_sync = true;
 
@@ -454,24 +481,6 @@ async fn handle_beacon_chain_head_event(
                 helpers::get_first_epoch_for_sync_committee(currently_processed_sync_committee_id + 1),
                 helpers::get_last_epoch_for_sync_committee(currently_processed_sync_committee_id + 1)
             );
-
-            if helpers::get_sync_committee_id_by_epoch(epoch_to_start_from)
-                > latest_scheduled_sync_committee
-            {
-                // We reached end of current sync committee, need to schedule new sync committee proving
-                match run_sync_committee_update_job(
-                    db_manager.clone(),
-                    latest_scheduled_sync_committee + 1,
-                    tx.clone(),
-                )
-                .await
-                {
-                    Ok(()) => {}
-                    Err(e) => {
-                        error!("Error while creating sync committee update job: {}", e);
-                    }
-                };
-            }
 
             if helpers::get_last_epoch_for_sync_committee(currently_processed_sync_committee_id)
                 == epoch_to_start_from
