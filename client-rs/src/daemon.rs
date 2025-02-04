@@ -930,7 +930,7 @@ async fn broadcast_onchain_ready_jobs(
 
                 match confirmation_result {
                     Ok(_) => {
-                        info!("[EPOCH BATCH JOB] Transaction is confirmed on-chain!");
+                        info!("[SYNC COMMITTEE JOB] Transaction is confirmed on-chain!");
                         db_manager
                             .update_job_status(job.job_uuid, JobStatus::Done)
                             .await?;
@@ -963,7 +963,10 @@ async fn broadcast_onchain_ready_jobs(
                             .await?;
                     }
                     Err(e) => {
-                        eprintln!("[EPOCH BATCH JOB] Transaction failed or timed out: {:?}", e);
+                        eprintln!(
+                            "[SYNC COMMITTEE JOB] Transaction failed or timed out: {:?}",
+                            e
+                        );
                         db_manager
                             .update_job_status(job.job_uuid, JobStatus::Error)
                             .await?;
@@ -1158,7 +1161,7 @@ async fn process_job(
                         break;
                     }
                     _ => {
-                        error!("[EPOCH JOB] Unexpected behaviour");
+                        error!("[SYNC COMMITTEE JOB] Unexpected behaviour");
                         break;
                     }
                 }
@@ -1256,7 +1259,7 @@ async fn process_job(
                             .await?;
 
                         info!(
-                            "[EPOCH JOB] Proof retrieved from Atlantic. QueryID: {}",
+                            "[BATCH EPOCH JOB] Proof retrieved from Atlantic. QueryID: {}",
                             batch_id
                         );
 
@@ -1266,12 +1269,12 @@ async fn process_job(
 
                         // 5) Submit wrapped proof request
                         info!(
-                            "[EPOCH JOB] Uploading proof and sending wrapping query to Atlantic.."
+                            "[BATCH EPOCH JOB] Uploading proof and sending wrapping query to Atlantic.."
                         );
                         wrapping_batch_id =
                             bankai.atlantic_client.submit_wrapped_proof(proof).await?;
                         info!(
-                                    "[EPOCH JOB] Proof wrapping query submitted to Atlantic. Wrapping QueryID: {}",
+                                    "[BATCH EPOCH JOB] Proof wrapping query submitted to Atlantic. Wrapping QueryID: {}",
                                     wrapping_batch_id
                                 );
 
@@ -1292,7 +1295,7 @@ async fn process_job(
                     JobStatus::WrapProofRequested => {
                         // Pool for Atlantic execution done
                         info!(
-                        "[SYNC COMMITTEE JOB] Waiting for completion of Atlantic proof wrapping job. QueryID: {}",
+                        "[BATCH EPOCH JOB] Waiting for completion of Atlantic proof wrapping job. QueryID: {}",
                          wrapping_batch_id
                         );
 
@@ -1309,7 +1312,7 @@ async fn process_job(
                             .update_job_status(job.job_id, JobStatus::WrappedProofDone)
                             .await?;
 
-                        info!("[EPOCH JOB] Proof wrapping done by Atlantic. Fact registered on Integrity. Wrapping QueryID: {}", wrapping_batch_id);
+                        info!("[BATCH EPOCH JOB] Proof wrapping done by Atlantic. Fact registered on Integrity. Wrapping QueryID: {}", wrapping_batch_id);
 
                         db_manager
                             .update_job_status(job.job_id, JobStatus::OffchainComputationFinished)
@@ -1318,7 +1321,7 @@ async fn process_job(
                         break;
                     }
                     _ => {
-                        error!("[EPOCH JOB] Unexpected behaviour");
+                        error!("[BATCH EPOCH JOB] Unexpected behaviour");
                         break;
                     }
                 }
