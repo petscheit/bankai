@@ -27,11 +27,11 @@ impl Default for BankaiConfig {
     fn default() -> Self {
         Self {
             contract_class_hash: Felt::from_hex(
-                "0x020e0b39c5a14e0979081bde8a6670c9c8f69540f0078f0ec586ca51305bb3d0",
+                "0x00034b6d1cd9858aeabcee33ef5ec5cd04be155d79ca2bbf9036700cb6c7c287",
             )
             .unwrap(),
             contract_address: Felt::from_hex(
-                "0x1653a617deb89574e9328ce29e3a6893737bc38a4b5af0ec8265e0061f77c50",
+                "0x1b7b70023bc2429d4453ce75d75f3e8b01b0730ca83068a82b4d17aa88a25e3",
             )
             .unwrap(),
             committee_update_program_hash: Felt::from_hex(

@@ -124,8 +124,11 @@ impl StarknetClient {
             class_hash
         );
 
+        let mut params = init_data.to_calldata();
+        params.push(self.account.address());
+
         let contract_factory = ContractFactory::new(class_hash, self.account.clone());
-        let deploy_tx = contract_factory.deploy_v1(init_data.to_calldata(), felt!("1337"), false);
+        let deploy_tx = contract_factory.deploy_v1(params, felt!("1337"), false);
 
         let contract_address = deploy_tx.deployed_address();
 

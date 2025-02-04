@@ -16,7 +16,7 @@ pub mod BankaiContract {
     };
     use starknet::ClassHash;
 
-    use starknet::{get_caller_address, get_block_timestamp};
+    use starknet::{ContractAddress, get_block_timestamp};
     use integrity::{
         Integrity, IntegrityWithConfig, SHARP_BOOTLOADER_PROGRAM_HASH, VerifierConfiguration,
     };
@@ -122,9 +122,10 @@ pub mod BankaiContract {
         committee_update_program_hash: felt252,
         epoch_update_program_hash: felt252,
         epoch_batch_program_hash: felt252,
+        owner: ContractAddress,
     ) {
         // Initialize owner as contract deployer
-        self.ownable.initializer(get_caller_address());
+        self.ownable.initializer(owner);
         self.latest_epoch_slot.write(0);
 
         // Write trusted initial committee
