@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:14
+    container_name: postgres
+    environment:
+      POSTGRESQL_USER: ${POSTGRES_USER:-postgres}
+      POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRESQL_DB_NAME: ${POSTGRES_DB:-bankai}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - ${POSTGRES_PORT:-5432}:${POSTGRES_PORT:-5432}
+
+  daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bankai-daemon
+    depends_on:
+      - postgres
+    env_file:
+      - .env.sepolia
+    #environment:
+    # POSTGRESQL_USER
+    volumes:
+      - ./batches:/usr/src/app/batches
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:

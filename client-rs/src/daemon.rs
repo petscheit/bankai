@@ -193,7 +193,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         ))
         .with_state(app_state);
 
-    let addr = "0.0.0.0:3000".parse::<SocketAddr>()?;
+    let addr = "0.0.0.0:3001".parse::<SocketAddr>()?;
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
     info!("Bankai RPC HTTP server is listening on http://{}", addr);
@@ -825,12 +825,8 @@ async fn broadcast_onchain_ready_jobs(
         match job.job_type {
             JobType::EpochBatchUpdate => {
                 let circuit_inputs = EpochUpdateBatch::from_json::<EpochUpdateBatch>(
-                    helpers::get_first_slot_for_epoch(
-                        job.batch_range_begin_epoch.try_into().unwrap(),
-                    ),
-                    helpers::get_first_slot_for_epoch(
-                        job.batch_range_end_epoch.try_into().unwrap(),
-                    ),
+                    job.batch_range_begin_epoch.try_into().unwrap(),
+                    job.batch_range_end_epoch.try_into().unwrap(),
                 )?;
 
                 info!(
@@ -1164,7 +1160,6 @@ async fn process_job(
                 match current_status {
                     JobStatus::Created => {
                         info!("[BATCH EPOCH JOB] Preparing inputs for program...");
-
                         let circuit_inputs = EpochUpdateBatch::new_by_epoch_range(
                             &bankai,
                             db_manager.clone(),
@@ -1184,8 +1179,8 @@ async fn process_job(
                     }
                     JobStatus::ProgramInputsPrepared => {
                         let circuit_inputs = EpochUpdateBatch::from_json::<EpochUpdateBatch>(
-                            helpers::get_first_slot_for_epoch(job.batch_range_begin_epoch.unwrap()),
-                            helpers::get_first_slot_for_epoch(job.batch_range_end_epoch.unwrap()),
+                            job.batch_range_begin_epoch.unwrap(),
+                            job.batch_range_end_epoch.unwrap(),
                         )?;
 
                         info!("[BATCH EPOCH JOB] Starting trace generation...");
@@ -1200,8 +1195,8 @@ async fn process_job(
                     }
                     JobStatus::PieGenerated => {
                         let circuit_inputs = EpochUpdateBatch::from_json::<EpochUpdateBatch>(
-                            helpers::get_first_slot_for_epoch(job.batch_range_begin_epoch.unwrap()),
-                            helpers::get_first_slot_for_epoch(job.batch_range_end_epoch.unwrap()),
+                            job.batch_range_begin_epoch.unwrap(),
+                            job.batch_range_end_epoch.unwrap(),
                         )?;
 
                         info!("[BATCH EPOCH JOB] Uploading PIE and sending proof generation request to Atlantic...");
