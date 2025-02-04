@@ -126,6 +126,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     });
 
+    // Retry any failed jobs before processing new ones
+    retry_failed_jobs(db_manager.clone(), tx_for_listener.clone()).await?;
+
     // 🔄 Resume any unfinished jobs before processing new ones
     resume_unfinished_jobs(db_manager.clone(), tx_for_listener.clone()).await?;
 
@@ -327,6 +330,10 @@ async fn handle_beacon_chain_head_event(
             );
         }
     }
+
+    let _ = db_manager
+        .update_daemon_state_info(parsed_event.slot, parsed_event.block)
+        .await;
 
     // We can do all circuit computations up to latest slot in advance, but the onchain broadcasts must be send in correct order
     // By correct order mean that within the same sync committe the epochs are not needed to be broadcasted in order
@@ -712,18 +719,29 @@ async fn resume_unfinished_jobs(
 
         let tx_clone = tx.clone();
         tokio::spawn(async move {
-            info!(
-                "Resuming job {} with status {}...",
-                job_id,
-                job_to_resume.job_status.to_string()
-            );
+            match job_to_resume.job_type {
+                JobType::SyncCommitteeUpdate => {
+                    info!(
+                        "Resuming job {}... (sync committee update job for sync committee {})",
+                        job_id,
+                        helpers::slot_to_sync_committee_id(job.slot.to_u64().unwrap())
+                    );
+                }
+                JobType::EpochBatchUpdate => {
+                    info!(
+                        "Resuming job {}... (batch epoch update job for epochs from {} to {})",
+                        job_id, job.batch_range_begin_epoch, job.batch_range_end_epoch
+                    );
+                }
+            }
+
             if tx_clone.send(job_to_resume).await.is_err() {
                 // return Err("Failed to send job".into());
                 error!("Error resuming job: {}", job_id);
             }
         });
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_millis(500)).await;
     }
 
     Ok(())
@@ -763,14 +781,31 @@ async fn retry_failed_jobs(
 
         let tx_clone = tx.clone();
         tokio::spawn(async move {
-            info!("Retrying failed job {}...", job_id);
+            match job_to_retry.job_type {
+                JobType::SyncCommitteeUpdate => {
+                    info!(
+                        "Requesting retry of failed job {}... (sync committee update job for sync committee {})",
+                        job_id,
+                        helpers::slot_to_sync_committee_id(job.slot.to_u64().unwrap())
+                    );
+                }
+                JobType::EpochBatchUpdate => {
+                    info!(
+                        "Requesting retry of failed job {}... (batch epoch update job for epochs from {} to {})",
+                        job_id,
+                        job.batch_range_begin_epoch,
+                        job.batch_range_end_epoch
+                    );
+                }
+            }
+
             if tx_clone.send(job_to_retry).await.is_err() {
                 // return Err("Failed to send job".into());
                 error!("Error retrying job: {}", job_id);
             }
         });
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_millis(500)).await;
     }
 
     Ok(())

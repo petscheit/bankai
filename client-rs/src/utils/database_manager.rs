@@ -268,7 +268,7 @@ impl DatabaseManager {
             .client
             .query_opt(
                 "SELECT slot FROM jobs
-                 WHERE job_status NOT IN ('DONE', 'CANCELLED', 'ERROR')
+                 WHERE job_status NOT IN ('DONE')
                         AND type = 'SYNC_COMMITTEE_UPDATE'
                  ORDER BY slot DESC
                  LIMIT 1",
@@ -604,4 +604,36 @@ impl DatabaseManager {
 
     //     Ok(())
     // }
+    //
+
+    // pub async fn insert_job_log_entry(
+    //     &self,
+    //     job_id: u64,
+    //     event_type: JobLogEntry,
+    //     details: String,
+    // ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    //     self.client
+    //         .execute(
+    //             "INSERT INTO job_logs (job_id, event_type, details)
+    //          VALUES ($1, $2, $3)",
+    //             &[&job_id.to_string(), &event_type.to_string(), &details],
+    //         )
+    //         .await?;
+
+    //     Ok(())
+    // }
+    //
+    pub async fn update_daemon_state_info(
+        &self,
+        latest_known_beacon_slot: u64,
+        latest_known_beacon_block: FixedBytes<32>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.client
+            .execute(
+                "UPDATE daemon_state SET latest_known_beacon_slot = $1, latest_known_beacon_block = NOW()",
+                &[&latest_known_beacon_slot.to_string(), &latest_known_beacon_block.to_string()],
+            )
+            .await?;
+        Ok(())
+    }
 }

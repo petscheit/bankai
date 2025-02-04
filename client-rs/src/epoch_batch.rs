@@ -1,8 +1,8 @@
 use crate::constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE};
 use crate::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs};
 use crate::helpers::{
-    calculate_slots_range_for_batch, get_first_slot_for_epoch, get_sync_committee_id_by_epoch,
-    slot_to_epoch_id,
+    self, calculate_slots_range_for_batch, get_first_slot_for_epoch,
+    get_sync_committee_id_by_epoch, slot_to_epoch_id,
 };
 use crate::traits::{Provable, Submittable};
 use crate::utils::hashing::get_committee_hash;
@@ -278,18 +278,18 @@ impl EpochUpdateBatch {
 }
 
 impl EpochUpdateBatch {
-    pub fn from_json<T>(first_slot: u64, last_slot: u64) -> Result<T, Error>
+    pub fn from_json<T>(first_epoch: u64, last_epoch: u64) -> Result<T, Error>
     where
         T: serde::de::DeserializeOwned,
     {
         info!(
             "Trying to read file batches/epoch_batch/{}_to_{}/input_batch_{}_to_{}.json",
-            first_slot, last_slot, first_slot, last_slot
+            first_epoch, last_epoch, first_epoch, last_epoch
         );
         // Pattern match for files like: batches/epoch_batch/6709248_to_6710272/input_batch_6709248_to_6710272.json
         let path = format!(
             "batches/epoch_batch/{}_to_{}/input_batch_{}_to_{}.json",
-            first_slot, last_slot, first_slot, last_slot
+            first_epoch, last_epoch, first_epoch, last_epoch
         );
         debug!(path);
         let glob_pattern = glob::glob(&path)
@@ -326,6 +326,7 @@ impl Provable for EpochUpdateBatch {
             .circuit_inputs
             .header
             .slot;
+        let first_epoch = helpers::slot_to_epoch_id(first_slot);
         let last_slot = self
             .circuit_inputs
             .epochs
@@ -334,11 +335,12 @@ impl Provable for EpochUpdateBatch {
             .circuit_inputs
             .header
             .slot;
-        let dir_path = format!("batches/epoch_batch/{}_to_{}", first_slot, last_slot);
+        let last_epoch = helpers::slot_to_epoch_id(last_slot);
+        let dir_path = format!("batches/epoch_batch/{}_to_{}", first_epoch, last_epoch);
         fs::create_dir_all(dir_path.clone()).map_err(Error::IoError)?;
         let path = format!(
             "{}/input_batch_{}_to_{}.json",
-            dir_path, first_slot, last_slot
+            dir_path, first_epoch, last_epoch
         );
         fs::write(path.clone(), json).map_err(Error::IoError)?;
         Ok(path)
@@ -357,6 +359,7 @@ impl Provable for EpochUpdateBatch {
             .circuit_inputs
             .header
             .slot;
+        let first_epoch = helpers::slot_to_epoch_id(first_slot);
         let last_slot = self
             .circuit_inputs
             .epochs
@@ -365,9 +368,10 @@ impl Provable for EpochUpdateBatch {
             .circuit_inputs
             .header
             .slot;
+        let last_epoch = helpers::slot_to_epoch_id(last_slot);
         format!(
             "batches/epoch_batch/{}_to_{}/pie_batch_{}_to_{}.zip",
-            first_slot, last_slot, first_slot, last_slot
+            first_epoch, last_epoch, first_epoch, last_epoch
         )
     }
 
@@ -380,6 +384,7 @@ impl Provable for EpochUpdateBatch {
             .circuit_inputs
             .header
             .slot;
+        let first_epoch = helpers::slot_to_epoch_id(first_slot);
         let last_slot = self
             .circuit_inputs
             .epochs
@@ -388,9 +393,10 @@ impl Provable for EpochUpdateBatch {
             .circuit_inputs
             .header
             .slot;
+        let last_epoch = helpers::slot_to_epoch_id(last_slot);
         format!(
             "batches/epoch_batch/{}_to_{}/input_batch_{}_to_{}.json",
-            first_slot, last_slot, first_slot, last_slot
+            first_epoch, last_epoch, first_epoch, last_epoch
         )
     }
 }
