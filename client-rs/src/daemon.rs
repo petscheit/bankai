@@ -415,13 +415,18 @@ async fn handle_beacon_chain_head_event(
         latest_scheduled_sync_committee = latest_verified_sync_committee_id;
     }
 
+    info!(
+        "Current state: Beacon Chain: [Slot: {} Epoch: {} Sync Committee: {}] | Latest verified: [Slot: {} Epoch: {} Sync Committee: {}] | Latest in progress: [Epoch: {} Sync Committee: {}] | Sync in progress...",
+        parsed_event.slot, current_epoch_id, current_sync_committee_id, latest_verified_epoch_slot, latest_verified_epoch_id, latest_verified_sync_committee_id, last_epoch_in_progress, last_sync_committee_in_progress
+    );
+
     // Decide basing on actual state
     if epochs_behind > constants::TARGET_BATCH_SIZE {
         // is_node_in_sync = true;
 
         warn!(
-            "Bankai is out of sync now. Node is {} epochs behind network. Current Beacon Chain state: [Slot: {} Epoch: {} Sync Committee: {}] | Latest verified: [Slot: {} Epoch: {} Sync Committee: {}] | Latest in progress: [Epoch: {} Sync Committee: {}] | Sync in progress...",
-            epochs_behind, parsed_event.slot, current_epoch_id, current_sync_committee_id, latest_verified_epoch_slot, latest_verified_epoch_id, latest_verified_sync_committee_id, last_epoch_in_progress, last_sync_committee_in_progress
+            "Bankai is out of sync now. Node is {} epochs behind network. | Sync in progress...",
+            epochs_behind
         );
 
         // Check if we have in progress all epochs that need to be processed, if no, run job
@@ -517,32 +522,35 @@ async fn handle_beacon_chain_head_event(
             debug!("All reqired jobs are now queued and processing");
         }
     } else if epochs_behind == constants::TARGET_BATCH_SIZE {
-        // This is when we are synced properly and new epoch batch needs to be inserted
-        info!(
-            "Starting processing next epoch batch. Current Beacon Chain epoch: {} Latest verified epoch: {}",
-            current_epoch_id, latest_verified_epoch_id
-        );
+        if last_epoch_in_progress < (epochs_behind + current_epoch_id) {
+            // This is when we are synced properly and new epoch batch needs to be inserted
+            info!(
+                "Target batch size reached. Starting processing next epoch batch. Current Beacon Chain epoch: {} Latest verified epoch: {}",
+                current_epoch_id, latest_verified_epoch_id
+            );
 
-        let epoch_to_start_from = latest_scheduled_epoch + 1;
-        let epoch_to_end_on = latest_scheduled_epoch + constants::TARGET_BATCH_SIZE;
-        match run_batch_epoch_update_job(
-            db_manager.clone(),
-            get_first_slot_for_epoch(epoch_to_start_from)
-                + (constants::SLOTS_PER_EPOCH * constants::TARGET_BATCH_SIZE),
-            epoch_to_start_from,
-            epoch_to_end_on,
-            tx.clone(),
-        )
-        .await
-        {
-            Ok(()) => {}
-            Err(e) => {
-                error!("Error while creating job: {}", e);
-            }
-        };
+            let epoch_to_start_from = latest_scheduled_epoch + 1;
+            let epoch_to_end_on = latest_scheduled_epoch + constants::TARGET_BATCH_SIZE;
+            match run_batch_epoch_update_job(
+                db_manager.clone(),
+                get_first_slot_for_epoch(epoch_to_start_from)
+                    + (constants::SLOTS_PER_EPOCH * constants::TARGET_BATCH_SIZE),
+                epoch_to_start_from,
+                epoch_to_end_on,
+                tx.clone(),
+            )
+            .await
+            {
+                Ok(()) => {}
+                Err(e) => {
+                    error!("Error while creating job: {}", e);
+                }
+            };
+        }
     } else if epochs_behind < constants::TARGET_BATCH_SIZE {
         // When we are in sync and not yet reached the TARGET_BATCH_SIZE epochs lagging behind actual beacon chian state
-        debug!("Target batch size not reached yet, daemon is in sync");
+        let eppchs_left = constants::TARGET_BATCH_SIZE - epochs_behind;
+        info!("Target batch size not reached yet, daemon is in sync, {} epochs left to start new batch job", eppchs_left);
     }
 
     // Check if sync committee update is needed
@@ -688,6 +696,8 @@ async fn resume_unfinished_jobs(
     let unfinished_jobs = db_manager
         .get_jobs_with_statuses(vec![
             JobStatus::Created,
+            JobStatus::ProgramInputsPrepared,
+            JobStatus::StartedTraceGeneration,
             JobStatus::PieGenerated,
             JobStatus::AtlanticProofRequested,
             JobStatus::AtlanticProofRetrieved,
@@ -830,7 +840,7 @@ async fn broadcast_onchain_ready_jobs(
                 )?;
 
                 info!(
-                    "[SYNC COMMITTEE JOB] Calling epoch batch update onchain for epochs range from {} to {}...",
+                    "[EPOCH BATCH JOB] Calling epoch batch update onchain for epochs range from {} to {}...",
                     job.batch_range_begin_epoch, job.batch_range_end_epoch
                 );
 
@@ -849,7 +859,7 @@ async fn broadcast_onchain_ready_jobs(
                     .update_job_status(job.job_uuid, JobStatus::ProofVerifyCalledOnchain)
                     .await?;
 
-                let send_result = db_manager.set_job_txhash(job.job_uuid, txhash).await?;
+                let _send_result = db_manager.set_job_txhash(job.job_uuid, txhash).await?;
 
                 let confirmation_result =
                     bankai.starknet_client.wait_for_confirmation(txhash).await;
@@ -1013,7 +1023,7 @@ async fn process_job(
 
                         current_status = JobStatus::ProgramInputsPrepared;
                     }
-                    JobStatus::ProgramInputsPrepared => {
+                    JobStatus::ProgramInputsPrepared | JobStatus::StartedTraceGeneration => {
                         let sync_committe_update_program_inputs =
                             SyncCommitteeUpdate::from_json::<SyncCommitteeUpdate>(
                                 job.slot.unwrap(),
@@ -1103,8 +1113,6 @@ async fn process_job(
                             .update_job_status(job.job_id, JobStatus::AtlanticProofRetrieved)
                             .await?;
 
-                        current_status = JobStatus::AtlanticProofRetrieved;
-
                         // Submit wrapped proof request
                         info!("[SYNC COMMITTEE JOB] Sending proof wrapping query to Atlantic..");
                         wrapping_batch_id =
@@ -1177,7 +1185,7 @@ async fn process_job(
 
                         current_status = JobStatus::ProgramInputsPrepared;
                     }
-                    JobStatus::ProgramInputsPrepared => {
+                    JobStatus::ProgramInputsPrepared | JobStatus::StartedTraceGeneration => {
                         let circuit_inputs = EpochUpdateBatch::from_json::<EpochUpdateBatch>(
                             job.batch_range_begin_epoch.unwrap(),
                             job.batch_range_end_epoch.unwrap(),

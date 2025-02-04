@@ -19,7 +19,7 @@ pub async fn handle_get_status(State(state): State<AppState>) -> impl IntoRespon
             last_epoch_in_progress
         }
         Ok(None) => 0,
-        Err(e) => 0,
+        Err(_) => 0,
     };
     let in_progress_jobs_count = state.db_manager.count_jobs_in_progress().await.unwrap();
     let last_sync_committee_in_progress = state
