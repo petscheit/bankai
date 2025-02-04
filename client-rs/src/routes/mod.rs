@@ -1,5 +1,4 @@
 use crate::state::AppState;
-use alloy_primitives::map::HashMap;
 use axum::{
     extract::{Path, State},
     response::IntoResponse,
@@ -19,23 +18,20 @@ pub mod dashboard;
 // Handler for GET /status
 pub async fn handle_get_status(State(state): State<AppState>) -> impl IntoResponse {
     let last_epoch_in_progress = match state.db_manager.get_latest_epoch_in_progress().await {
-        Ok(Some(epoch)) => epoch.to_u64().unwrap(),
-        Ok(None) | Err(_) => 0,
+        Ok(Some(epoch)) => {
+            let last_epoch_in_progress = epoch.to_u64().unwrap();
+            last_epoch_in_progress
+        }
+        Ok(None) => 0,
+        Err(_) => 0,
     };
-
-    let in_progress_jobs_count = match state.db_manager.count_jobs_in_progress().await {
-        Ok(Some(count)) => count,
-        Ok(None) | Err(_) => 0,
-    };
-
-    let last_sync_committee_in_progress = match state
+    let in_progress_jobs_count = state.db_manager.count_jobs_in_progress().await.unwrap();
+    let last_sync_committee_in_progress = state
         .db_manager
         .get_latest_sync_committee_in_progress()
         .await
-    {
-        Ok(Some(sync_committee)) => sync_committee,
-        Ok(None) | Err(_) => 0,
-    };
+        .unwrap()
+        .unwrap();
 
     // let beacon_chain_state = state
     //     .db_manager
@@ -43,26 +39,12 @@ pub async fn handle_get_status(State(state): State<AppState>) -> impl IntoRespon
     //     .await
     //     .unwrap();
 
-    let jobs_status_counts = state
-        .db_manager
-        .get_jobs_count_by_status()
-        .await
-        .unwrap_or_default();
+    Json(json!({ "success": true, "details": {
+        "last_epoch_in_progress": last_epoch_in_progress,
+        "last_sync_committee_in_progress": last_sync_committee_in_progress,
+        "jobs_in_progress_count": in_progress_jobs_count,
 
-    let mut jobs_status_map = HashMap::new();
-    for job_status_count in jobs_status_counts {
-        jobs_status_map.insert(job_status_count.status.to_string(), job_status_count.count);
-    }
-
-    Json(json!({
-        "success": true,
-        "details": {
-            "last_epoch_in_progress": last_epoch_in_progress,
-            "last_sync_committee_in_progress": last_sync_committee_in_progress,
-            "jobs_in_progress_count": in_progress_jobs_count,
-            "jobs_statuses": jobs_status_map,
-        }
-    }))
+    } }))
 }
 
 // // Handler for GET /epoch/:slot
@@ -223,19 +205,4 @@ pub async fn handle_get_merkle_paths_for_epoch(
             Json(json!({ "error": "Failed to fetch latest epoch" }))
         }
     }
-}
-
-pub fn configure_routes(state: AppState) -> Router {
-    Router::new()
-        // Status routes
-        .route("/status", get(handle_get_status))
-        .route("/epoch/:slot/proof", get(handle_get_epoch_proof))
-        .route("/committee/:committee_id/hash", get(handle_get_committee_hash))
-        .route("/latest/verified/slot", get(handle_get_latest_verified_slot))
-        .route("/latest/verified/committee", get(handle_get_latest_verified_committee))
-        .route("/job/:job_id/status", get(handle_get_job_status))
-        .route("/epoch/:epoch_id/merkle_paths", get(handle_get_merkle_paths_for_epoch))
-        // Dashboard routes
-        .nest("/dashboard", dashboard::routes())
-        .with_state(state)
 }
