@@ -27,7 +27,7 @@ pub struct AppState {
     pub bankai: Arc<BankaiClient>,
 }
 
-#[derive(Debug, FromSql, ToSql, Clone)]
+#[derive(Debug, FromSql, ToSql, Clone, Eq, Hash, PartialEq)]
 #[postgres(name = "job_status")]
 pub enum JobStatus {
     #[postgres(name = "CREATED")]

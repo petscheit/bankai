@@ -7,6 +7,7 @@ use std::str::FromStr;
 //use std::error::Error;
 use chrono::NaiveDateTime;
 use num_traits::ToPrimitive;
+use std::collections::HashMap;
 use tokio_postgres::{Client, Row};
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -30,6 +31,11 @@ pub struct JobWithTimestamps {
     pub created_at: String,
     pub updated_at: String,
     pub tx_hash: Option<String>,
+}
+
+pub struct JobStatusCount {
+    pub status: JobStatus,
+    pub count: i64,
 }
 
 #[derive(Debug)]
@@ -739,5 +745,53 @@ impl DatabaseManager {
             Ok(_) => true,
             Err(_) => false,
         }
+    }
+
+    pub async fn get_jobs_count_by_status(
+        &self,
+    ) -> Result<Vec<JobStatusCount>, Box<dyn std::error::Error + Send + Sync>> {
+        let rows = self
+            .client
+            .query(
+                "SELECT job_status, COUNT(*) AS job_count FROM jobs GROUP BY job_status",
+                &[],
+            )
+            .await?;
+
+        let mut db_counts: HashMap<JobStatus, i64> = HashMap::new();
+        for row in rows {
+            let status_str: String = row.get("job_status");
+            let status_count: i64 = row.get("job_count");
+
+            let job_status = JobStatus::from_str(&status_str)
+                .map_err(|err| format!("Failed to parse job status from DB row: {}", err))?;
+
+            db_counts.insert(job_status, status_count);
+        }
+
+        let all_possible_statuses = vec![
+            JobStatus::Created,
+            JobStatus::StartedTraceGeneration,
+            JobStatus::ProgramInputsPrepared,
+            JobStatus::PieGenerated,
+            JobStatus::AtlanticProofRequested,
+            JobStatus::AtlanticProofRetrieved,
+            JobStatus::WrapProofRequested,
+            JobStatus::WrappedProofDone,
+            JobStatus::OffchainComputationFinished,
+            JobStatus::ReadyToBroadcastOnchain,
+            JobStatus::ProofVerifyCalledOnchain,
+            JobStatus::Done,
+            JobStatus::Error,
+            JobStatus::Cancelled,
+        ];
+
+        let mut result = Vec::with_capacity(all_possible_statuses.len());
+        for status in all_possible_statuses {
+            let count = db_counts.get(&status).copied().unwrap_or(0);
+            result.push(JobStatusCount { status, count });
+        }
+
+        Ok(result)
     }
 }

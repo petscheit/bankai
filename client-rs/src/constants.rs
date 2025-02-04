@@ -8,3 +8,4 @@ pub const MAX_CONCURRENT_RPC_DATA_FETCH_JOBS: usize = 1; // Define how many data
 pub const STARKNET_SEPOLIA: &str = "0x534e5f5345504f4c4941";
 pub const STARKNET_MAINNET: &str = "0x534e5f4d41494e";
 pub const USE_TRANSACTOR: bool = false;
+pub const MAX_JOB_RETRIES_COUNT: u64 = 10;
