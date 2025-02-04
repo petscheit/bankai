@@ -25,6 +25,14 @@ pub struct JobSchema {
 }
 
 #[derive(Debug)]
+pub struct JobWithTimestamps {
+    pub job: JobSchema,
+    pub created_at: String,
+    pub updated_at: String,
+    pub tx_hash: Option<String>,
+}
+
+#[derive(Debug)]
 pub struct DatabaseManager {
     client: Client,
 }
@@ -635,5 +643,101 @@ impl DatabaseManager {
             )
             .await?;
         Ok(())
+    }
+
+    pub async fn count_total_jobs(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+        let row = self.client
+            .query_one(
+                "SELECT COUNT(*) as count FROM jobs",
+                &[],
+            )
+            .await?;
+
+        Ok(row.get::<_, i64>("count").to_u64().unwrap_or(0))
+    }
+
+    pub async fn count_successful_jobs(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+        let row = self.client
+            .query_one(
+                "SELECT COUNT(*) as count FROM jobs WHERE job_status = 'DONE'",
+                &[],
+            )
+            .await?;
+
+        Ok(row.get::<_, i64>("count").to_u64().unwrap_or(0))
+    }
+
+    pub async fn get_average_job_duration(&self) -> Result<i64, Box<dyn std::error::Error + Send + Sync>> {
+        let row = self.client
+            .query_one(
+                "SELECT EXTRACT(EPOCH FROM AVG(updated_at - created_at))::INTEGER as avg_duration 
+                 FROM jobs 
+                 WHERE job_status = 'DONE'",
+                &[],
+            )
+            .await?;
+
+        Ok(i64::from(row.get::<_, Option<i32>>("avg_duration").unwrap_or(0)))
+    }
+
+
+    pub async fn get_recent_batch_jobs(&self, limit: i64) -> Result<Vec<JobWithTimestamps>, Box<dyn std::error::Error + Send + Sync>> {
+        let rows = self.client
+            .query(
+                "SELECT *, 
+                 to_char(created_at, 'HH24:MI:SS') as created_time,
+                 to_char(updated_at, 'HH24:MI:SS') as updated_time 
+                 FROM jobs 
+                 WHERE type = 'EPOCH_BATCH_UPDATE' 
+                 ORDER BY batch_range_begin_epoch DESC 
+                 LIMIT $1",
+                &[&limit],
+            )
+            .await?;
+
+        let jobs = rows
+            .into_iter()
+            .map(|row| {
+                let job_type_str: String = row.get("type");
+                let job_status_str: String = row.get("job_status");
+
+                let job_type = JobType::from_str(&job_type_str)
+                    .expect("Failed to parse job type");
+                let job_status = JobStatus::from_str(&job_status_str)
+                    .expect("Failed to parse job status");
+
+                JobWithTimestamps {
+                    job: JobSchema {
+                        job_uuid: row.get("job_uuid"),
+                        job_status,
+                        slot: row.get("slot"),
+                        batch_range_begin_epoch: row
+                            .get::<&str, Option<i64>>("batch_range_begin_epoch")
+                            .unwrap_or(0),
+                        batch_range_end_epoch: row
+                            .get::<&str, Option<i64>>("batch_range_end_epoch")
+                            .unwrap_or(0),
+                        job_type,
+                        atlantic_proof_generate_batch_id: row.get("atlantic_proof_generate_batch_id"),
+                        atlantic_proof_wrapper_batch_id: row.get("atlantic_proof_wrapper_batch_id"),
+                    },
+                    created_at: row.get("created_time"),
+                    updated_at: row.get("updated_time"),
+                    tx_hash: row.get("tx_hash"),
+                }
+            })
+            .collect();
+
+        Ok(jobs)
+    }
+
+    pub async fn is_connected(&self) -> bool {
+        match self.client
+            .query_one("SELECT 1", &[])
+            .await
+        {
+            Ok(_) => true,
+            Err(_) => false,
+        }
     }
 }

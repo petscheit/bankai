@@ -31,6 +31,7 @@ use helpers::{
 };
 use num_traits::cast::ToPrimitive;
 use reqwest;
+use routes::dashboard::handle_get_dashboard;
 use starknet::core::types::Felt;
 use state::check_env_vars;
 use state::{AppState, Job};
@@ -181,6 +182,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             get(handle_get_latest_verified_committee),
         )
         .route("/debug/get_job_status", get(handle_get_job_status))
+        // Add dashboard route here
+        .route("/dashboard", get(handle_get_dashboard))
         // .route("/get-merkle-inclusion-proof", get(handle_get_merkle_inclusion_proof))
         .layer(DefaultBodyLimit::disable())
         .layer(

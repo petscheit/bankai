@@ -3,11 +3,15 @@ use axum::{
     extract::{Path, State},
     response::IntoResponse,
     Json,
+    routing::{get, post},
+    Router,
 };
 use num_traits::cast::ToPrimitive;
 use serde_json::{json, Value};
 use tracing::error;
 use uuid::Uuid;
+
+pub mod dashboard;
 
 //  RPC requests handling functions //
 
@@ -201,4 +205,19 @@ pub async fn handle_get_merkle_paths_for_epoch(
             Json(json!({ "error": "Failed to fetch latest epoch" }))
         }
     }
+}
+
+pub fn configure_routes(state: AppState) -> Router {
+    Router::new()
+        // Status routes
+        .route("/status", get(handle_get_status))
+        .route("/epoch/:slot/proof", get(handle_get_epoch_proof))
+        .route("/committee/:committee_id/hash", get(handle_get_committee_hash))
+        .route("/latest/verified/slot", get(handle_get_latest_verified_slot))
+        .route("/latest/verified/committee", get(handle_get_latest_verified_committee))
+        .route("/job/:job_id/status", get(handle_get_job_status))
+        .route("/epoch/:epoch_id/merkle_paths", get(handle_get_merkle_paths_for_epoch))
+        // Dashboard routes
+        .nest("/dashboard", dashboard::routes())
+        .with_state(state)
 }
