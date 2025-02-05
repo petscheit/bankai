@@ -57,6 +57,7 @@ use routes::{
     handle_get_latest_verified_slot,
     handle_get_merkle_paths_for_epoch,
     handle_get_status,
+    handle_root_route,
 };
 use std::net::SocketAddr;
 use sync_committee::SyncCommitteeUpdate;
@@ -156,6 +157,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     });
 
     let app = Router::new()
+        .route("/", get(handle_root_route))
         .route("/status", get(handle_get_status))
         .route(
             "/get_verified_epoch_proof/:epoch",
@@ -442,11 +444,10 @@ async fn handle_beacon_chain_head_event(
         };
     }
 
-    let current_sync_committee_epochs_left = helpers::get_last_epoch_for_sync_committee(
-        helpers::get_sync_committee_id_by_epoch(latest_scheduled_epoch + 1),
-    ) - current_epoch_id;
+    let current_sync_committee_epochs_left =
+        helpers::get_last_epoch_for_sync_committee(current_sync_committee_id) - current_epoch_id;
     info!(
-        "{} epochs left in current sync committee",
+        "{} epochs left in current beacon chain sync committee",
         current_sync_committee_epochs_left
     );
 

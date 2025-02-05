@@ -32,3 +32,9 @@ CREATE TABLE verified_sync_committee (
     sync_committee_id UUID PRIMARY KEY, -- Unique identifier for sync committee  (slot number/0x2000)
     sync_committee_hash TEXT NOT NULL -- Sync committee hash that we are creating inside bankai
 );
+
+CREATE TABLE daemon_state (
+    latest_known_beacon_slot BIGINT NOT NULL,
+    latest_known_beacon_block BYTEA NOT NULL,
+    updated_at TIMESTAMP DEFAULT NOW ()
+);

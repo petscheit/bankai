@@ -1,10 +1,10 @@
 use crate::state::AppState;
+use alloy_primitives::map::HashMap;
 use axum::{
     extract::{Path, State},
     response::IntoResponse,
-    Json,
     routing::{get, post},
-    Router,
+    Json, Router,
 };
 use num_traits::cast::ToPrimitive;
 use serde_json::{json, Value};
@@ -14,6 +14,9 @@ use uuid::Uuid;
 pub mod dashboard;
 
 //  RPC requests handling functions //
+pub async fn handle_root_route(State(_state): State<AppState>) -> impl IntoResponse {
+    Json(json!({ "success": true, "message": "Bankai daemon running" }))
+}
 
 // Handler for GET /status
 pub async fn handle_get_status(State(state): State<AppState>) -> impl IntoResponse {
@@ -38,12 +41,23 @@ pub async fn handle_get_status(State(state): State<AppState>) -> impl IntoRespon
     //     .get_latest_known_beacon_chain_state()
     //     .await
     //     .unwrap();
+    //
+    let jobs_status_counts = state
+        .db_manager
+        .get_jobs_count_by_status()
+        .await
+        .unwrap_or_default();
+
+    let mut jobs_status_map = HashMap::new();
+    for job_status_count in jobs_status_counts {
+        jobs_status_map.insert(job_status_count.status.to_string(), job_status_count.count);
+    }
 
     Json(json!({ "success": true, "details": {
         "last_epoch_in_progress": last_epoch_in_progress,
         "last_sync_committee_in_progress": last_sync_committee_in_progress,
         "jobs_in_progress_count": in_progress_jobs_count,
-
+        "jobs_statuses": jobs_status_map
     } }))
 }
 
