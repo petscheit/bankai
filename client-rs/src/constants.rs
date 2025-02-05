@@ -9,3 +9,6 @@ pub const STARKNET_SEPOLIA: &str = "0x534e5f5345504f4c4941";
 pub const STARKNET_MAINNET: &str = "0x534e5f4d41494e";
 pub const USE_TRANSACTOR: bool = false;
 pub const MAX_JOB_RETRIES_COUNT: u64 = 10;
+pub const BEACON_CHAIN_LISTENER_ENABLED: bool = true;
+pub const JOBS_RETRY_ENABLED: bool = false;
+pub const JOBS_RESUME_ENABLED: bool = false;

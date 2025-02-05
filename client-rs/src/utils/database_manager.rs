@@ -440,6 +440,24 @@ impl DatabaseManager {
         Ok(())
     }
 
+    pub async fn count_epoch_jobs_waiting_for_sync_committe_update(
+        &self,
+        latest_verified_sync_committee: u64,
+    ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+        let epoch_to_start_check_from =
+            helpers::get_last_epoch_for_sync_committee(latest_verified_sync_committee) + 1; // So we getting first epoch number from latest unverified committee
+        let row = self
+            .client
+            .query_one(
+                "SELECT COUNT(*) as count FROM jobs WHERE batch_range_begin_epoch >= $1
+                 AND job_status = 'OFFCHAIN_COMPUTATION_FINISHED'",
+                &[&epoch_to_start_check_from.to_i64()],
+            )
+            .await?;
+
+        Ok(row.get::<_, i64>("count").to_u64().unwrap_or(0))
+    }
+
     pub async fn set_ready_to_broadcast_for_batch_epochs(
         &self,
         first_epoch: u64,
@@ -457,7 +475,44 @@ impl DatabaseManager {
 
         if rows_affected > 0 {
             info!(
-                "{} jobs changed state to READY_TO_BROADCAST_ONCHAIN",
+                "{} EPOCH_BATCH_UPDATE jobs changed state to READY_TO_BROADCAST_ONCHAIN",
+                rows_affected
+            );
+        }
+        Ok(())
+    }
+
+    pub async fn set_ready_to_broadcast_for_sync_committee(
+        &self,
+        sync_committee_id: u64,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let sync_commite_first_slot = helpers::get_first_slot_for_sync_committee(sync_committee_id);
+        let sync_commite_last_slot = helpers::get_last_slot_for_sync_committee(sync_committee_id);
+
+        let rows_affected = self
+            .client
+            .execute(
+                "UPDATE jobs
+                SET job_status = 'READY_TO_BROADCAST_ONCHAIN', updated_at = NOW()
+                WHERE type = 'SYNC_COMMITTEE_UPDATE'
+                AND job_status = 'OFFCHAIN_COMPUTATION_FINISHED'
+                AND slot BETWEEN $1 AND $2
+                ",
+                &[
+                    &sync_commite_first_slot.to_i64(),
+                    &sync_commite_last_slot.to_i64(),
+                ],
+            )
+            .await?;
+
+        if rows_affected == 1 {
+            info!(
+                "{} SYNC_COMMITTEE_UPDATE jobs changed state to READY_TO_BROADCAST_ONCHAIN",
+                rows_affected
+            );
+        } else if rows_affected > 1 {
+            warn!(
+                "{} SYNC_COMMITTEE_UPDATE jobs changed state to READY_TO_BROADCAST_ONCHAIN in one query, something may be wrong!",
                 rows_affected
             );
         }
@@ -652,18 +707,19 @@ impl DatabaseManager {
     }
 
     pub async fn count_total_jobs(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
-        let row = self.client
-            .query_one(
-                "SELECT COUNT(*) as count FROM jobs",
-                &[],
-            )
+        let row = self
+            .client
+            .query_one("SELECT COUNT(*) as count FROM jobs", &[])
             .await?;
 
         Ok(row.get::<_, i64>("count").to_u64().unwrap_or(0))
     }
 
-    pub async fn count_successful_jobs(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
-        let row = self.client
+    pub async fn count_successful_jobs(
+        &self,
+    ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+        let row = self
+            .client
             .query_one(
                 "SELECT COUNT(*) as count FROM jobs WHERE job_status = 'DONE'",
                 &[],
@@ -673,29 +729,37 @@ impl DatabaseManager {
         Ok(row.get::<_, i64>("count").to_u64().unwrap_or(0))
     }
 
-    pub async fn get_average_job_duration(&self) -> Result<i64, Box<dyn std::error::Error + Send + Sync>> {
-        let row = self.client
+    pub async fn get_average_job_duration(
+        &self,
+    ) -> Result<i64, Box<dyn std::error::Error + Send + Sync>> {
+        let row = self
+            .client
             .query_one(
-                "SELECT EXTRACT(EPOCH FROM AVG(updated_at - created_at))::INTEGER as avg_duration 
-                 FROM jobs 
+                "SELECT EXTRACT(EPOCH FROM AVG(updated_at - created_at))::INTEGER as avg_duration
+                 FROM jobs
                  WHERE job_status = 'DONE'",
                 &[],
             )
             .await?;
 
-        Ok(i64::from(row.get::<_, Option<i32>>("avg_duration").unwrap_or(0)))
+        Ok(i64::from(
+            row.get::<_, Option<i32>>("avg_duration").unwrap_or(0),
+        ))
     }
 
-
-    pub async fn get_recent_batch_jobs(&self, limit: i64) -> Result<Vec<JobWithTimestamps>, Box<dyn std::error::Error + Send + Sync>> {
-        let rows = self.client
+    pub async fn get_recent_batch_jobs(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<JobWithTimestamps>, Box<dyn std::error::Error + Send + Sync>> {
+        let rows = self
+            .client
             .query(
-                "SELECT *, 
+                "SELECT *,
                  to_char(created_at, 'HH24:MI:SS') as created_time,
-                 to_char(updated_at, 'HH24:MI:SS') as updated_time 
-                 FROM jobs 
-                 WHERE type = 'EPOCH_BATCH_UPDATE' 
-                 ORDER BY batch_range_begin_epoch DESC 
+                 to_char(updated_at, 'HH24:MI:SS') as updated_time
+                 FROM jobs
+                 WHERE type = 'EPOCH_BATCH_UPDATE'
+                 ORDER BY batch_range_begin_epoch DESC
                  LIMIT $1",
                 &[&limit],
             )
@@ -707,10 +771,9 @@ impl DatabaseManager {
                 let job_type_str: String = row.get("type");
                 let job_status_str: String = row.get("job_status");
 
-                let job_type = JobType::from_str(&job_type_str)
-                    .expect("Failed to parse job type");
-                let job_status = JobStatus::from_str(&job_status_str)
-                    .expect("Failed to parse job status");
+                let job_type = JobType::from_str(&job_type_str).expect("Failed to parse job type");
+                let job_status =
+                    JobStatus::from_str(&job_status_str).expect("Failed to parse job status");
 
                 JobWithTimestamps {
                     job: JobSchema {
@@ -724,7 +787,8 @@ impl DatabaseManager {
                             .get::<&str, Option<i64>>("batch_range_end_epoch")
                             .unwrap_or(0),
                         job_type,
-                        atlantic_proof_generate_batch_id: row.get("atlantic_proof_generate_batch_id"),
+                        atlantic_proof_generate_batch_id: row
+                            .get("atlantic_proof_generate_batch_id"),
                         atlantic_proof_wrapper_batch_id: row.get("atlantic_proof_wrapper_batch_id"),
                     },
                     created_at: row.get("created_time"),
@@ -738,10 +802,7 @@ impl DatabaseManager {
     }
 
     pub async fn is_connected(&self) -> bool {
-        match self.client
-            .query_one("SELECT 1", &[])
-            .await
-        {
+        match self.client.query_one("SELECT 1", &[]).await {
             Ok(_) => true,
             Err(_) => false,
         }

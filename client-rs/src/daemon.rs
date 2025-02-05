@@ -69,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Load .env.sepolia file
     from_filename(".env.sepolia").ok();
 
-    //let slot_listener_toggle = true;
+    let slot_listener_toggle = constants::BEACON_CHAIN_LISTENER_ENABLED;
 
     let subscriber = FmtSubscriber::builder()
         //.with_max_level(Level::DEBUG)
@@ -127,12 +127,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             tokio::time::sleep(std::time::Duration::from_secs(30)).await;
         }
     });
-
-    // Retry any failed jobs before processing new ones
-    retry_failed_jobs(db_manager.clone(), tx_for_listener.clone()).await?;
-
-    // 🔄 Resume any unfinished jobs before processing new ones
-    resume_unfinished_jobs(db_manager.clone(), tx_for_listener.clone()).await?;
 
     //Spawn a background task to process jobs
     tokio::spawn(async move {
@@ -210,6 +204,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             .unwrap();
     });
 
+    // After RPC init, we do some startup checks before start listening to beacon chain:
+    //
+    // Retry any failed jobs before processing new ones
+    if constants::JOBS_RETRY_ENABLED {
+        retry_failed_jobs(db_manager_for_listener.clone(), tx_for_listener.clone()).await?;
+    }
+
+    // 🔄 Resume any unfinished jobs before processing new ones
+    if constants::JOBS_RESUME_ENABLED {
+        resume_unfinished_jobs(db_manager_for_listener.clone(), tx_for_listener.clone()).await?;
+    }
+
     //enqueue_sync_committee_jobs();
     //enqueue_batch_epochs_jobs();
     //
@@ -217,93 +223,99 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Listen for the new slots on BeaconChain
     // Create an HTTP client
     let http_stream_client = reqwest::Client::new();
+    if slot_listener_toggle {
+        tokio::spawn(async move {
+            loop {
+                // Send the request to the Beacon node
+                let response = match http_stream_client
+                    .get(&events_endpoint)
+                    //.timeout(std::time::Duration::from_secs(30)) - cannot do this because this will give timeout after each duration since we not using HTTP Pooling here but HTTP streaming
+                    .send()
+                    .await
+                {
+                    Ok(r) => r,
+                    Err(e) => {
+                        error!("Failed to connect: {}", e);
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        continue; // retry
+                    }
+                };
 
-    tokio::spawn(async move {
-        loop {
-            // Send the request to the Beacon node
-            let response = match http_stream_client
-                .get(&events_endpoint)
-                //.timeout(std::time::Duration::from_secs(30)) - cannot do this because this will give timeout after evach duration since we not using HTTP Pooling here but HTTP streaming
-                .send()
-                .await
-            {
-                Ok(r) => r,
-                Err(e) => {
-                    error!("Failed to connect: {}", e);
+                if !response.status().is_success() {
+                    error!("Got non-200: {}", response.status());
                     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                     continue; // retry
                 }
-            };
 
-            if !response.status().is_success() {
-                error!("Got non-200: {}", response.status());
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                continue; // retry
-            }
+                info!("Listening for new slots, epochs and sync committee updates...");
 
-            info!("Listening for new slots, epochs and sync committee updates...");
+                let mut stream = response.bytes_stream();
 
-            let mut stream = response.bytes_stream();
-
-            loop {
-                match timeout(Duration::from_secs(30), stream.next()).await {
-                    // Timed out; handle it locally
-                    Err(_elapsed) => {
-                        warn!(
+                loop {
+                    match timeout(Duration::from_secs(30), stream.next()).await {
+                        // Timed out; handle it locally
+                        Err(_elapsed) => {
+                            warn!(
                             "Timed out waiting for new slot beacon chain event chunk. Maybe some slots was skipped. Will reconnect..."
                         );
-                        break;
-                    }
-                    Ok(Some(Ok(bytes))) => {
-                        if let Ok(event_text) = String::from_utf8(bytes.to_vec()) {
-                            // Preprocess the event text
-                            if let Some(json_data) = helpers::extract_json_from_event(&event_text) {
-                                match serde_json::from_str::<HeadEvent>(&json_data) {
-                                    Ok(parsed_event) => {
-                                        let epoch_id = helpers::slot_to_epoch_id(parsed_event.slot);
-                                        let sync_committee_id =
-                                            helpers::slot_to_sync_committee_id(parsed_event.slot);
-                                        info!(
+                            break;
+                        }
+                        Ok(Some(Ok(bytes))) => {
+                            if let Ok(event_text) = String::from_utf8(bytes.to_vec()) {
+                                // Preprocess the event text
+                                if let Some(json_data) =
+                                    helpers::extract_json_from_event(&event_text)
+                                {
+                                    match serde_json::from_str::<HeadEvent>(&json_data) {
+                                        Ok(parsed_event) => {
+                                            let epoch_id =
+                                                helpers::slot_to_epoch_id(parsed_event.slot);
+                                            let sync_committee_id =
+                                                helpers::slot_to_sync_committee_id(
+                                                    parsed_event.slot,
+                                                );
+                                            info!(
                                                 "[EVENT] New beacon slot detected: {} |  Block: {} | Epoch: {} | Sync committee: {} | Is epoch transition: {}",
                                                 parsed_event.slot, parsed_event.block, epoch_id, sync_committee_id, parsed_event.epoch_transition
                                             );
 
-                                        handle_beacon_chain_head_event(
-                                            parsed_event,
-                                            bankai_for_listener.clone(),
-                                            db_manager_for_listener.clone(),
-                                            tx_for_listener.clone(),
-                                        )
-                                        .await;
+                                            handle_beacon_chain_head_event(
+                                                parsed_event,
+                                                bankai_for_listener.clone(),
+                                                db_manager_for_listener.clone(),
+                                                tx_for_listener.clone(),
+                                            )
+                                            .await;
+                                        }
+                                        Err(err) => {
+                                            warn!("Failed to parse JSON data: {}", err);
+                                        }
                                     }
-                                    Err(err) => {
-                                        warn!("Failed to parse JSON data: {}", err);
-                                    }
+                                } else {
+                                    warn!("No valid JSON data found in event: {}", event_text);
                                 }
-                            } else {
-                                warn!("No valid JSON data found in event: {}", event_text);
                             }
                         }
-                    }
-                    Ok(Some(Err(e))) => {
-                        warn!("Beacon chain client stream error: {}", e);
-                        break; // break the while, then reconnect
-                    }
-                    Ok(None) => {
-                        warn!("Beacon chain client stream ended");
-                        // Stream ended
-                        break;
+                        Ok(Some(Err(e))) => {
+                            warn!("Beacon chain client stream error: {}", e);
+                            break; // break the while, then reconnect
+                        }
+                        Ok(None) => {
+                            warn!("Beacon chain client stream ended");
+                            // Stream ended
+                            break;
+                        }
                     }
                 }
-            }
-            // If we got here because of `timeout` returning `Err(_)`, that means 30s
-            // passed without a single chunk of data arriving or
-            // the RPC server has closed connection or some other unknown network error occured
+                // If we got here because of `timeout` returning `Err(_)`, that means 30s
+                // passed without a single chunk of data arriving or
+                // the RPC server has closed connection or some other unknown network error occured
 
-            // If we exit the while, we reconnect in the outer loop
-            info!("Timeout waiting for next event, reconnecting to beacon node...");
-        }
-    });
+                // If we exit the while, we reconnect in the outer loop
+                info!("Timeout waiting for next event, reconnecting to beacon node...");
+            }
+        });
+    }
 
     // Wait for the server task to finish
     server_task.await?;
@@ -694,6 +706,10 @@ async fn evaluate_jobs_statuses(
 
     db_manager
         .set_ready_to_broadcast_for_batch_epochs(first_epoch, last_epoch) // Set READY_TO_BROADCAST when OFFCHAIN_COMPUTATION_FINISHED
+        .await?;
+
+    db_manager
+        .set_ready_to_broadcast_for_sync_committee(latest_verified_sync_committee_id + 1)
         .await?;
 
     Ok(())
