@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: database
+    networks:
+      - bankai-network
+    ports:
+      - "5432:5432"
+    restart: always
+    env_file:
+      - .env.sepolia
+    environment:
+      - POSTGRESQL_USER=${POSTGRESQL_USER}
+      - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
+      - POSTGRESQL_DB_NAME=${POSTGRESQL_DB_NAME}
+      - POSTGRES_USER=${POSTGRESQL_USER}
+      - POSTGRES_PASSWORD=${POSTGRESQL_PASSWORD}
+      - POSTGRES_DB=${POSTGRESQL_DB_NAME}
+      
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRESQL_USER} -d ${POSTGRESQL_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile  
+    container_name: bankai-daemon
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env.sepolia
+    environment:
+      - NODE_ENV=local
+      - POSTGRESQL_HOST=database
+      - POSTGRESQL_PORT=5432
+      - POSTGRESQL_USER=${POSTGRESQL_USER}
+      - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
+      - POSTGRESQL_DB_NAME=${POSTGRESQL_DB_NAME}
+    networks:
+      - bankai-network
+    ports:
+      - "3001:3001"
+    restart: always
+    volumes:
+      - batches:/batches
+
+networks:
+  bankai-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  batches:

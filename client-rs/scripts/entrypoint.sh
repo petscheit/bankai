@@ -1,15 +1,13 @@
-#!/usr/bin/env bash
-set -e
+#!/bin/bash
+# Enable debug output
+set -x
 
-su postgres -c "/usr/lib/postgresql/14/bin/pg_ctl -D /var/lib/postgresql/data -l logfile start"
+# Run migrations first
+echo "[$(date)] Starting database migrations..."
+/usr/src/app/client-rs/scripts/run-migrations.sh
+MIGRATION_STATUS=$?
+echo "[$(date)] Migration completed with status: $MIGRATION_STATUS"
 
-sleep 5
-
-su postgres -c "psql -c \"CREATE USER postgres WITH SUPERUSER PASSWORD 'postgres';\"" || true
-su postgres -c "psql -c \"CREATE DATABASE bankai_sepolia;\"" || true
-
-# We need to do migration here, create initial DB structure form DB file
-
-echo "PostgreSQL is running. Starting the daemon..."
-
-exec "$@"
+# Start daemon
+echo "Starting the daemon..."
+exec /usr/local/bin/daemon
