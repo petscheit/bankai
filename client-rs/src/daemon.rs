@@ -711,7 +711,7 @@ async fn evaluate_jobs_statuses(
         .await?;
 
     db_manager
-        .set_ready_to_broadcast_for_sync_committee(latest_verified_sync_committee_id)
+        .set_ready_to_broadcast_for_sync_committee(latest_verified_sync_committee_id + 1)
         .await?;
 
     Ok(())
