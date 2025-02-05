@@ -381,6 +381,11 @@ impl DatabaseManager {
         job_id: Uuid,
         new_status: JobStatus,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        info!(
+            "Job {} status changed to {}",
+            job_id,
+            new_status.to_string()
+        );
         self.client
             .execute(
                 "UPDATE jobs SET job_status = $1, updated_at = NOW() WHERE job_uuid = $2",

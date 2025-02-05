@@ -288,7 +288,7 @@ impl StarknetClient {
         let delay = Duration::from_secs(5);
 
         for _ in 0..max_retries {
-            let status = self.get_transaction_status(tx_hash).await?;
+            let status = self.get_transaction_status(tx_hash).await.unwrap();
 
             info!("Starknet transaction status: {:?}", status);
 

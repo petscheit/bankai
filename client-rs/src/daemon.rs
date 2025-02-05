@@ -846,10 +846,10 @@ async fn retry_failed_jobs(
                 }
             }
 
+            let _ = db_clone.update_job_status(job_id, failed_at_step).await;
             if tx_clone.send(job_to_retry).await.is_err() {
                 // return Err("Failed to send job".into());
                 // Update the status to status what was at the error occurene time
-                let _ = db_clone.update_job_status(job_id, failed_at_step).await;
                 error!("Error retrying job: {}", job_id);
             }
         });
@@ -1231,7 +1231,7 @@ async fn process_job(
             JobType::EpochBatchUpdate => {
                 match current_status {
                     JobStatus::Created => {
-                        info!("[BATCH EPOCH JOB] Preparing inputs for program...");
+                        info!("[BATCH EPOCH JOB] Preparing inputs for program for epochs from {} to {}...", job.batch_range_begin_epoch.unwrap(), job.batch_range_end_epoch.unwrap());
                         let circuit_inputs = EpochUpdateBatch::new_by_epoch_range(
                             &bankai,
                             db_manager.clone(),
