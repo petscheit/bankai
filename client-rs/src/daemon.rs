@@ -846,11 +846,19 @@ async fn retry_failed_jobs(
                 }
             }
 
-            let _ = db_clone.update_job_status(job_id, failed_at_step).await;
-            if tx_clone.send(job_to_retry).await.is_err() {
-                // return Err("Failed to send job".into());
-                // Update the status to status what was at the error occurene time
-                error!("Error retrying job: {}", job_id);
+            let _ = db_clone
+                .update_job_status(job_id, failed_at_step.clone())
+                .await;
+            if failed_at_step != JobStatus::OffchainComputationFinished
+                && failed_at_step != JobStatus::ReadyToBroadcastOnchain
+                && failed_at_step != JobStatus::ProofVerifyCalledOnchain
+            // These jobs are done sequentially, not in parallel
+            {
+                if tx_clone.send(job_to_retry).await.is_err() {
+                    // return Err("Failed to send job".into());
+                    // Update the status to status what was at the error occurene time
+                    error!("Error retrying job: {}", job_id);
+                }
             }
         });
 
