@@ -8,8 +8,8 @@ CREATE TABLE jobs (
     batch_range_end_epoch BIGINT NULL,
     type TEXT NOT NULL,
     tx_hash TEXT NULL,
-    failed_at_step TEXT NOT NULL,
-    retries_count BIGINT NOT NULL,
+    failed_at_step TEXT NULL,
+    retries_count BIGINT NULL,
     last_failure_time TIMESTAMP NULL,
     updated_at TIMESTAMP DEFAULT NOW (),
     created_at TIMESTAMP DEFAULT NOW ()
