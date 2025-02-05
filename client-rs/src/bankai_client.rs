@@ -1,3 +1,4 @@
+use crate::constants;
 use crate::{
     contract_init::ContractInitializationData,
     epoch_update::EpochUpdate,
@@ -52,7 +53,6 @@ impl BankaiClient {
         mut slot: u64,
     ) -> Result<SyncCommitteeUpdate, Error> {
         let mut attempts = 0;
-        const MAX_ATTEMPTS: u8 = 3;
 
         // Before we start generating the proof, we ensure the slot was not missed
         let _header = loop {
@@ -60,13 +60,15 @@ impl BankaiClient {
                 Ok(header) => break header,
                 Err(Error::EmptySlotDetected(_)) => {
                     attempts += 1;
-                    if attempts >= MAX_ATTEMPTS {
+                    if attempts >= constants::MAX_SKIPPED_SLOTS_RETRY_ATTEMPTS {
                         return Err(Error::EmptySlotDetected(slot));
                     }
                     slot += 1;
                     info!(
                         "Empty slot detected! Attempt {}/{}. Fetching slot: {}",
-                        attempts, MAX_ATTEMPTS, slot
+                        attempts,
+                        constants::MAX_SKIPPED_SLOTS_RETRY_ATTEMPTS,
+                        slot
                     );
                 }
                 Err(e) => return Err(e), // Propagate other errors immediately

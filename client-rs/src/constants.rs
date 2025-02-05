@@ -13,3 +13,4 @@ pub const BEACON_CHAIN_LISTENER_ENABLED: bool = true;
 pub const JOBS_RETRY_ENABLED: bool = true;
 pub const JOBS_RESUME_ENABLED: bool = true;
 pub const RETRY_DELAY_MS: u64 = 300_0000;
+pub const MAX_SKIPPED_SLOTS_RETRY_ATTEMPTS: u64 = 5;

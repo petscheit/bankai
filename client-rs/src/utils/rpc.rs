@@ -1,3 +1,4 @@
+use crate::constants;
 use crate::epoch_update::SyncCommitteeValidatorPubs;
 use crate::Error;
 use alloy_rpc_types_beacon::events::light_client_finality::SyncAggregate;
@@ -81,7 +82,6 @@ impl BeaconRpcClient {
         slot += 1; // signature is in the next slot
 
         let mut attempts = 0;
-        const MAX_ATTEMPTS: u8 = 3;
 
         // Ensure the slot is not missed and increment in case it is
         let _header = loop {
@@ -89,13 +89,15 @@ impl BeaconRpcClient {
                 Ok(header) => break header,
                 Err(Error::EmptySlotDetected(_)) => {
                     attempts += 1;
-                    if attempts >= MAX_ATTEMPTS {
+                    if attempts >= constants::MAX_SKIPPED_SLOTS_RETRY_ATTEMPTS {
                         return Err(Error::EmptySlotDetected(slot));
                     }
                     slot += 1;
                     warn!(
                         "Empty slot detected! Attempt {}/{}. Fetching slot: {}",
-                        attempts, MAX_ATTEMPTS, slot
+                        attempts,
+                        constants::MAX_SKIPPED_SLOTS_RETRY_ATTEMPTS,
+                        slot
                     );
                 }
                 Err(e) => return Err(e), // Propagate other errors immediately
@@ -104,7 +106,7 @@ impl BeaconRpcClient {
 
         let json = self
             .get_json(&format!("eth/v2/beacon/blocks/{}", slot))
-                .await?;
+            .await?;
 
         serde_json::from_value(json["data"]["message"]["body"]["sync_aggregate"].clone())
             .map_err(|e| Error::DeserializeError(e.to_string()))
@@ -207,7 +209,7 @@ impl BeaconRpcClient {
     /// The current slot number of the beacon chain head.
     pub async fn get_head_slot(&self) -> Result<u64, Error> {
         let json = self.get_json("eth/v1/beacon/headers/head").await?;
-        
+
         let slot = json["data"]["header"]["message"]["slot"]
             .as_str()
             .ok_or(Error::DeserializeError("Missing slot field".into()))?

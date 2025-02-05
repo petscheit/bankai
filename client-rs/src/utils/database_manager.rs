@@ -451,6 +451,30 @@ impl DatabaseManager {
         Ok(())
     }
 
+    pub async fn set_ready_to_broadcast_for_batch_epochs_to(
+        &self,
+        to_epoch: u64,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let rows_affected = self
+            .client
+            .execute(
+                "UPDATE jobs
+                SET job_status = 'READY_TO_BROADCAST_ONCHAIN', updated_at = NOW()
+                WHERE batch_range_end_epoch <= $2 AND type = 'EPOCH_BATCH_UPDATE'
+                      AND job_status = 'OFFCHAIN_COMPUTATION_FINISHED'",
+                &[&to_epoch.to_i64()],
+            )
+            .await?;
+
+        if rows_affected > 0 {
+            info!(
+                "{} EPOCH_BATCH_UPDATE jobs changed state to READY_TO_BROADCAST_ONCHAIN",
+                rows_affected
+            );
+        }
+        Ok(())
+    }
+
     pub async fn set_ready_to_broadcast_for_sync_committee(
         &self,
         sync_committee_id: u64,

@@ -709,8 +709,12 @@ async fn evaluate_jobs_statuses(
     );
 
     db_manager
-        .set_ready_to_broadcast_for_batch_epochs(first_epoch, last_epoch) // Set READY_TO_BROADCAST when OFFCHAIN_COMPUTATION_FINISHED
+        .set_ready_to_broadcast_for_batch_epochs_to(last_epoch) // Set READY_TO_BROADCAST when OFFCHAIN_COMPUTATION_FINISHED
         .await?;
+
+    // db_manager
+    //     .set_ready_to_broadcast_for_batch_epochs(first_epoch, last_epoch) // Set READY_TO_BROADCAST when OFFCHAIN_COMPUTATION_FINISHED
+    //     .await?;
 
     db_manager
         .set_ready_to_broadcast_for_sync_committee(latest_verified_sync_committee_id + 1)
@@ -991,11 +995,11 @@ async fn broadcast_onchain_ready_jobs(
 
                 let txhash = match send_result {
                     Ok(txhash) => {
-                        info!("[EPOCH BATCH JOB] Transaction sent: {}", txhash);
+                        info!("[SYNC COMMITTEE JOB] Transaction sent: {}", txhash);
                         txhash
                     }
                     Err(e) => {
-                        error!("[EPOCH BATCH JOB] Transaction sending error: {:?}", e);
+                        error!("[SYNC COMMITTEE JOB] Transaction sending error: {:?}", e);
                         let _ = db_manager
                             .set_failure_info(job.job_uuid, JobStatus::ReadyToBroadcastOnchain)
                             .await?;
