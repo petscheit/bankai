@@ -48,9 +48,9 @@ impl Default for BankaiConfig {
             .unwrap(),
             contract_path: "../contract/target/release/bankai_BankaiContract.contract_class.json"
                 .to_string(),
-            epoch_circuit_path: "../cairo/build/epoch_update.json".to_string(),
-            epoch_batch_circuit_path: "../cairo/build/epoch_batch.json".to_string(),
-            committee_circuit_path: "../cairo/build/committee_update.json".to_string(),
+            epoch_circuit_path: "/usr/src/app/cairo/build/epoch_update.json".to_string(),
+            epoch_batch_circuit_path: "/usr/src/app/cairo/build/epoch_batch.json".to_string(),
+            committee_circuit_path: "/usr/src/app/cairo/build/committee_update.json".to_string(),
             atlantic_endpoint: "https://atlantic.api.herodotus.cloud".to_string(),
             transactor_endpoint: "https://staging.api.herodotus.cloud".to_string(),
             // Set how many concurrent pie generation (trace generation) tasks are allowed

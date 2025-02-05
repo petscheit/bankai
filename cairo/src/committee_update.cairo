@@ -116,6 +116,8 @@ func compute_committee_hash{
     let s = UInt384(d0=flags.sign_bit, d1=0, d2=0, d3=0);
 
     // Derive the full G1 point and hash it
+    // ToDo: Currently we dont valudiate the correct larger/smaller point is really returned.
+    // This can lead to an invalid committee hash being returned.
     let (point) = derive_g1_point_from_x(curve_id=1, x=x_point, s=s);
     let committee_hash = commit_committee_key(point=point);
 
