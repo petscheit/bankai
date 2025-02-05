@@ -9,6 +9,8 @@ edition = "2024_07"
 starknet = "2.9.1"
 cairo_test = "2.9.1"
 integrity = "2.0.0"
+openzeppelin_access = "0.20.0"
+openzeppelin_upgrades = "0.20.0"
 
 [[target.starknet-contract]]
 sierra = true

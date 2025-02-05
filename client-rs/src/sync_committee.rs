@@ -40,6 +40,15 @@ impl SyncCommitteeUpdate {
             expected_circuit_outputs,
         })
     }
+
+    pub fn from_json<T>(slot: u64) -> Result<T, Error>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let path = format!("batches/committee/{}/input_{}.json", slot, slot);
+        let json: String = fs::read_to_string(path).map_err(Error::IoError)?;
+        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
+    }
 }
 
 impl Provable for SyncCommitteeUpdate {
@@ -63,20 +72,18 @@ impl Provable for SyncCommitteeUpdate {
         Ok(path)
     }
 
-    fn from_json<T>(slot: u64) -> Result<T, Error>
-    where
-        T: serde::de::DeserializeOwned,
-    {
-        let path = format!("batches/committee/{}/input_{}.json", slot, slot);
-        let json: String = fs::read_to_string(path).map_err(Error::IoError)?;
-        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
-    }
-
     fn pie_path(&self) -> String {
         format!(
             "batches/committee/{}/pie_{}.zip",
             self.circuit_inputs.beacon_slot,
             self.id()
+        )
+    }
+
+    fn inputs_path(&self) -> String {
+        format!(
+            "batches/committee/{}/input_{}.json",
+            self.circuit_inputs.beacon_slot, self.circuit_inputs.beacon_slot,
         )
     }
 

@@ -5,11 +5,13 @@ use alloy_rpc_types_beacon::header::HeaderResponse;
 use itertools::Itertools;
 use reqwest::Client;
 use serde_json::Value;
+use tracing::warn;
 use types::eth_spec::MainnetEthSpec;
 use types::{BeaconBlockBody, FullPayload};
 
 /// A client for interacting with the Ethereum Beacon Chain RPC endpoints.
 /// Provides methods to fetch headers, sync aggregates, and validator information.
+#[derive(Debug)]
 pub(crate) struct BeaconRpcClient {
     provider: Client,
     pub rpc_url: String,
@@ -77,7 +79,7 @@ impl BeaconRpcClient {
     /// the previous slot's header.
     pub async fn get_sync_aggregate(&self, mut slot: u64) -> Result<SyncAggregate, Error> {
         slot += 1; // signature is in the next slot
-        
+
         let mut attempts = 0;
         const MAX_ATTEMPTS: u8 = 3;
 
@@ -91,7 +93,10 @@ impl BeaconRpcClient {
                         return Err(Error::EmptySlotDetected(slot));
                     }
                     slot += 1;
-                    println!("Empty slot detected! Attempt {}/{}. Fetching slot: {}", attempts, MAX_ATTEMPTS, slot);
+                    warn!(
+                        "Empty slot detected! Attempt {}/{}. Fetching slot: {}",
+                        attempts, MAX_ATTEMPTS, slot
+                    );
                 }
                 Err(e) => return Err(e), // Propagate other errors immediately
             }
@@ -99,7 +104,7 @@ impl BeaconRpcClient {
 
         let json = self
             .get_json(&format!("eth/v2/beacon/blocks/{}", slot))
-            .await?;
+                .await?;
 
         serde_json::from_value(json["data"]["message"]["body"]["sync_aggregate"].clone())
             .map_err(|e| Error::DeserializeError(e.to_string()))
@@ -194,5 +199,21 @@ impl BeaconRpcClient {
         let indexes = self.fetch_sync_committee_indexes(slot).await?;
         let pubkeys = self.fetch_validator_pubkeys(&indexes).await?;
         Ok(pubkeys.into())
+    }
+
+    /// Fetches the current head slot of the beacon chain.
+    ///
+    /// # Returns
+    /// The current slot number of the beacon chain head.
+    pub async fn get_head_slot(&self) -> Result<u64, Error> {
+        let json = self.get_json("eth/v1/beacon/headers/head").await?;
+        
+        let slot = json["data"]["header"]["message"]["slot"]
+            .as_str()
+            .ok_or(Error::DeserializeError("Missing slot field".into()))?
+            .parse()
+            .map_err(|e: std::num::ParseIntError| Error::DeserializeError(e.to_string()))?;
+
+        Ok(slot)
     }
 }
