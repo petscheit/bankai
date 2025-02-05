@@ -822,6 +822,8 @@ async fn retry_failed_jobs(
             batch_range_end_epoch: job.batch_range_end_epoch.to_u64(),
         };
 
+        let failed_at_step = job.failed_at_step.unwrap_or(JobStatus::Created);
+        let db_clone = db_manager.clone();
         let tx_clone = tx.clone();
         tokio::spawn(async move {
             match job_to_retry.job_type {
@@ -829,7 +831,7 @@ async fn retry_failed_jobs(
                     info!(
                         "Requesting retry of failed job {} failed previously at step {}... (sync committee update job for sync committee {})",
                         job_id,
-                        job.failed_at_step.unwrap(),
+                        failed_at_step.to_string(),
                         helpers::slot_to_sync_committee_id(job.slot.to_u64().unwrap())
                     );
                 }
@@ -837,7 +839,7 @@ async fn retry_failed_jobs(
                     info!(
                         "Requesting retry of failed job {} failed previously at step {} ... (batch epoch update job for epochs from {} to {})",
                         job_id,
-                        job.failed_at_step.unwrap(),
+                        failed_at_step.to_string(),
                         job.batch_range_begin_epoch,
                         job.batch_range_end_epoch
                     );
@@ -846,6 +848,8 @@ async fn retry_failed_jobs(
 
             if tx_clone.send(job_to_retry).await.is_err() {
                 // return Err("Failed to send job".into());
+                // Update the status to status what was at the error occurene time
+                let _ = db_clone.update_job_status(job_id, failed_at_step).await;
                 error!("Error retrying job: {}", job_id);
             }
         });

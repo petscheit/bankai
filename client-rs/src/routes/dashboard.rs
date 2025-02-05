@@ -36,8 +36,8 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
         .unwrap_or(Some(0))
         .unwrap();
 
-    // Fetch last 12 batch jobs
-    let recent_batches = db.get_recent_batch_jobs(12).await.unwrap_or_default();
+    // Fetch last 20 batch jobs
+    let recent_batches = db.get_recent_batch_jobs(20).await.unwrap_or_default();
 
     // Format batch information
     let batch_info = recent_batches

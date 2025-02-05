@@ -22,7 +22,7 @@ pub struct JobSchema {
     pub job_type: JobType,
     pub atlantic_proof_generate_batch_id: Option<String>,
     pub atlantic_proof_wrapper_batch_id: Option<String>,
-    pub failed_at_step: Option<JobType>,
+    pub failed_at_step: Option<JobStatus>,
     pub retries_count: Option<i64>,
     pub last_failure_time: Option<NaiveDateTime>, //pub updated_at: i64,
 }
@@ -193,11 +193,6 @@ impl DatabaseManager {
         &self,
         job_id: Uuid,
     ) -> Result<Option<JobSchema>, Box<dyn std::error::Error + Send + Sync>> {
-        let row_opt = self
-            .client
-            .query_opt("SELECT * FROM jobs WHERE job_uuid = $1", &[&job_id])
-            .await?;
-
         let row_opt = self
             .client
             .query_opt("SELECT * FROM jobs WHERE job_uuid = $1", &[&job_id])
@@ -796,10 +791,10 @@ impl DatabaseManager {
             .parse::<JobType>()
             .map_err(|err| format!("Failed to parse job type: {}", err))?;
 
-        let failed_at_step: Option<JobType> = row
+        let failed_at_step: Option<JobStatus> = row
             .get::<_, Option<String>>("failed_at_step")
             .map(|step| {
-                step.parse::<JobType>()
+                step.parse::<JobStatus>()
                     .map_err(|err| format!("Failed to parse job type: {}", err))
             })
             .transpose()?;
