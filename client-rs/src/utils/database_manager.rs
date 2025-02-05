@@ -460,7 +460,7 @@ impl DatabaseManager {
             .execute(
                 "UPDATE jobs
                 SET job_status = 'READY_TO_BROADCAST_ONCHAIN', updated_at = NOW()
-                WHERE batch_range_end_epoch <= $2 AND type = 'EPOCH_BATCH_UPDATE'
+                WHERE batch_range_end_epoch <= $1 AND type = 'EPOCH_BATCH_UPDATE'
                       AND job_status = 'OFFCHAIN_COMPUTATION_FINISHED'",
                 &[&to_epoch.to_i64()],
             )
