@@ -22,7 +22,9 @@ pub struct JobSchema {
     pub job_type: JobType,
     pub atlantic_proof_generate_batch_id: Option<String>,
     pub atlantic_proof_wrapper_batch_id: Option<String>,
-    //pub updated_at: i64,
+    pub failed_at_step: Option<JobType>,
+    pub retries_count: Option<i64>,
+    pub last_failure_time: Option<NaiveDateTime>, //pub updated_at: i64,
 }
 
 #[derive(Debug)]
@@ -196,32 +198,12 @@ impl DatabaseManager {
             .query_opt("SELECT * FROM jobs WHERE job_uuid = $1", &[&job_id])
             .await?;
 
-        Ok(row_opt.map(|row| {
-            let job_status_str: String = row.get("job_status");
-            let job_status = job_status_str
-                .parse::<JobStatus>()
-                .expect("Unknown job status from DB");
+        let row_opt = self
+            .client
+            .query_opt("SELECT * FROM jobs WHERE job_uuid = $1", &[&job_id])
+            .await?;
 
-            let job_type_str: String = row.get("type");
-            let job_type = job_type_str
-                .parse::<JobType>()
-                .expect("Unknown job type from DB");
-
-            JobSchema {
-                job_uuid: row.get("job_uuid"),
-                job_status,
-                slot: row.get("slot"),
-                batch_range_begin_epoch: row
-                    .get::<&str, Option<i64>>("batch_range_begin_epoch")
-                    .unwrap_or(0),
-                batch_range_end_epoch: row
-                    .get::<&str, Option<i64>>("batch_range_end_epoch")
-                    .unwrap_or(0),
-                job_type,
-                atlantic_proof_generate_batch_id: row.get("atlantic_proof_generate_batch_id"),
-                atlantic_proof_wrapper_batch_id: row.get("atlantic_proof_wrapper_batch_id"),
-            }
-        }))
+        row_opt.map(Self::map_row_to_job).transpose()
     }
     // pub async fn get_latest_slot_id_in_progress(
     //     &self,
@@ -390,37 +372,10 @@ impl DatabaseManager {
             )
             .await?;
 
-        // Map rows into JobSchema structs
-        let jobs: Vec<JobSchema> = rows
-            .into_iter()
-            .map(
-                |row: Row| -> Result<JobSchema, Box<dyn std::error::Error + Send + Sync>> {
-                    let job_type_str: String = row.get("type");
-                    let job_status_str: String = row.get("job_status");
-
-                    let job_type = JobType::from_str(&job_type_str)
-                        .map_err(|err| format!("Failed to parse job type: {}", err))?;
-                    let job_status = JobStatus::from_str(&job_status_str)
-                        .map_err(|err| format!("Failed to parse job status: {}", err))?;
-
-                    Ok(JobSchema {
-                        job_uuid: row.get("job_uuid"),
-                        job_status,
-                        slot: row.get("slot"),
-                        batch_range_begin_epoch: row
-                            .get::<&str, Option<i64>>("batch_range_begin_epoch")
-                            .unwrap_or(0),
-                        batch_range_end_epoch: row
-                            .get::<&str, Option<i64>>("batch_range_end_epoch")
-                            .unwrap_or(0),
-                        job_type,
-                        atlantic_proof_generate_batch_id: row
-                            .get("atlantic_proof_generate_batch_id"),
-                        atlantic_proof_wrapper_batch_id: row.get("atlantic_proof_wrapper_batch_id"),
-                        //updated_at: row.get("updated_at"),
-                    })
-                },
-            )
+        let jobs = rows
+            .iter()
+            .cloned()
+            .map(Self::map_row_to_job)
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(jobs)
@@ -447,7 +402,7 @@ impl DatabaseManager {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         self.client
             .execute(
-                "UPDATE jobs SET errored_at_step = $1, updated_at = NOW() WHERE job_uuid = $2",
+                "UPDATE jobs SET errored_at_step = $1, updated_at = NOW(), last_failure_time = NOW() WHERE job_uuid = $2",
                 &[&failed_at_step.to_string(), &job_id],
             )
             .await?;
@@ -609,36 +564,10 @@ impl DatabaseManager {
 
         let rows = self.client.query(&query, &params).await?;
 
-        let jobs: Vec<JobSchema> = rows
-            .into_iter()
-            .map(
-                |row: Row| -> Result<JobSchema, Box<dyn std::error::Error + Send + Sync>> {
-                    let job_type_str: String = row.get("type");
-                    let job_status_str: String = row.get("job_status");
-
-                    let job_type = JobType::from_str(&job_type_str)
-                        .map_err(|err| format!("Failed to parse job type: {}", err))?;
-                    let job_status = JobStatus::from_str(&job_status_str)
-                        .map_err(|err| format!("Failed to parse job status: {}", err))?;
-
-                    Ok(JobSchema {
-                        job_uuid: row.get("job_uuid"),
-                        job_status,
-                        slot: row.get("slot"),
-                        batch_range_begin_epoch: row
-                            .get::<&str, Option<i64>>("batch_range_begin_epoch")
-                            .unwrap_or(0),
-                        batch_range_end_epoch: row
-                            .get::<&str, Option<i64>>("batch_range_end_epoch")
-                            .unwrap_or(0),
-                        job_type,
-                        atlantic_proof_generate_batch_id: row
-                            .get("atlantic_proof_generate_batch_id"),
-                        atlantic_proof_wrapper_batch_id: row.get("atlantic_proof_wrapper_batch_id"),
-                        //updated_at: row.get("updated_at"),
-                    })
-                },
-            )
+        let jobs = rows
+            .iter()
+            .cloned()
+            .map(Self::map_row_to_job)
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(jobs)
@@ -787,29 +716,9 @@ impl DatabaseManager {
         let jobs = rows
             .into_iter()
             .map(|row| {
-                let job_type_str: String = row.get("type");
-                let job_status_str: String = row.get("job_status");
-
-                let job_type = JobType::from_str(&job_type_str).expect("Failed to parse job type");
-                let job_status =
-                    JobStatus::from_str(&job_status_str).expect("Failed to parse job status");
-
+                let job = Self::map_row_to_job(row.clone()).unwrap();
                 JobWithTimestamps {
-                    job: JobSchema {
-                        job_uuid: row.get("job_uuid"),
-                        job_status,
-                        slot: row.get("slot"),
-                        batch_range_begin_epoch: row
-                            .get::<&str, Option<i64>>("batch_range_begin_epoch")
-                            .unwrap_or(0),
-                        batch_range_end_epoch: row
-                            .get::<&str, Option<i64>>("batch_range_end_epoch")
-                            .unwrap_or(0),
-                        job_type,
-                        atlantic_proof_generate_batch_id: row
-                            .get("atlantic_proof_generate_batch_id"),
-                        atlantic_proof_wrapper_batch_id: row.get("atlantic_proof_wrapper_batch_id"),
-                    },
+                    job,
                     created_at: row.get("created_time"),
                     updated_at: row.get("updated_time"),
                     tx_hash: row.get("tx_hash"),
@@ -873,5 +782,46 @@ impl DatabaseManager {
         }
 
         Ok(result)
+    }
+
+    // Helper functions
+    fn map_row_to_job(row: Row) -> Result<JobSchema, Box<dyn std::error::Error + Send + Sync>> {
+        let job_status_str: String = row.get("job_status");
+        let job_status = job_status_str
+            .parse::<JobStatus>()
+            .map_err(|err| format!("Failed to parse job status: {}", err))?;
+
+        let job_type_str: String = row.get("type");
+        let job_type = job_type_str
+            .parse::<JobType>()
+            .map_err(|err| format!("Failed to parse job type: {}", err))?;
+
+        let failed_at_step: Option<JobType> = row
+            .get::<_, Option<String>>("failed_at_step")
+            .map(|step| {
+                step.parse::<JobType>()
+                    .map_err(|err| format!("Failed to parse job type: {}", err))
+            })
+            .transpose()?;
+
+        let last_failure_time: Option<NaiveDateTime> = row.get("last_failure_time");
+
+        Ok(JobSchema {
+            job_uuid: row.get("job_uuid"),
+            job_status,
+            slot: row.get("slot"),
+            batch_range_begin_epoch: row
+                .get::<&str, Option<i64>>("batch_range_begin_epoch")
+                .unwrap_or(0),
+            batch_range_end_epoch: row
+                .get::<&str, Option<i64>>("batch_range_end_epoch")
+                .unwrap_or(0),
+            job_type,
+            atlantic_proof_generate_batch_id: row.get("atlantic_proof_generate_batch_id"),
+            atlantic_proof_wrapper_batch_id: row.get("atlantic_proof_wrapper_batch_id"),
+            failed_at_step,
+            retries_count: row.get("retries_count"),
+            last_failure_time,
+        })
     }
 }

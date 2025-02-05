@@ -2,9 +2,7 @@ use crate::state::{AppState, JobStatus};
 use axum::extract::State;
 use num_traits::SaturatingSub;
 
-pub async fn handle_get_dashboard(
-    State(state): State<AppState>,
-) -> String {
+pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
     let db = state.db_manager.clone();
     let bankai = state.bankai.clone();
 
@@ -18,7 +16,7 @@ pub async fn handle_get_dashboard(
         .to_string()
         .parse::<u64>()
         .unwrap_or(0);
-    
+
     // Calculate success rate from database
     let total_jobs = db.count_total_jobs().await.unwrap_or(0);
     let successful_jobs = db.count_successful_jobs().await.unwrap_or(0);
@@ -32,11 +30,15 @@ pub async fn handle_get_dashboard(
     let avg_duration = db.get_average_job_duration().await.unwrap_or(0);
     let avg_duration_str = format!("{}s", avg_duration);
 
-    let jobs_in_progress = db.count_jobs_in_progress().await.unwrap_or(Some(0)).unwrap();
-    
-    // Fetch last 3 batch jobs
-    let recent_batches = db.get_recent_batch_jobs(6).await.unwrap_or_default();
-    
+    let jobs_in_progress = db
+        .count_jobs_in_progress()
+        .await
+        .unwrap_or(Some(0))
+        .unwrap();
+
+    // Fetch last 12 batch jobs
+    let recent_batches = db.get_recent_batch_jobs(12).await.unwrap_or_default();
+
     // Format batch information
     let batch_info = recent_batches
         .iter()
@@ -62,17 +64,27 @@ pub async fn handle_get_dashboard(
         .join("\n");
 
     let batch_display = if recent_batches.is_empty() {
-        "  ║  No recent batches found                                                ║    ".to_string()
+        "  ║  No recent batches found                                                ║    "
+            .to_string()
     } else {
         batch_info
     };
 
     // Update system health indicators with simpler checks
-    let daemon_status = "● Active"; 
-    let db_status = if db.is_connected().await { "● Connected" } else { "○ Disconnected" };
-    let beacon_status = if bankai.client.get_head_slot().await.is_ok() { "● Connected" } else { "○ Disconnected" };
+    let daemon_status = "● Active";
+    let db_status = if db.is_connected().await {
+        "● Connected"
+    } else {
+        "○ Disconnected"
+    };
+    let beacon_status = if bankai.client.get_head_slot().await.is_ok() {
+        "● Connected"
+    } else {
+        "○ Disconnected"
+    };
 
-    let epoch_gap = (latest_beacon_slot.saturating_sub(latest_verified_slot) as f64 / 32.0).round() as u64;
+    let epoch_gap =
+        (latest_beacon_slot.saturating_sub(latest_verified_slot) as f64 / 32.0).round() as u64;
 
     create_ascii_dashboard(
         latest_beacon_slot,
@@ -84,7 +96,7 @@ pub async fn handle_get_dashboard(
         daemon_status,
         db_status,
         beacon_status,
-        &batch_display
+        &batch_display,
     )
 }
 
@@ -101,11 +113,11 @@ pub fn create_ascii_dashboard(
     batch_display: &str,
 ) -> String {
     format!(
-r#"
- ____    _    _   _ _  __   _    ___ 
+        r#"
+ ____    _    _   _ _  __   _    ___
 | __ )  / \  | \ | | |/ /  / \  |_ _|
-|  _ \ / _ \ |  \| | ' /  / _ \  | | 
-| |_) / ___ \| |\  | . \ / ___ \ | | 
+|  _ \ / _ \ |  \| | ' /  / _ \  | |
+| |_) / ___ \| |\  | . \ / ___ \ | |
 |____/_/   \_\_| \_|_|\_/_/   \_\___|
 
 ╔════════════════════════════════════════ DASHBOARD OVERVIEW ═════════════════════════════════════╗
@@ -140,4 +152,4 @@ r#"
         epoch_gap = epoch_gap,
         batch_display_block = batch_display
     )
-} 
+}

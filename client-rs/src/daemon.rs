@@ -142,6 +142,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         info!("Job {} completed successfully", job_id);
                     }
                     Err(e) => {
+                        let job_data = db_clone.get_job_by_id(job_id).await.unwrap().unwrap();
+                        let _ = db_clone.set_failure_info(job_id, job_data.job_status).await;
                         let _ = db_clone.update_job_status(job_id, JobStatus::Error).await;
                         error!("Error processing job {}: {}", job_id, e);
                     }
@@ -825,15 +827,17 @@ async fn retry_failed_jobs(
             match job_to_retry.job_type {
                 JobType::SyncCommitteeUpdate => {
                     info!(
-                        "Requesting retry of failed job {}... (sync committee update job for sync committee {})",
+                        "Requesting retry of failed job {} failed previously at step {}... (sync committee update job for sync committee {})",
                         job_id,
+                        job.failed_at_step.unwrap(),
                         helpers::slot_to_sync_committee_id(job.slot.to_u64().unwrap())
                     );
                 }
                 JobType::EpochBatchUpdate => {
                     info!(
-                        "Requesting retry of failed job {}... (batch epoch update job for epochs from {} to {})",
+                        "Requesting retry of failed job {} failed previously at step {} ... (batch epoch update job for epochs from {} to {})",
                         job_id,
+                        job.failed_at_step.unwrap(),
                         job.batch_range_begin_epoch,
                         job.batch_range_end_epoch
                     );
