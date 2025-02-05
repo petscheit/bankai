@@ -884,10 +884,28 @@ async fn broadcast_onchain_ready_jobs(
                 );
 
                 // Submit to Starknet
-                let txhash = bankai
+                let send_result = bankai
                     .starknet_client
                     .submit_update(circuit_inputs.expected_circuit_outputs, &bankai.config)
-                    .await?;
+                    .await;
+
+                let txhash = match send_result {
+                    Ok(txhash) => {
+                        info!("[EPOCH BATCH JOB] Transaction sent: {}", txhash);
+                        txhash
+                    }
+                    Err(e) => {
+                        error!("[EPOCH BATCH JOB] Transaction sending error: {:?}", e);
+                        let _ = db_manager
+                            .set_failure_info(job.job_uuid, JobStatus::ReadyToBroadcastOnchain)
+                            .await?;
+                        db_manager
+                            .update_job_status(job.job_uuid, JobStatus::Error)
+                            .await?;
+
+                        continue;
+                    }
+                };
 
                 info!(
                     "[EPOCH BATCH JOB] Successfully called batch epoch update onchain for job_uuid: {}, txhash: {}",
@@ -899,28 +917,6 @@ async fn broadcast_onchain_ready_jobs(
                     .await?;
 
                 let _ = db_manager.set_job_txhash(job.job_uuid, txhash).await;
-
-                // match send_result {
-                //     Ok(_) => {
-                //         info!("[EPOCH BATCH JOB] Transaction sent");
-                //         db_manager
-                //             .update_job_status(job.job_uuid, JobStatus::VerifyTransactionSend)
-                //             .await?;
-
-                //         // Iterate over and insert epochs proofs to db
-                //         for (index, epoch) in
-                //             circuit_inputs.circuit_inputs.epochs.iter().enumerate()
-                //         {
-                //             println!("Epoch {}: {:?}", index, epoch.expected_circuit_outputs);
-                //         }
-                //     }
-                //     Err(e) => {
-                //         error!("[EPOCH BATCH JOB] Transaction sending error: {:?}", e);
-                //         db_manager
-                //             .update_job_status(job.job_uuid, JobStatus::Error)
-                //             .await?;
-                //     }
-                // }
 
                 let confirmation_result =
                     bankai.starknet_client.wait_for_confirmation(txhash).await;
@@ -941,6 +937,9 @@ async fn broadcast_onchain_ready_jobs(
                     }
                     Err(e) => {
                         error!("[EPOCH BATCH JOB] Transaction failed or timed out: {:?}", e);
+                        let _ = db_manager
+                            .set_failure_info(job.job_uuid, JobStatus::ReadyToBroadcastOnchain)
+                            .await?;
                         db_manager
                             .update_job_status(job.job_uuid, JobStatus::Error)
                             .await?;
@@ -974,13 +973,31 @@ async fn broadcast_onchain_ready_jobs(
                     sync_commite_id
                 );
 
-                let txhash = bankai
+                let send_result = bankai
                     .starknet_client
                     .submit_update(
                         sync_committee_update_inputs.expected_circuit_outputs,
                         &bankai.config,
                     )
-                    .await?;
+                    .await;
+
+                let txhash = match send_result {
+                    Ok(txhash) => {
+                        info!("[EPOCH BATCH JOB] Transaction sent: {}", txhash);
+                        txhash
+                    }
+                    Err(e) => {
+                        error!("[EPOCH BATCH JOB] Transaction sending error: {:?}", e);
+                        let _ = db_manager
+                            .set_failure_info(job.job_uuid, JobStatus::ReadyToBroadcastOnchain)
+                            .await?;
+                        db_manager
+                            .update_job_status(job.job_uuid, JobStatus::Error)
+                            .await?;
+
+                        continue;
+                    }
+                };
 
                 info!("[SYNC COMMITTEE JOB] Successfully called sync committee ID {} update onchain, transaction confirmed, txhash: {}", sync_commite_id, txhash);
 
@@ -1028,6 +1045,9 @@ async fn broadcast_onchain_ready_jobs(
                             "[SYNC COMMITTEE JOB] Transaction failed or timed out: {:?}",
                             e
                         );
+                        let _ = db_manager
+                            .set_failure_info(job.job_uuid, JobStatus::ReadyToBroadcastOnchain)
+                            .await?;
                         db_manager
                             .update_job_status(job.job_uuid, JobStatus::Error)
                             .await?;

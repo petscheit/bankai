@@ -402,7 +402,7 @@ impl DatabaseManager {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         self.client
             .execute(
-                "UPDATE jobs SET errored_at_step = $1, updated_at = NOW(), last_failure_time = NOW() WHERE job_uuid = $2",
+                "UPDATE jobs SET failed_at_step = $1, updated_at = NOW(), last_failure_time = NOW() WHERE job_uuid = $2",
                 &[&failed_at_step.to_string(), &job_id],
             )
             .await?;

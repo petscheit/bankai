@@ -177,10 +177,10 @@ impl StarknetClient {
             }
             Err(e) => {
                 error!("Transaction execution error: {:#?}", e);
-                Err(StarknetError::TransactionError(format!(
+                return Err(StarknetError::TransactionError(format!(
                     "TransactionExecutionError: {:#?}",
                     e
-                )))
+                )));
             }
         }
     }
