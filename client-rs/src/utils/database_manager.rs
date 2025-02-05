@@ -9,7 +9,7 @@ use chrono::NaiveDateTime;
 use num_traits::ToPrimitive;
 use std::collections::HashMap;
 use tokio_postgres::{Client, Row};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -440,6 +440,20 @@ impl DatabaseManager {
         Ok(())
     }
 
+    pub async fn set_failure_info(
+        &self,
+        job_id: Uuid,
+        failed_at_step: JobStatus,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.client
+            .execute(
+                "UPDATE jobs SET errored_at_step = $1, updated_at = NOW() WHERE job_uuid = $2",
+                &[&failed_at_step.to_string(), &job_id],
+            )
+            .await?;
+        Ok(())
+    }
+
     pub async fn count_epoch_jobs_waiting_for_sync_committe_update(
         &self,
         latest_verified_sync_committee: u64,
@@ -488,6 +502,11 @@ impl DatabaseManager {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let sync_commite_first_slot = helpers::get_first_slot_for_sync_committee(sync_committee_id);
         let sync_commite_last_slot = helpers::get_last_slot_for_sync_committee(sync_committee_id);
+
+        debug!(
+            "Setting syn committee between slots {} and {} to READY_TO_BROADCAST_ONCHAIN",
+            sync_commite_first_slot, sync_commite_last_slot
+        );
 
         let rows_affected = self
             .client

@@ -12,3 +12,4 @@ pub const MAX_JOB_RETRIES_COUNT: u64 = 10;
 pub const BEACON_CHAIN_LISTENER_ENABLED: bool = true;
 pub const JOBS_RETRY_ENABLED: bool = false;
 pub const JOBS_RESUME_ENABLED: bool = false;
+pub const RETRY_DELAY_MS: u64 = 300_0000;

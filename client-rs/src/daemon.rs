@@ -696,8 +696,10 @@ async fn evaluate_jobs_statuses(
     // Firstly we get all jobs with status OFFCHAIN_COMPUTATION_FINISHED
     // We calculating the start and end epoch for provided last verified sync committe
     // and setting READY_TO_BROADCAST status for epochs up to the last epoch belonging to provided latest_verified_sync_committee_id
-    let first_epoch = get_first_epoch_for_sync_committee(latest_verified_sync_committee_id);
-    let last_epoch = get_last_epoch_for_sync_committee(latest_verified_sync_committee_id);
+    let first_epoch = get_first_epoch_for_sync_committee(latest_verified_sync_committee_id + 1);
+    let last_epoch = get_last_epoch_for_sync_committee(latest_verified_sync_committee_id + 1);
+
+    //let first_epoch = first_epoch - 32; // So we also broadcast first epoch from next sync committee
 
     info!(
         "Evaluating jobs for epochs range from {} to {}, for sync committee {}",
@@ -709,7 +711,7 @@ async fn evaluate_jobs_statuses(
         .await?;
 
     db_manager
-        .set_ready_to_broadcast_for_sync_committee(latest_verified_sync_committee_id + 1)
+        .set_ready_to_broadcast_for_sync_committee(latest_verified_sync_committee_id)
         .await?;
 
     Ok(())
@@ -888,7 +890,29 @@ async fn broadcast_onchain_ready_jobs(
                     .update_job_status(job.job_uuid, JobStatus::ProofVerifyCalledOnchain)
                     .await?;
 
-                let _send_result = db_manager.set_job_txhash(job.job_uuid, txhash).await?;
+                let _ = db_manager.set_job_txhash(job.job_uuid, txhash).await;
+
+                // match send_result {
+                //     Ok(_) => {
+                //         info!("[EPOCH BATCH JOB] Transaction sent");
+                //         db_manager
+                //             .update_job_status(job.job_uuid, JobStatus::VerifyTransactionSend)
+                //             .await?;
+
+                //         // Iterate over and insert epochs proofs to db
+                //         for (index, epoch) in
+                //             circuit_inputs.circuit_inputs.epochs.iter().enumerate()
+                //         {
+                //             println!("Epoch {}: {:?}", index, epoch.expected_circuit_outputs);
+                //         }
+                //     }
+                //     Err(e) => {
+                //         error!("[EPOCH BATCH JOB] Transaction sending error: {:?}", e);
+                //         db_manager
+                //             .update_job_status(job.job_uuid, JobStatus::Error)
+                //             .await?;
+                //     }
+                // }
 
                 let confirmation_result =
                     bankai.starknet_client.wait_for_confirmation(txhash).await;

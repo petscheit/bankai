@@ -4,8 +4,8 @@ CREATE TABLE jobs (
     atlantic_proof_generate_batch_id TEXT NULL,
     atlantic_proof_wrapper_batch_id TEXT NULL,
     slot BIGINT NOT NULL, -- Slot associated with the job
-    batch_range_begin_epoch BIGINT NOT NULL,
-    batch_range_end_epoch BIGINT NOT NULL,
+    batch_range_begin_epoch BIGINT NULL,
+    batch_range_end_epoch BIGINT NULL,
     type TEXT NOT NULL,
     tx_hash TEXT NULL,
     errored_at_step TEXT NOT NULL,

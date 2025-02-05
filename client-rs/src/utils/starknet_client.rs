@@ -166,12 +166,8 @@ impl StarknetClient {
             selector,
             calldata,
         };
-        
-        let send_result = self
-            .account
-            .execute_v1(vec![call])
-            .send()
-            .await;
+
+        let send_result = self.account.execute_v1(vec![call]).send().await;
 
         match send_result {
             Ok(tx_response) => {
