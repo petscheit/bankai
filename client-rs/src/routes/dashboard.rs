@@ -47,7 +47,7 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
         .iter()
         .map(|entry| {
             format!(
-                "║  Batch {:}: {} -> {} [{}] {:<45}             ║",
+                "║  Batch {:}: {} -> {} [{}] {:<32} {:<66}  ║",
                 entry.job.job_uuid.to_string()[..8].to_string(),
                 entry.job.batch_range_begin_epoch,
                 entry.job.batch_range_end_epoch,
@@ -57,10 +57,10 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
                     _ => "⋯",
                 },
                 entry.job.job_status.to_string(),
-                // entry.tx_hash.as_ref().map_or(
-                //     "-".to_string(),
-                //     |hash| format!("0x{:x}", hash)
-                // )
+                entry
+                    .tx_hash
+                    .as_ref()
+                    .map_or("-".to_string(), |s| s.clone()),
             )
         })
         .collect::<Vec<_>>()
@@ -84,7 +84,7 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
         .iter()
         .map(|entry| {
             format!(
-                "║  Batch {:}: {}   {}      [{}] {:<45}           ║",
+                "║  Batch {:}: {}  {}      [{}] {:<32} {:<66} ║",
                 entry.job.job_uuid.to_string()[..8].to_string(),
                 entry.job.slot,
                 helpers::get_sync_committee_id_by_slot(entry.job.slot.to_u64().unwrap()),
@@ -94,17 +94,17 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
                     _ => "⋯",
                 },
                 entry.job.job_status.to_string(),
-                // entry.tx_hash.as_ref().map_or(
-                //     "-".to_string(),
-                //     |hash| format!("0x{:x}", hash)
-                // )
+                entry
+                    .tx_hash
+                    .as_ref()
+                    .map_or("-".to_string(), |s| s.clone()),
             )
         })
         .collect::<Vec<_>>()
         .join("\n");
 
     let sync_committee_jobs_display = if recent_batches.is_empty() {
-        "  ║  No recent sync committee jobs found                                                ║    "
+        "  ║  No recent sync committee jobs found                                                                                                                 ║    "
             .to_string()
     } else {
         sync_committee_info
@@ -162,30 +162,30 @@ pub fn create_ascii_dashboard(
 | |_) / ___ \| |\  | . \ / ___ \ | |
 |____/_/   \_\_| \_|_|\_/_/   \_\___|
 
-╔════════════════════════════════════════ DASHBOARD OVERVIEW ═════════════════════════════════════╗
-║                                                                                                 ║
-║   Statuses:                                                                                     ║
-║     • Daemon:    {daemon_status:<12}  • Database:  {db_status:<12}  • Beacon: {beacon_status:<12}                ║
-║                                                                                                 ║
-║   Metrics:                                                                                      ║
-║     • Success Rate:        {success_rate:<10}                                                           ║
-║     • Average Duration:    {avg_duration:<10}                                                           ║
-║     • Jobs in Progress:    {jobs_in_progress:<10}                                                           ║
-║                                                                                                 ║
-║   Beacon Info:                                                                                  ║
-║     • Latest Beacon Slot:    {latest_beacon_slot:<12}                                                       ║
-║     • Latest Verified Slot:  {latest_verified_slot:<12}                                                       ║
-║     • Epoch Gap:             {epoch_gap:<12}                                                       ║
-║                                                                                                 ║
-╠═══════════════════════════════════════ RECENT BATCH JOBS ═══════════════════════════════════════╣
-║        UUID:     FROM:     TO:        STATUS:                     TX:                           ║
-║ ─────────────────────────────────────────────────────────────────────────────────────────────── ║
+╔════════════════════════════════════════ DASHBOARD OVERVIEW ════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                                                                            ║
+║   Statuses:                                                                                                                                ║
+║     • Daemon:    {daemon_status:<12}  • Database:  {db_status:<12}  • Beacon: {beacon_status:<12}                                                           ║
+║                                                                                                                                            ║
+║   Metrics:                                                                                                                                 ║
+║     • Success Rate:        {success_rate:<10}                                                                                                      ║
+║     • Average Duration:    {avg_duration:<10}                                                                                                      ║
+║     • Jobs in Progress:    {jobs_in_progress:<10}                                                                                                      ║
+║                                                                                                                                            ║
+║   Beacon Info:                                                                                                                             ║
+║     • Latest Beacon Slot:    {latest_beacon_slot:<12}                                                                                                  ║
+║     • Latest Verified Slot:  {latest_verified_slot:<12}                                                                                                  ║
+║     • Epoch Gap:             {epoch_gap:<12}                                                                                                  ║
+║                                                                                                                                            ║
+╠═══════════════════════════════════════ RECENT BATCH JOBS ══════════════════════════════════════════════════════════════════════════════════╣
+║        UUID:     FROM:     TO:        STATUS:                     TX:                                                                      ║
+║ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── ║
 {batch_display_block}
-╠══════════════════════════════   RECENT SYNC COMMITTEE JOBS  ════════════════════════════════════╣
-║        UUID:     SLOT:    COMMITTEE:  STATUS:                     TX:                           ║
-║ ─────────────────────────────────────────────────────────────────────────────────────────────── ║
+╠══════════════════════════════   RECENT SYNC COMMITTEE JOBS  ═══════════════════════════════════════════════════════════════════════════════╣
+║        UUID:     SLOT:    COMMITTEE:  STATUS:                     TX:                                                                      ║
+║ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── ║
 {sync_committee_jobs_display_block}
-╚═════════════════════════════════════════════════════════════════════════════════════════════════╝
+╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
 "#,
         daemon_status = daemon_status,
         db_status = db_status,
