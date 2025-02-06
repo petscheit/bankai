@@ -57,8 +57,8 @@ pub fn get_last_epoch_for_sync_committee(sync_committee_id: u64) -> u64 {
     (sync_committee_id + 1) * EPOCHS_PER_SYNC_COMMITTEE - 1
 }
 
-pub fn get_first_slot_for_epoch(slot: u64) -> u64 {
-    slot * SLOTS_PER_EPOCH
+pub fn get_first_slot_for_epoch(epoch: u64) -> u64 {
+    epoch * SLOTS_PER_EPOCH
 }
 
 pub fn get_last_slot_for_epoch(epoch: u64) -> u64 {
@@ -69,16 +69,16 @@ pub fn get_sync_committee_id_by_epoch(epoch: u64) -> u64 {
     epoch / EPOCHS_PER_SYNC_COMMITTEE
 }
 
-pub fn get_sync_committee_id_by_slot(epoch: u64) -> u64 {
-    epoch / SLOTS_PER_SYNC_COMMITTEE
+pub fn get_sync_committee_id_by_slot(slot: u64) -> u64 {
+    slot / SLOTS_PER_SYNC_COMMITTEE
 }
 
-pub fn get_first_slot_for_sync_committee(slot: u64) -> u64 {
-    slot * SLOTS_PER_SYNC_COMMITTEE
+pub fn get_first_slot_for_sync_committee(sync_committee: u64) -> u64 {
+    sync_committee * SLOTS_PER_SYNC_COMMITTEE
 }
 
-pub fn get_last_slot_for_sync_committee(slot: u64) -> u64 {
-    (slot + 1) * SLOTS_PER_SYNC_COMMITTEE - 1
+pub fn get_last_slot_for_sync_committee(sync_committee: u64) -> u64 {
+    (sync_committee + 1) * SLOTS_PER_SYNC_COMMITTEE - 1
 }
 
 // Since beacon chain RPCs have different response structure (quicknode responds different than nidereal) we use this event extraction logic

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
 mod bankai_client;
 mod config;
 mod constants;
@@ -150,6 +152,10 @@ enum Commands {
     ProveNextCommittee,
     ProveNextEpoch,
     ProveNextEpochBatch,
+    ProveCommitteeAtSlot {
+        #[arg(long, short)]
+        slot: u64,
+    },
     CheckBatchStatus {
         #[arg(long, short)]
         batch_id: String,
@@ -291,19 +297,19 @@ async fn main() -> Result<(), Error> {
                 .await?;
             let lowest_committee_update_slot = (latest_committee_id) * Felt::from(0x2000);
             println!("Min Slot Required: {}", lowest_committee_update_slot);
-            let latest_epoch = bankai
+            let latest_epoch_slot = bankai
                 .starknet_client
                 .get_latest_epoch_slot(&bankai.config)
                 .await?;
-            println!("Latest epoch: {}", latest_epoch);
-            if latest_epoch < lowest_committee_update_slot {
-                return Err(Error::RequiresNewerEpoch(latest_epoch));
+            println!("Latest epoch slot: {}", latest_epoch_slot);
+            if latest_epoch_slot < lowest_committee_update_slot {
+                return Err(Error::RequiresNewerEpoch(latest_epoch_slot));
             }
             let update = bankai
-                .get_sync_committee_update(latest_epoch.try_into().unwrap())
+                .get_sync_committee_update(latest_epoch_slot.try_into().unwrap())
                 .await?;
             let _ = update.export()?;
-            CairoRunner::generate_pie(&update, &bankai.config).await?;
+            CairoRunner::generate_pie(&update, &bankai.config, None, None).await?;
             let batch_id = bankai.atlantic_client.submit_batch(update).await?;
             println!("Batch Submitted: {}", batch_id);
         }
@@ -319,7 +325,7 @@ async fn main() -> Result<(), Error> {
             // let proof = bankai.get_epoch_proof(next_epoch).await?;
             let epoch_update = EpochUpdate::new(&bankai.client, next_epoch).await?;
             let _ = epoch_update.export()?;
-            CairoRunner::generate_pie(&epoch_update, &bankai.config).await?;
+            CairoRunner::generate_pie(&epoch_update, &bankai.config, None, None).await?;
             let batch_id = bankai.atlantic_client.submit_batch(epoch_update).await?;
             println!("Batch Submitted: {}", batch_id);
         }
@@ -327,8 +333,26 @@ async fn main() -> Result<(), Error> {
             let epoch_update = EpochUpdateBatch::new(&bankai).await?;
             println!("Update contents: {:?}", epoch_update);
             let _ = epoch_update.export()?;
-            CairoRunner::generate_pie(&epoch_update, &bankai.config).await?;
+            CairoRunner::generate_pie(&epoch_update, &bankai.config, None, None).await?;
             let batch_id = bankai.atlantic_client.submit_batch(epoch_update).await?;
+            println!("Batch Submitted: {}", batch_id);
+        }
+        Commands::ProveCommitteeAtSlot { slot } => {
+            let latest_committee_id = bankai
+                .starknet_client
+                .get_latest_committee_id(&bankai.config)
+                .await?;
+            let lowest_committee_update_slot = (latest_committee_id) * Felt::from(0x2000);
+            println!("Min Slot Required: {}", lowest_committee_update_slot);
+            // if slot < lowest_committee_update_slot {
+            //     return Err(Error::RequiresNewerEpoch(slot));
+            // }
+            let update = bankai
+                .get_sync_committee_update(slot.try_into().unwrap())
+                .await?;
+            let _ = update.export()?;
+            CairoRunner::generate_pie(&update, &bankai.config, None, None).await?;
+            let batch_id = bankai.atlantic_client.submit_batch(update).await?;
             println!("Batch Submitted: {}", batch_id);
         }
         Commands::VerifyEpoch { batch_id, slot } => {

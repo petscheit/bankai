@@ -1,14 +1,25 @@
+use std::sync::Arc;
+
+use crate::state::JobStatus;
 use crate::traits::ProofType;
 use crate::BankaiConfig;
 use crate::{traits::Provable, Error};
 use tokio::task;
 use tokio::task::JoinError;
-use tracing::{debug, info};
+use tracing::info;
+use uuid::Uuid;
+
+use super::database_manager::DatabaseManager;
 
 pub struct CairoRunner();
 
 impl CairoRunner {
-    pub async fn generate_pie(input: &impl Provable, config: &BankaiConfig) -> Result<(), Error> {
+    pub async fn generate_pie(
+        input: &impl Provable,
+        config: &BankaiConfig,
+        db_manager: Option<Arc<DatabaseManager>>,
+        job_id: Option<Uuid>,
+    ) -> Result<(), Error> {
         // Acquire a permit from the semaphore.
         // If all permits are in use we will wait until one is available.
         let _permit = config
@@ -18,8 +29,16 @@ impl CairoRunner {
             .await
             .map_err(|e| Error::CairoRunError(format!("Semaphore error: {}", e)))?;
 
-        let input_path = input.inputs_path();
-        info!("Cairo Input path: {}", input_path);
+        match db_manager {
+            None => {}
+            Some(db) => {
+                let _ = db
+                    .update_job_status(job_id.unwrap(), JobStatus::StartedTraceGeneration)
+                    .await;
+            }
+        }
+
+        let input_path = input.export()?;
 
         let program_path = match input.proof_type() {
             ProofType::Epoch => config.epoch_circuit_path.clone(),

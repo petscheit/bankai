@@ -440,22 +440,42 @@ async fn handle_beacon_chain_head_event(
     );
 
     // Decide basing on actual state
-    if helpers::get_sync_committee_id_by_epoch(latest_scheduled_epoch + 1)
-        > latest_scheduled_sync_committee
-    {
-        // We reached end of current sync committee, need to schedule new sync committee proving
-        match run_sync_committee_update_job(
-            db_manager.clone(),
-            latest_scheduled_sync_committee + 1,
-            tx.clone(),
-        )
-        .await
-        {
-            Ok(()) => {}
-            Err(e) => {
-                error!("Error while creating sync committee update job: {}", e);
-            }
-        };
+    // if helpers::get_sync_committee_id_by_epoch(latest_scheduled_epoch + 1)
+    //     > latest_scheduled_sync_committee
+    // {
+    //     // We reached end of current sync committee, need to schedule new sync committee proving
+    //     match run_sync_committee_update_job(
+    //         db_manager.clone(),
+    //         latest_scheduled_sync_committee + 1,
+    //         tx.clone(),
+    //     )
+    //     .await
+    //     {
+    //         Ok(()) => {}
+    //         Err(e) => {
+    //             error!("Error while creating sync committee update job: {}", e);
+    //         }
+    //     };
+    // }
+    //
+
+    let lowest_committee_update_slot =
+        (latest_verified_sync_committee_id) * constants::SLOTS_PER_SYNC_COMMITTEE;
+    if !(latest_verified_epoch_slot < lowest_committee_update_slot) {
+        if last_sync_committee_in_progress < (latest_scheduled_sync_committee + 1) {
+            match run_sync_committee_update_job(
+                db_manager.clone(),
+                latest_scheduled_sync_committee + 1,
+                tx.clone(),
+            )
+            .await
+            {
+                Ok(()) => {}
+                Err(e) => {
+                    error!("Error while creating sync committee update job: {}", e);
+                }
+            };
+        }
     }
 
     let current_sync_committee_epochs_left =
@@ -1132,6 +1152,8 @@ async fn process_job(
                         CairoRunner::generate_pie(
                             &sync_committe_update_program_inputs,
                             &bankai.config,
+                            Some(db_manager.clone()),
+                            Some(job.job_id),
                         )
                         .await?;
 
@@ -1289,7 +1311,13 @@ async fn process_job(
 
                         info!("[BATCH EPOCH JOB] Starting trace generation...");
 
-                        CairoRunner::generate_pie(&circuit_inputs, &bankai.config).await?;
+                        CairoRunner::generate_pie(
+                            &circuit_inputs,
+                            &bankai.config,
+                            Some(db_manager.clone()),
+                            Some(job.job_id),
+                        )
+                        .await?;
 
                         db_manager
                             .update_job_status(job.job_id, JobStatus::PieGenerated)

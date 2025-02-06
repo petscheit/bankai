@@ -1,6 +1,9 @@
-use crate::state::{AppState, JobStatus};
+use crate::{
+    helpers,
+    state::{AppState, JobStatus},
+};
 use axum::extract::State;
-use num_traits::SaturatingSub;
+use num_traits::{SaturatingSub, ToPrimitive};
 
 pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
     let db = state.db_manager.clone();
@@ -70,6 +73,43 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
         batch_info
     };
 
+    // Fetch last 20 batch jobs
+    let recent_sync_committee_jobs = db
+        .get_recent_sync_committee_jobs(20)
+        .await
+        .unwrap_or_default();
+
+    // Format batch information
+    let sync_committee_info = recent_sync_committee_jobs
+        .iter()
+        .map(|entry| {
+            format!(
+                "║  Batch {:}: {}   {}      [{}] {:<45}           ║",
+                entry.job.job_uuid.to_string()[..8].to_string(),
+                entry.job.slot,
+                helpers::get_sync_committee_id_by_slot(entry.job.slot.to_u64().unwrap()),
+                match entry.job.job_status {
+                    JobStatus::Done => "✓",
+                    JobStatus::Error => "✗",
+                    _ => "⋯",
+                },
+                entry.job.job_status.to_string(),
+                // entry.tx_hash.as_ref().map_or(
+                //     "-".to_string(),
+                //     |hash| format!("0x{:x}", hash)
+                // )
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let sync_committee_jobs_display = if recent_batches.is_empty() {
+        "  ║  No recent sync committee jobs found                                                ║    "
+            .to_string()
+    } else {
+        sync_committee_info
+    };
+
     // Update system health indicators with simpler checks
     let daemon_status = "● Active";
     let db_status = if db.is_connected().await {
@@ -97,6 +137,7 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
         db_status,
         beacon_status,
         &batch_display,
+        &sync_committee_jobs_display,
     )
 }
 
@@ -111,6 +152,7 @@ pub fn create_ascii_dashboard(
     db_status: &str,
     beacon_status: &str,
     batch_display: &str,
+    sync_committee_jobs_display: &str,
 ) -> String {
     format!(
         r#"
@@ -139,6 +181,10 @@ pub fn create_ascii_dashboard(
 ║        UUID:     FROM:     TO:        STATUS:                     TX:                           ║
 ║ ─────────────────────────────────────────────────────────────────────────────────────────────── ║
 {batch_display_block}
+╠══════════════════════════════   RECENT SYNC COMMITTEE JOBS  ════════════════════════════════════╣
+║        UUID:     SLOT:    COMMITTEE:  STATUS:                     TX:                           ║
+║ ─────────────────────────────────────────────────────────────────────────────────────────────── ║
+{sync_committee_jobs_display_block}
 ╚═════════════════════════════════════════════════════════════════════════════════════════════════╝
 "#,
         daemon_status = daemon_status,
@@ -150,6 +196,7 @@ pub fn create_ascii_dashboard(
         latest_beacon_slot = latest_beacon_slot,
         latest_verified_slot = latest_verified_slot,
         epoch_gap = epoch_gap,
-        batch_display_block = batch_display
+        batch_display_block = batch_display,
+        sync_committee_jobs_display_block = sync_committee_jobs_display
     )
 }

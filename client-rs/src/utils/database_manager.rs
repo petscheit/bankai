@@ -525,7 +525,7 @@ impl DatabaseManager {
         self.client
             .execute(
                 "UPDATE jobs SET tx_hash = $1, updated_at = NOW() WHERE job_uuid = $2",
-                &[&txhash.to_string(), &job_id],
+                &[&txhash.to_hex_string(), &job_id],
             )
             .await?;
         Ok(())
@@ -732,6 +732,40 @@ impl DatabaseManager {
                  FROM jobs
                  WHERE type = 'EPOCH_BATCH_UPDATE'
                  ORDER BY batch_range_begin_epoch DESC
+                 LIMIT $1",
+                &[&limit],
+            )
+            .await?;
+
+        let jobs = rows
+            .into_iter()
+            .map(|row| {
+                let job = Self::map_row_to_job(row.clone()).unwrap();
+                JobWithTimestamps {
+                    job,
+                    created_at: row.get("created_time"),
+                    updated_at: row.get("updated_time"),
+                    tx_hash: row.get("tx_hash"),
+                }
+            })
+            .collect();
+
+        Ok(jobs)
+    }
+
+    pub async fn get_recent_sync_committee_jobs(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<JobWithTimestamps>, Box<dyn std::error::Error + Send + Sync>> {
+        let rows = self
+            .client
+            .query(
+                "SELECT *,
+                 to_char(created_at, 'HH24:MI:SS') as created_time,
+                 to_char(updated_at, 'HH24:MI:SS') as updated_time
+                 FROM jobs
+                 WHERE type = 'SYNC_COMMITTEE_UPDATE'
+                 ORDER BY slot DESC
                  LIMIT $1",
                 &[&limit],
             )

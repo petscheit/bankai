@@ -88,6 +88,7 @@ impl FromStr for JobStatus {
         match s {
             "CREATED" => Ok(JobStatus::Created),
             "PROGRAM_INPUTS_PREPARED" => Ok(JobStatus::ProgramInputsPrepared),
+            "STARTED_TRACE_GENERATION" => Ok(JobStatus::StartedTraceGeneration),
             "PIE_GENERATED" => Ok(JobStatus::PieGenerated),
             "OFFCHAIN_PROOF_REQUESTED" => Ok(JobStatus::AtlanticProofRequested),
             "OFFCHAIN_PROOF_RETRIEVED" => Ok(JobStatus::AtlanticProofRetrieved),
