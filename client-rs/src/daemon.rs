@@ -208,14 +208,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // After RPC init, we do some startup checks before start listening to beacon chain:
     //
-    // Retry any failed jobs before processing new ones
-    if constants::JOBS_RETRY_ENABLED {
-        retry_failed_jobs(db_manager_for_listener.clone(), tx_for_listener.clone()).await?;
-    }
-
     // 🔄 Resume any unfinished jobs before processing new ones
     if constants::JOBS_RESUME_ENABLED {
         resume_unfinished_jobs(db_manager_for_listener.clone(), tx_for_listener.clone()).await?;
+    }
+
+    // Retry any failed jobs before processing new ones
+    if constants::JOBS_RETRY_ENABLED {
+        retry_failed_jobs(db_manager_for_listener.clone(), tx_for_listener.clone()).await?;
     }
 
     //enqueue_sync_committee_jobs();
@@ -375,14 +375,21 @@ async fn handle_beacon_chain_head_event(
         .to_u64()
         .unwrap();
 
+    let lowest_committee_update_slot =
+        (latest_verified_sync_committee_id) * constants::SLOTS_PER_SYNC_COMMITTEE;
+
     let latest_verified_epoch_id = helpers::slot_to_epoch_id(latest_verified_epoch_slot);
     let epochs_behind = current_epoch_id - latest_verified_epoch_id;
 
-    let _ = evaluate_jobs_statuses(db_manager.clone(), latest_verified_sync_committee_id)
-        .await
-        .map_err(|e| {
-            error!("Error evaluating jobs statuses: {}", e);
-        });
+    let _ = evaluate_jobs_statuses(
+        db_manager.clone(),
+        latest_verified_sync_committee_id,
+        latest_verified_epoch_slot,
+    )
+    .await
+    .map_err(|e| {
+        error!("Error evaluating jobs statuses: {}", e);
+    });
     let _ = broadcast_onchain_ready_jobs(db_manager.clone(), bankai.clone())
         .await
         .map_err(|e| {
@@ -467,24 +474,26 @@ async fn handle_beacon_chain_head_event(
     // }
     //
 
-    // let lowest_committee_update_slot =
-    //     (latest_verified_sync_committee_id) * constants::SLOTS_PER_SYNC_COMMITTEE;
-    // if !(latest_verified_epoch_slot < lowest_committee_update_slot) {
-    //     if last_sync_committee_in_progress < (latest_scheduled_sync_committee + 1) {
-    //         match run_sync_committee_update_job(
-    //             db_manager.clone(),
-    //             latest_scheduled_sync_committee + 1,
-    //             tx.clone(),
-    //         )
-    //         .await
-    //         {
-    //             Ok(()) => {}
-    //             Err(e) => {
-    //                 error!("Error while creating sync committee update job: {}", e);
-    //             }
-    //         };
-    //     }
-    // }
+    if !(latest_verified_epoch_slot < lowest_committee_update_slot) {
+        info!(
+            "Lowest committee update slot: {}",
+            lowest_committee_update_slot
+        );
+        if last_sync_committee_in_progress < latest_scheduled_sync_committee {
+            match run_sync_committee_update_job(
+                db_manager.clone(),
+                latest_scheduled_sync_committee,
+                tx.clone(),
+            )
+            .await
+            {
+                Ok(()) => {}
+                Err(e) => {
+                    error!("Error while creating sync committee update job: {}", e);
+                }
+            };
+        }
+    }
 
     let current_sync_committee_epochs_left =
         helpers::get_last_epoch_for_sync_committee(current_sync_committee_id) - current_epoch_id;
@@ -560,23 +569,23 @@ async fn handle_beacon_chain_head_event(
             // );
             //
             // Mitigate the issue when Starknet Sequencer RPC responds about last verified slot with delay
-            if last_done_epoch < latest_verified_epoch_id {
-                match run_batch_epoch_update_job(
-                    db_manager.clone(),
-                    get_first_slot_for_epoch(epoch_to_start_from)
-                        + (constants::SLOTS_PER_EPOCH * constants::TARGET_BATCH_SIZE),
-                    epoch_to_start_from,
-                    epoch_to_end_on,
-                    tx.clone(),
-                )
-                .await
-                {
-                    Ok(()) => {}
-                    Err(e) => {
-                        error!("Error while creating job: {}", e);
-                    }
-                };
-            }
+            // if last_done_epoch < latest_verified_epoch_id {
+            //     match run_batch_epoch_update_job(
+            //         db_manager.clone(),
+            //         get_first_slot_for_epoch(epoch_to_start_from)
+            //             + (constants::SLOTS_PER_EPOCH * constants::TARGET_BATCH_SIZE),
+            //         epoch_to_start_from,
+            //         epoch_to_end_on,
+            //         tx.clone(),
+            //     )
+            //     .await
+            //     {
+            //         Ok(()) => {}
+            //         Err(e) => {
+            //             error!("Error while creating job: {}", e);
+            //         }
+            //     };
+            // }
         } else {
             debug!("All reqired jobs are now queued and processing");
         }
@@ -725,6 +734,7 @@ async fn run_sync_committee_update_job(
 async fn evaluate_jobs_statuses(
     db_manager: Arc<DatabaseManager>,
     latest_verified_sync_committee_id: u64,
+    latest_verified_epoch_slot: u64,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // The purpose of this function is to manage the sequential nature of onchain verification of epochs and sync committees
     // Firstly we get all jobs with status OFFCHAIN_COMPUTATION_FINISHED
@@ -749,7 +759,7 @@ async fn evaluate_jobs_statuses(
     //     .await?;
 
     db_manager
-        .set_ready_to_broadcast_for_sync_committee(latest_verified_sync_committee_id + 1)
+        .set_ready_to_broadcast_for_sync_committee(latest_verified_sync_committee_id)
         .await?;
 
     Ok(())
