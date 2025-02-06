@@ -401,8 +401,16 @@ async fn handle_beacon_chain_head_event(
         .unwrap()
         .unwrap();
 
+    let last_done_epoch = db_manager.get_latest_done_epoch().await.unwrap().unwrap();
+
     let last_sync_committee_in_progress = db_manager
         .get_latest_sync_committee_in_progress()
+        .await
+        .unwrap()
+        .unwrap();
+
+    let last_done_sync_committee = db_manager
+        .get_latest_done_sync_committee()
         .await
         .unwrap()
         .unwrap();
@@ -412,7 +420,7 @@ async fn handle_beacon_chain_head_event(
 
     if latest_verified_epoch_id > last_epoch_in_progress {
         if last_epoch_in_progress == 0 {
-            info!("Starting daemon on clean epochs jobs table");
+            //info!("Starting daemon on clean epochs jobs table");
         } else {
             warn!(
                 "Something may be wrong, last verified epoch is greather than last epoch in progress"
@@ -424,7 +432,7 @@ async fn handle_beacon_chain_head_event(
 
     if latest_verified_sync_committee_id > last_sync_committee_in_progress {
         if last_sync_committee_in_progress == 0 {
-            info!("Starting daemon on clean sync committees jobs table");
+            //info!("Starting daemon on clean sync committees jobs table");
         } else {
             warn!(
                 "Something may be wrong, last verified sync committee is greather than last sync committee in progress"
@@ -550,26 +558,30 @@ async fn handle_beacon_chain_head_event(
             //     helpers::get_last_epoch_for_sync_committee(currently_processed_sync_committee_id)
             //         - latest_scheduled_epoch
             // );
-            match run_batch_epoch_update_job(
-                db_manager.clone(),
-                get_first_slot_for_epoch(epoch_to_start_from)
-                    + (constants::SLOTS_PER_EPOCH * constants::TARGET_BATCH_SIZE),
-                epoch_to_start_from,
-                epoch_to_end_on,
-                tx.clone(),
-            )
-            .await
-            {
-                Ok(()) => {}
-                Err(e) => {
-                    error!("Error while creating job: {}", e);
-                }
-            };
+            //
+            // Mitigate the issue when Starknet Sequencer RPC responds about last verified slot with delay
+            if last_done_epoch < latest_verified_epoch_id {
+                match run_batch_epoch_update_job(
+                    db_manager.clone(),
+                    get_first_slot_for_epoch(epoch_to_start_from)
+                        + (constants::SLOTS_PER_EPOCH * constants::TARGET_BATCH_SIZE),
+                    epoch_to_start_from,
+                    epoch_to_end_on,
+                    tx.clone(),
+                )
+                .await
+                {
+                    Ok(()) => {}
+                    Err(e) => {
+                        error!("Error while creating job: {}", e);
+                    }
+                };
+            }
         } else {
             debug!("All reqired jobs are now queued and processing");
         }
     } else if epochs_behind == constants::TARGET_BATCH_SIZE {
-        if last_epoch_in_progress < (epochs_behind + current_epoch_id) {
+        if last_epoch_in_progress < current_epoch_id {
             // This is when we are synced properly and new epoch batch needs to be inserted
             info!(
                 "Target batch size reached. Starting processing next epoch batch. Current Beacon Chain epoch: {} Latest verified epoch: {}",

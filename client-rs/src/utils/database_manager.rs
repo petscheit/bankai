@@ -251,6 +251,34 @@ impl DatabaseManager {
         }
     }
 
+    pub async fn get_latest_done_epoch(
+        &self,
+    ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
+        // Query the latest slot with job_status in ('in_progress', 'initialized')
+        // //, 'CANCELLED', 'ERROR'
+        let row_opt = self
+            .client
+            .query_opt(
+                "SELECT batch_range_end_epoch FROM jobs
+                 WHERE job_status = 'DONE'
+                        AND batch_range_end_epoch != 0
+                        AND type = 'EPOCH_BATCH_UPDATE'
+                 ORDER BY batch_range_end_epoch DESC
+                 LIMIT 1",
+                &[],
+            )
+            .await?;
+
+        // Extract and return the slot ID
+        if let Some(row) = row_opt {
+            Ok(Some(
+                row.get::<_, i64>("batch_range_end_epoch").to_u64().unwrap(),
+            ))
+        } else {
+            Ok(Some(0))
+        }
+    }
+
     pub async fn get_latest_sync_committee_in_progress(
         &self,
     ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
@@ -260,6 +288,32 @@ impl DatabaseManager {
             .query_opt(
                 "SELECT slot FROM jobs
                  WHERE job_status NOT IN ('DONE')
+                        AND type = 'SYNC_COMMITTEE_UPDATE'
+                 ORDER BY slot DESC
+                 LIMIT 1",
+                &[],
+            )
+            .await?;
+
+        // Extract and return the slot ID
+        if let Some(row) = row_opt {
+            Ok(Some(helpers::slot_to_sync_committee_id(
+                row.get::<_, i64>("slot").to_u64().unwrap(),
+            )))
+        } else {
+            Ok(Some(0))
+        }
+    }
+
+    pub async fn get_latest_done_sync_committee(
+        &self,
+    ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
+        // Query the latest slot with job_status in ('in_progress', 'initialized')
+        let row_opt = self
+            .client
+            .query_opt(
+                "SELECT slot FROM jobs
+                 WHERE job_status = 'DONE'
                         AND type = 'SYNC_COMMITTEE_UPDATE'
                  ORDER BY slot DESC
                  LIMIT 1",
