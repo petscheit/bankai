@@ -388,7 +388,7 @@ async fn handle_beacon_chain_head_event(
         .to_u64()
         .unwrap();
 
-    let lowest_committee_update_slot =
+    let lowest_required_committee_update_slot =
         (latest_verified_sync_committee_id) * constants::SLOTS_PER_SYNC_COMMITTEE;
 
     let latest_verified_epoch_id = helpers::slot_to_epoch_id(latest_verified_epoch_slot);
@@ -487,10 +487,10 @@ async fn handle_beacon_chain_head_event(
     // }
     //
 
-    if !(latest_verified_epoch_slot < lowest_committee_update_slot) {
+    if !(latest_verified_epoch_slot < lowest_required_committee_update_slot) {
         info!(
-            "Lowest committee update slot: {}",
-            lowest_committee_update_slot
+            "Lowest required committee update slot: {}",
+            lowest_required_committee_update_slot
         );
         if last_sync_committee_in_progress < latest_scheduled_sync_committee {
             match run_sync_committee_update_job(

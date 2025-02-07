@@ -33,9 +33,11 @@ pub enum JobStatus {
     #[postgres(name = "CREATED")]
     Created, // Can act as queued and be picked up by worker to proccess
     #[postgres(name = "PROGRAM_INPUTS_PREPARED")]
-    StartedTraceGeneration,
-    #[postgres(name = "STARTED_TRACE_GENERATION")]
+    StartedFetchingInputs,
+    #[postgres(name = "STARTED_FETCHING_INPUTS")]
     ProgramInputsPrepared,
+    #[postgres(name = "STARTED_TRACE_GENERATION")]
+    StartedTraceGeneration,
     #[postgres(name = "PIE_GENERATED")]
     PieGenerated,
     #[postgres(name = "OFFCHAIN_PROOF_REQUESTED")]
@@ -64,6 +66,7 @@ impl ToString for JobStatus {
     fn to_string(&self) -> String {
         match self {
             JobStatus::Created => "CREATED".to_string(),
+            JobStatus::StartedFetchingInputs => "STARTED_FETCHING_INPUTS".to_string(),
             JobStatus::ProgramInputsPrepared => "PROGRAM_INPUTS_PREPARED".to_string(),
             JobStatus::StartedTraceGeneration => "STARTED_TRACE_GENERATION".to_string(),
             JobStatus::PieGenerated => "PIE_GENERATED".to_string(),
@@ -87,6 +90,7 @@ impl FromStr for JobStatus {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "CREATED" => Ok(JobStatus::Created),
+            "STARTED_FETCHING_INPUTS" => Ok(JobStatus::StartedFetchingInputs),
             "PROGRAM_INPUTS_PREPARED" => Ok(JobStatus::ProgramInputsPrepared),
             "STARTED_TRACE_GENERATION" => Ok(JobStatus::StartedTraceGeneration),
             "PIE_GENERATED" => Ok(JobStatus::PieGenerated),
