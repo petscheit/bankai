@@ -14,3 +14,4 @@ pub const JOBS_RETRY_ENABLED: bool = true;
 pub const JOBS_RESUME_ENABLED: bool = true;
 pub const RETRY_DELAY_MS: u64 = 300_0000;
 pub const MAX_SKIPPED_SLOTS_RETRY_ATTEMPTS: u64 = 5; // How many skipped slots in row can be on Beacon Chain before we throw error
+pub const JOBS_RETRY_CHECK_INTERVAL: u64 = 600; // In seconds

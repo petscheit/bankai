@@ -111,9 +111,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     //let events_endpoint = format!("{}/eth/v1/events?topics=head", beacon_node_url)
     let db_manager_for_listener = db_manager.clone();
+    let db_manager_for_watcher = db_manager.clone();
     let bankai_for_listener = bankai.clone();
 
     let tx_for_listener = tx.clone();
+    let tx_for_watcher = tx.clone();
 
     let app_state: AppState = AppState {
         db_manager: db_manager.clone(),
@@ -319,6 +321,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         });
     }
 
+    // Run check and retry failed jobs periodicially
+    tokio::spawn(async move {
+        loop {
+            retry_failed_jobs(db_manager_for_watcher.clone(), tx_for_watcher.clone()).await;
+            tokio::time::sleep(std::time::Duration::from_secs(
+                constants::JOBS_RETRY_CHECK_INTERVAL,
+            ))
+            .await;
+        }
+    });
+
     // Wait for the server task to finish
     server_task.await?;
 
@@ -482,7 +495,7 @@ async fn handle_beacon_chain_head_event(
         if last_sync_committee_in_progress < latest_scheduled_sync_committee {
             match run_sync_committee_update_job(
                 db_manager.clone(),
-                latest_scheduled_sync_committee,
+                latest_verified_epoch_slot,
                 tx.clone(),
             )
             .await
@@ -800,26 +813,28 @@ async fn resume_unfinished_jobs(
         let job_to_resume = Job {
             job_id,
             job_type: job.job_type,
-            job_status: job.job_status,
+            job_status: job.job_status.clone(),
             slot: Some(job.slot.to_u64().unwrap()),
             batch_range_begin_epoch: job.batch_range_begin_epoch.to_u64(),
             batch_range_end_epoch: job.batch_range_end_epoch.to_u64(),
         };
 
+        let resumed_from_step = job.job_status.clone();
         let tx_clone = tx.clone();
         tokio::spawn(async move {
             match job_to_resume.job_type {
                 JobType::SyncCommitteeUpdate => {
                     info!(
-                        "Resuming job {}... (sync committee update job for sync committee {})",
+                        "Resuming job {} from step {}... (sync committee update job for sync committee {})",
                         job_id,
+                        resumed_from_step.to_string(),
                         helpers::slot_to_sync_committee_id(job.slot.to_u64().unwrap())
                     );
                 }
                 JobType::EpochBatchUpdate => {
                     info!(
-                        "Resuming job {}... (batch epoch update job for epochs from {} to {})",
-                        job_id, job.batch_range_begin_epoch, job.batch_range_end_epoch
+                        "Resuming job {} from step {}... (batch epoch update job for epochs from {} to {})",
+                        job_id, resumed_from_step.to_string(), job.batch_range_begin_epoch, job.batch_range_end_epoch
                     );
                 }
             }
@@ -1276,6 +1291,10 @@ async fn process_job(
                         current_status = JobStatus::WrapProofRequested;
                     }
                     JobStatus::WrapProofRequested => {
+                        info!(
+                            "[SYNC COMMITTEE JOB] Waiting for completion of Atlantic proof wrappinf job. QueryID: {}",
+                            wrapping_batch_id
+                        );
                         // Pool for Atlantic execution done
                         bankai
                             .atlantic_client

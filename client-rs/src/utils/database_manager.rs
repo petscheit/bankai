@@ -848,6 +848,38 @@ impl DatabaseManager {
         }
     }
 
+    pub async fn get_recent_atlantic_queries_in_progress(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<JobWithTimestamps>, Box<dyn std::error::Error + Send + Sync>> {
+        let rows = self
+            .client
+            .query(
+                "SELECT atlantic_proof_generate_batch_id, atlantic_proof_wrapper_batch_id
+                 FROM jobs
+                 WHERE job_status != 'DONE'
+                 ORDER BY slot DESC
+                 LIMIT $1",
+                &[&limit],
+            )
+            .await?;
+
+        let jobs = rows
+            .into_iter()
+            .map(|row| {
+                let job = Self::map_row_to_job(row.clone()).unwrap();
+                JobWithTimestamps {
+                    job,
+                    created_at: row.get("created_time"),
+                    updated_at: row.get("updated_time"),
+                    tx_hash: row.get("tx_hash"),
+                }
+            })
+            .collect();
+
+        Ok(jobs)
+    }
+
     pub async fn get_jobs_count_by_status(
         &self,
     ) -> Result<Vec<JobStatusCount>, Box<dyn std::error::Error + Send + Sync>> {
