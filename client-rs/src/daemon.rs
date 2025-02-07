@@ -569,23 +569,23 @@ async fn handle_beacon_chain_head_event(
             // );
             //
             // Mitigate the issue when Starknet Sequencer RPC responds about last verified slot with delay
-            // if last_done_epoch < latest_verified_epoch_id {
-            //     match run_batch_epoch_update_job(
-            //         db_manager.clone(),
-            //         get_first_slot_for_epoch(epoch_to_start_from)
-            //             + (constants::SLOTS_PER_EPOCH * constants::TARGET_BATCH_SIZE),
-            //         epoch_to_start_from,
-            //         epoch_to_end_on,
-            //         tx.clone(),
-            //     )
-            //     .await
-            //     {
-            //         Ok(()) => {}
-            //         Err(e) => {
-            //             error!("Error while creating job: {}", e);
-            //         }
-            //     };
-            // }
+            if last_done_epoch < latest_verified_epoch_id {
+                match run_batch_epoch_update_job(
+                    db_manager.clone(),
+                    get_first_slot_for_epoch(epoch_to_start_from)
+                        + (constants::SLOTS_PER_EPOCH * constants::TARGET_BATCH_SIZE),
+                    epoch_to_start_from,
+                    epoch_to_end_on,
+                    tx.clone(),
+                )
+                .await
+                {
+                    Ok(()) => {}
+                    Err(e) => {
+                        error!("Error while creating job: {}", e);
+                    }
+                };
+            }
         } else {
             debug!("All reqired jobs are now queued and processing");
         }

@@ -11,6 +11,6 @@ pub const USE_TRANSACTOR: bool = false;
 pub const MAX_JOB_RETRIES_COUNT: u64 = 10;
 pub const BEACON_CHAIN_LISTENER_ENABLED: bool = true;
 pub const JOBS_RETRY_ENABLED: bool = true;
-pub const JOBS_RESUME_ENABLED: bool = true;
+pub const JOBS_RESUME_ENABLED: bool = false;
 pub const RETRY_DELAY_MS: u64 = 300_0000;
 pub const MAX_SKIPPED_SLOTS_RETRY_ATTEMPTS: u64 = 5; // How many skipped slots in row can be on Beacon Chain before we throw error

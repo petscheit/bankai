@@ -20,6 +20,18 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
         .parse::<u64>()
         .unwrap_or(0);
 
+    let latest_beacon_committee = helpers::get_sync_committee_id_by_slot(latest_beacon_slot);
+
+    let latest_verified_committee = bankai
+        .starknet_client
+        .get_latest_committee_id(&bankai.config)
+        .await
+        .unwrap_or_default()
+        .to_string()
+        .parse::<u64>()
+        .unwrap_or(0)
+        - 1;
+
     // Calculate success rate from database
     let total_jobs = db.count_total_jobs().await.unwrap_or(0);
     let successful_jobs = db.count_successful_jobs().await.unwrap_or(0);
@@ -129,6 +141,8 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
     create_ascii_dashboard(
         latest_beacon_slot,
         latest_verified_slot,
+        latest_beacon_committee,
+        latest_verified_committee,
         epoch_gap,
         success_rate,
         &avg_duration_str,
@@ -144,6 +158,8 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
 pub fn create_ascii_dashboard(
     latest_beacon_slot: u64,
     latest_verified_slot: u64,
+    latest_beacon_committee: u64,
+    latest_verified_committee: u64,
     epoch_gap: u64,
     success_rate: f64,
     avg_duration_str: &str,
@@ -173,8 +189,8 @@ pub fn create_ascii_dashboard(
 ║     • Jobs in Progress:    {jobs_in_progress:<10}                                                                                                      ║
 ║                                                                                                                                            ║
 ║   Beacon Info:                                                                                                                             ║
-║     • Latest Beacon Slot:    {latest_beacon_slot:<12}                                                                                                  ║
-║     • Latest Verified Slot:  {latest_verified_slot:<12}                                                                                                  ║
+║     • Latest Beacon Slot:    {latest_beacon_slot:<12}   • Latest Beacon Committee:    {latest_beacon_committee:<12}                                                     ║
+║     • Latest Verified Slot:  {latest_verified_slot:<12}   • Latest Verified Committee:  {latest_verified_committee:<12}                                                     ║
 ║     • Epoch Gap:             {epoch_gap:<12}                                                                                                  ║
 ║                                                                                                                                            ║
 ╠═══════════════════════════════════════ RECENT BATCH JOBS ══════════════════════════════════════════════════════════════════════════════════╣
@@ -195,6 +211,8 @@ pub fn create_ascii_dashboard(
         jobs_in_progress = jobs_in_progress,
         latest_beacon_slot = latest_beacon_slot,
         latest_verified_slot = latest_verified_slot,
+        latest_beacon_committee = latest_beacon_committee,
+        latest_verified_committee = latest_verified_committee,
         epoch_gap = epoch_gap,
         batch_display_block = batch_display,
         sync_committee_jobs_display_block = sync_committee_jobs_display
