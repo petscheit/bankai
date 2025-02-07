@@ -708,7 +708,8 @@ async fn run_batch_epoch_update_job(
 
 async fn run_sync_committee_update_job(
     db_manager: Arc<DatabaseManager>,
-    sync_committee_id: u64,
+    //sync_committee_id: u64,
+    slot: u64,
     tx: mpsc::Sender<Job>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let job_id = Uuid::new_v4();
@@ -716,9 +717,10 @@ async fn run_sync_committee_update_job(
         job_id: job_id.clone(),
         job_type: JobType::SyncCommitteeUpdate,
         job_status: JobStatus::Created,
-        slot: Some(helpers::get_first_slot_for_sync_committee(
-            sync_committee_id,
-        )),
+        slot: Some(slot),
+        // : Some(helpers::get_first_slot_for_sync_committee(
+        //     sync_committee_id,
+        // )),
         batch_range_begin_epoch: None,
         batch_range_end_epoch: None,
     };
