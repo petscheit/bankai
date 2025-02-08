@@ -172,28 +172,28 @@ pub fn create_ascii_dashboard(
 ) -> String {
     format!(
         r#"
-BBBBBBBBBBBBBBBBB                                       kkkkkkkk                               iiii  
-B::::::::::::::::B                                      k::::::k                              i::::i 
-B::::::BBBBBB:::::B                                     k::::::k                               iiii  
-BB:::::B     B:::::B                                    k::::::k                                     
-  B::::B     B:::::B  aaaaaaaaaaaaa   nnnn  nnnnnnnn     k:::::k    kkkkkkk  aaaaaaaaaaaaa   iiiiiii 
-  B::::B     B:::::B  a::::::::::::a  n:::nn::::::::nn   k:::::k   k:::::k   a::::::::::::a  i:::::i 
-  B::::BBBBBB:::::B   aaaaaaaaa:::::a n::::::::::::::nn  k:::::k  k:::::k    aaaaaaaaa:::::a  i::::i 
-  B:::::::::::::BB             a::::a nn:::::::::::::::n k:::::k k:::::k              a::::a  i::::i 
-  B::::BBBBBB:::::B     aaaaaaa:::::a   n:::::nnnn:::::n k::::::k:::::k        aaaaaaa:::::a  i::::i 
-  B::::B     B:::::B  aa::::::::::::a   n::::n    n::::n k:::::::::::k       aa::::::::::::a  i::::i 
-  B::::B     B:::::B a::::aaaa::::::a   n::::n    n::::n k:::::::::::k      a::::aaaa::::::a  i::::i 
-  B::::B     B:::::Ba::::a    a:::::a   n::::n    n::::n k::::::k:::::k    a::::a    a:::::a  i::::i 
+BBBBBBBBBBBBBBBBB                                       kkkkkkkk                               iiii
+B::::::::::::::::B                                      k::::::k                              i::::i
+B::::::BBBBBB:::::B                                     k::::::k                               iiii
+BB:::::B     B:::::B                                    k::::::k
+  B::::B     B:::::B  aaaaaaaaaaaaa   nnnn  nnnnnnnn     k:::::k    kkkkkkk  aaaaaaaaaaaaa   iiiiiii
+  B::::B     B:::::B  a::::::::::::a  n:::nn::::::::nn   k:::::k   k:::::k   a::::::::::::a  i:::::i
+  B::::BBBBBB:::::B   aaaaaaaaa:::::a n::::::::::::::nn  k:::::k  k:::::k    aaaaaaaaa:::::a  i::::i
+  B:::::::::::::BB             a::::a nn:::::::::::::::n k:::::k k:::::k              a::::a  i::::i
+  B::::BBBBBB:::::B     aaaaaaa:::::a   n:::::nnnn:::::n k::::::k:::::k        aaaaaaa:::::a  i::::i
+  B::::B     B:::::B  aa::::::::::::a   n::::n    n::::n k:::::::::::k       aa::::::::::::a  i::::i
+  B::::B     B:::::B a::::aaaa::::::a   n::::n    n::::n k:::::::::::k      a::::aaaa::::::a  i::::i
+  B::::B     B:::::Ba::::a    a:::::a   n::::n    n::::n k::::::k:::::k    a::::a    a:::::a  i::::i
 BB:::::BBBBBB::::::Ba::::a    a:::::a   n::::n    n::::nk::::::k k:::::k   a::::a    a:::::a i::::::i
 B:::::::::::::::::B a:::::aaaa::::::a   n::::n    n::::nk::::::k  k:::::k  a:::::aaaa::::::a i::::::i
 B::::::::::::::::B   a::::::::::aa:::a  n::::n    n::::nk::::::k   k:::::k  a::::::::::aa:::ai::::::i
 BBBBBBBBBBBBBBBBB     aaaaaaaaaa  aaaa  nnnnnn    nnnnnnkkkkkkkk    kkkkkkk  aaaaaaaaaa  aaaaiiiiiiii
-                                    _             _   _                     _       _             
-                                   | |__  _   _  | | | | ___ _ __ ___   __| | ___ | |_ _   _ ___ 
+                                    _             _   _                     _       _
+                                   | |__  _   _  | | | | ___ _ __ ___   __| | ___ | |_ _   _ ___
                                    | '_ \| | | | | |_| |/ _ \ '__/ _ \ / _` |/ _ \| __| | | / __|
                                    | |_) | |_| | |  _  |  __/ | | (_) | (_| | (_) | |_| |_| \__ \
                                    |_.__/ \__, | |_| |_|\___|_|  \___/ \__,_|\___/ \__|\__,_|___/
-                                         |___/                                                     
+                                         |___/
 
 ╔════════════════════════════════════════ DASHBOARD OVERVIEW ════════════════════════════════════════════════════════════════════════════════╗
 ║                                                                                                                                            ║
@@ -220,23 +220,23 @@ BBBBBBBBBBBBBBBBB     aaaaaaaaaa  aaaa  nnnnnn    nnnnnnkkkkkkkk    kkkkkkk  aaa
 {sync_committee_jobs_display_block}
 ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
 
- ____                                _ 
+ ____                                _
 |  _ \ _____      _____ _ __ ___  __| |
 | |_) / _ \ \ /\ / / _ \ '__/ _ \/ _` |
 |  __/ (_) \ V  V /  __/ | |  __/ (_| |
 |_|   \___/ \_/\_/ \___|_|  \___|\__,_|
-  _                
- | |__  _   _ 
+  _
+ | |__  _   _
  | '_ \| | | |
  | |_) | |_| |
  |_.__/ \__, |
         |___/
-   ____                               
-  / ___| __ _ _ __ __ _  __ _  __ _     _  _    
- | |  _ / _` | '__/ _` |/ _` |/ _` |   ( \/ )   
- | |_| | (_| | | | (_| | (_| | (_| |    \  /    
-  \____|\__,_|_|  \__,_|\__, |\__,_|     \/     
-                        |___/          
+   ____
+  / ___| __ _ _ __ __ _  __ _  __ _     _  _
+ | |  _ / _` | '__/ _` |/ _` |/ _` |   ( \/ )
+ | |_| | (_| | | | (_| | (_| | (_| |    \  /
+  \____|\__,_|_|  \__,_|\__, |\__,_|     \/
+                        |___/
 "#,
         daemon_status = daemon_status,
         db_status = db_status,

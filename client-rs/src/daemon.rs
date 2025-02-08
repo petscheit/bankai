@@ -463,8 +463,8 @@ async fn handle_beacon_chain_head_event(
     }
 
     info!(
-        "Current state: Beacon Chain: [Slot: {} Epoch: {} Sync Committee: {}] | Latest verified: [Slot: {} Epoch: {} Sync Committee: {}] | Latest in progress: [Epoch: {} Sync Committee: {}] | Sync in progress...",
-        parsed_event.slot, current_epoch_id, current_sync_committee_id, latest_verified_epoch_slot, latest_verified_epoch_id, latest_verified_sync_committee_id, last_epoch_in_progress, last_sync_committee_in_progress
+        "Current state: Beacon Chain: [Slot: {} Epoch: {} Sync Committee: {}] | Latest verified: [Slot: {} Epoch: {} Sync Committee: {}] | Latest in progress: [Epoch: {} Sync Committee: {}] | Latest done: [Epoch: {} Sync Committee: {}] | Sync in progress...",
+        parsed_event.slot, current_epoch_id, current_sync_committee_id, latest_verified_epoch_slot, latest_verified_epoch_id, latest_verified_sync_committee_id, last_epoch_in_progress, last_sync_committee_in_progress, last_done_epoch, last_done_sync_committee
     );
 
     // Decide basing on actual state
@@ -493,18 +493,21 @@ async fn handle_beacon_chain_head_event(
             lowest_required_committee_update_slot
         );
         if last_sync_committee_in_progress < latest_scheduled_sync_committee {
-            match run_sync_committee_update_job(
-                db_manager.clone(),
-                latest_verified_epoch_slot,
-                tx.clone(),
-            )
-            .await
-            {
-                Ok(()) => {}
-                Err(e) => {
-                    error!("Error while creating sync committee update job: {}", e);
-                }
-            };
+            if last_done_sync_committee < latest_scheduled_sync_committee {
+                // This last check because the delay of data from sequencer update after verification onchain
+                match run_sync_committee_update_job(
+                    db_manager.clone(),
+                    latest_verified_epoch_slot,
+                    tx.clone(),
+                )
+                .await
+                {
+                    Ok(()) => {}
+                    Err(e) => {
+                        error!("Error while creating sync committee update job: {}", e);
+                    }
+                };
+            }
         }
     }
 
