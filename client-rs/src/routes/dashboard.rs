@@ -59,7 +59,7 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
         .iter()
         .map(|entry| {
             format!(
-                "║  Batch {:}: {} -> {} [{}] {:<32} {:<66}  ║",
+                "║  Batch {:}: {} -> {} [{}] {:<32} {:<66}  {}   ║",
                 entry.job.job_uuid.to_string()[..8].to_string(),
                 entry.job.batch_range_begin_epoch,
                 entry.job.batch_range_end_epoch,
@@ -73,6 +73,7 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
                     .tx_hash
                     .as_ref()
                     .map_or("-".to_string(), |s| s.clone()),
+                entry.updated_at
             )
         })
         .collect::<Vec<_>>()
@@ -96,7 +97,7 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
         .iter()
         .map(|entry| {
             format!(
-                "║  Batch {:}: {}  {}      [{}] {:<32} {:<66} ║",
+                "║  Batch {:}: {}  {}     [{}] {:<32} {:<66}  {}   ║",
                 entry.job.job_uuid.to_string()[..8].to_string(),
                 entry.job.slot,
                 helpers::get_sync_committee_id_by_slot(entry.job.slot.to_u64().unwrap()),
@@ -110,6 +111,7 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
                     .tx_hash
                     .as_ref()
                     .map_or("-".to_string(), |s| s.clone()),
+                entry.updated_at
             )
         })
         .collect::<Vec<_>>()
@@ -195,30 +197,29 @@ BBBBBBBBBBBBBBBBB     aaaaaaaaaa  aaaa  nnnnnn    nnnnnnkkkkkkkk    kkkkkkk  aaa
                                    |_.__/ \__, | |_| |_|\___|_|  \___/ \__,_|\___/ \__|\__,_|___/
                                          |___/
 
-╔════════════════════════════════════════ DASHBOARD OVERVIEW ════════════════════════════════════════════════════════════════════════════════╗
-║                                                                                                                                            ║
-║   Statuses:                                                                                                                                ║
-║     • Daemon:    {daemon_status:<12}  • Database:  {db_status:<12}  • Beacon: {beacon_status:<12}                                                           ║
-║                                                                                                                                            ║
-║   Metrics:                                                                                                                                 ║
-║     • Success Rate:        {success_rate:<10}                                                                                                      ║
-║     • Average Duration:    {avg_duration:<10}                                                                                                      ║
-║     • Jobs in Progress:    {jobs_in_progress:<10}                                                                                                      ║
-║                                                                                                                                            ║
-║   Beacon Info:                                                                                                                             ║
-║     • Latest Beacon Slot:    {latest_beacon_slot:<12}   • Latest Beacon Committee:    {latest_beacon_committee:<12}                                                     ║
-║     • Latest Verified Slot:  {latest_verified_slot:<12}   • Latest Verified Committee:  {latest_verified_committee:<12}                                                     ║
-║     • Epoch Gap:             {epoch_gap:<12}                                                                                                  ║
-║                                                                                                                                            ║
-╠═══════════════════════════════════════ RECENT BATCH JOBS ══════════════════════════════════════════════════════════════════════════════════╣
-║        UUID:     FROM:     TO:        STATUS:                          TX:                                                                 ║
-║ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── ║
+╔════════════════════════════════════════ DASHBOARD OVERVIEW ══════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                                                                                                  ║
+║     • Daemon:    {daemon_status:<12}  • Database:  {db_status:<12}  • Beacon: {beacon_status:<12}                                                                                 ║
+║                                                                                                                                                                  ║
+║   Metrics:                                                                                                                                                       ║
+║     • Success Rate:        {success_rate:<10}                                                                                                                            ║
+║     • Average Duration:    {avg_duration:<10}                                                                                                                            ║
+║     • Jobs in Progress:    {jobs_in_progress:<10}                                                                                                                            ║
+║                                                                                                                                                                  ║
+║   Beacon Info:                                                                                                                                                   ║
+║     • Latest Beacon Slot:    {latest_beacon_slot:<12}   • Latest Beacon Committee:    {latest_beacon_committee:<12}                                                                           ║
+║     • Latest Verified Slot:  {latest_verified_slot:<12}   • Latest Verified Committee:  {latest_verified_committee:<12}                                                                           ║
+║     • Epoch Gap:             {epoch_gap:<12}                                                                                                                        ║
+║                                                                                                                                                                  ║
+╠═══════════════════════════════════════ RECENT BATCH JOBS ════════════════════════════════════════════════════════════════════════════════════════════════════════╣
+║        UUID:     FROM:     TO:        STATUS:                          TX:                                                                 TIMESTAMP:            ║
+║ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── ║
 {batch_display_block}
-╠══════════════════════════════   RECENT SYNC COMMITTEE JOBS  ═══════════════════════════════════════════════════════════════════════════════╣
-║        UUID:     SLOT:    COMMITTEE:  STATUS:                          TX:                                                                 ║
-║ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── ║
+╠══════════════════════════════   RECENT SYNC COMMITTEE JOBS  ═════════════════════════════════════════════════════════════════════════════════════════════════════╣
+║        UUID:     SLOT:   COMMITTEE:  STATUS:                           TX:                                                                 TIMESTAMP:            ║
+║ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── ║
 {sync_committee_jobs_display_block}
-╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
 
  ____                                _
 |  _ \ _____      _____ _ __ ___  __| |

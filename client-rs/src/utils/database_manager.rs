@@ -781,8 +781,8 @@ impl DatabaseManager {
             .client
             .query(
                 "SELECT *,
-                 to_char(created_at, 'HH24:MI:SS') as created_time,
-                 to_char(updated_at, 'HH24:MI:SS') as updated_time
+                 to_char(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_time,
+                 to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS') as updated_time
                  FROM jobs
                  WHERE type = 'EPOCH_BATCH_UPDATE'
                  ORDER BY batch_range_begin_epoch DESC
@@ -815,8 +815,8 @@ impl DatabaseManager {
             .client
             .query(
                 "SELECT *,
-                 to_char(created_at, 'HH24:MI:SS') as created_time,
-                 to_char(updated_at, 'HH24:MI:SS') as updated_time
+                 to_char(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_time,
+                 to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS') as updated_time
                  FROM jobs
                  WHERE type = 'SYNC_COMMITTEE_UPDATE'
                  ORDER BY slot DESC
