@@ -585,7 +585,7 @@ async fn handle_beacon_chain_head_event(
             // );
             //
             // Mitigate the issue when Starknet Sequencer RPC responds about last verified slot with delay
-            if last_done_epoch < latest_verified_epoch_id {
+            if last_done_epoch < epoch_to_start_from {
                 match run_batch_epoch_update_job(
                     db_manager.clone(),
                     get_first_slot_for_epoch(epoch_to_start_from)
