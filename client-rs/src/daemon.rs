@@ -1330,13 +1330,14 @@ async fn process_job(
 
             JobType::EpochBatchUpdate => {
                 match current_status {
-                    JobStatus::Created => {
+                    JobStatus::Created | JobStatus::StartedFetchingInputs => {
                         info!("[BATCH EPOCH JOB] Preparing inputs for program for epochs from {} to {}...", job.batch_range_begin_epoch.unwrap(), job.batch_range_end_epoch.unwrap());
                         let circuit_inputs = EpochUpdateBatch::new_by_epoch_range(
                             &bankai,
                             db_manager.clone(),
                             job.batch_range_begin_epoch.unwrap(),
                             job.batch_range_end_epoch.unwrap(),
+                            job.job_id,
                         )
                         .await?;
 

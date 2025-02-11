@@ -735,7 +735,7 @@ impl DatabaseManager {
     pub async fn count_total_jobs(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
         let row = self
             .client
-            .query_one("SELECT COUNT(*) as count FROM jobs", &[])
+            .query_one("SELECT COUNT(*) as count FROM jobs WHERE job_status = 'DONE' OR job_status = 'ERROR'", &[])
             .await?;
 
         Ok(row.get::<_, i64>("count").to_u64().unwrap_or(0))
@@ -763,7 +763,8 @@ impl DatabaseManager {
             .query_one(
                 "SELECT EXTRACT(EPOCH FROM AVG(updated_at - created_at))::INTEGER as avg_duration
                  FROM jobs
-                 WHERE job_status = 'DONE'",
+                 WHERE job_status = 'DONE'
+                 LIMIT 20",
                 &[],
             )
             .await?;

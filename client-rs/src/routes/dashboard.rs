@@ -97,7 +97,7 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
         .iter()
         .map(|entry| {
             format!(
-                "║  Batch {:}: {}  {}     [{}] {:<32} {:<66}  {}   ║",
+                "║  Job   {:}: {}  {}     [{}] {:<32} {:<66}  {}   ║",
                 entry.job.job_uuid.to_string()[..8].to_string(),
                 entry.job.slot,
                 helpers::get_sync_committee_id_by_slot(entry.job.slot.to_u64().unwrap()),

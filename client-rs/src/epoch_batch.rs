@@ -4,6 +4,7 @@ use crate::helpers::{
     self, calculate_slots_range_for_batch, get_first_slot_for_epoch,
     get_sync_committee_id_by_epoch, slot_to_epoch_id,
 };
+use crate::state::JobStatus;
 use crate::traits::{Provable, Submittable};
 use crate::utils::hashing::get_committee_hash;
 
@@ -17,6 +18,7 @@ use sha2::{Digest, Sha256};
 use starknet::macros::selector;
 use starknet_crypto::Felt;
 use std::fs;
+use uuid::Uuid;
 
 use crate::utils::database_manager::DatabaseManager;
 use std::sync::Arc;
@@ -198,6 +200,7 @@ impl EpochUpdateBatch {
         db_manager: Arc<DatabaseManager>,
         start_epoch: u64,
         end_epoch: u64,
+        job_id: Uuid,
     ) -> Result<EpochUpdateBatch, Error> {
         let _permit = bankai
             .config
@@ -206,6 +209,10 @@ impl EpochUpdateBatch {
             .acquire_owned()
             .await
             .map_err(|e| Error::CairoRunError(format!("Semaphore error: {}", e)))?;
+
+        let _ = db_manager
+            .update_job_status(job_id, JobStatus::StartedFetchingInputs)
+            .await;
 
         let mut epochs = vec![];
 

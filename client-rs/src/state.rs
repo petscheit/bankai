@@ -33,9 +33,9 @@ pub enum JobStatus {
     #[postgres(name = "CREATED")]
     Created, // Can act as queued and be picked up by worker to proccess
     #[postgres(name = "PROGRAM_INPUTS_PREPARED")]
-    StartedFetchingInputs,
-    #[postgres(name = "STARTED_FETCHING_INPUTS")]
     ProgramInputsPrepared,
+    #[postgres(name = "STARTED_FETCHING_INPUTS")]
+    StartedFetchingInputs,
     #[postgres(name = "STARTED_TRACE_GENERATION")]
     StartedTraceGeneration,
     #[postgres(name = "PIE_GENERATED")]
