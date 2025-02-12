@@ -170,10 +170,13 @@ pub async fn handle_get_latest_verified_committee(
             // Convert `Felt` to a string and parse it as a hexadecimal number
             let hex_string = latest_epoch.to_string(); // Ensure this converts to a "0x..." string
             match u64::from_str_radix(hex_string.trim_start_matches("0x"), 16) {
-                Ok(decimal_epoch) => Json(json!({ "latest_verified_epoch": decimal_epoch })),
+                Ok(committee_hash) => Json(json!({ "latest_verified_committee": committee_hash })),
                 Err(err) => {
-                    eprintln!("Failed to parse latest_epoch as decimal: {:?}", err);
-                    Json(json!({ "error": "Invalid epoch format" }))
+                    eprintln!(
+                        "Failed to parse latest_verified_committee as decimal: {:?}",
+                        err
+                    );
+                    Json(json!({ "error": "Invalid committee format" }))
                 }
             }
         }
@@ -210,6 +213,33 @@ pub async fn handle_get_merkle_paths_for_epoch(
         Ok(merkle_paths) => {
             if merkle_paths.len() > 0 {
                 Json(json!({ "epoch_id": epoch_id, "merkle_paths": merkle_paths }))
+            } else {
+                Json(json!({ "error": "Epoch not available now" }))
+            }
+        }
+        Err(err) => {
+            error!("Failed to fetch merkle paths epoch: {:?}", err);
+            Json(json!({ "error": "Failed to fetch latest epoch" }))
+        }
+    }
+}
+
+pub async fn handle_get_decommitment_data_by_epoch(
+    Path(epoch_id): Path<i32>,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    match state.db_manager.get_merkle_paths_for_epoch(epoch_id).await {
+        Ok(merkle_paths) => {
+            if merkle_paths.len() > 0 {
+                let circuit_outputs_decommitment_data = state
+                    .db_manager
+                    .get_epoch_decommitment_data(epoch_id)
+                    .await
+                    .unwrap(); //ExpectedEpochUpdateOutputs
+
+                Json(
+                    json!({ "epoch_id": epoch_id, "merkle_paths": merkle_paths, "circuit_outputs_decommitment_data": circuit_outputs_decommitment_data}),
+                )
             } else {
                 Json(json!({ "error": "Epoch not available now" }))
             }

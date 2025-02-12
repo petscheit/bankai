@@ -158,6 +158,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .route("/", get(handle_root_route))
         .route("/status", get(handle_get_status))
         .route(
+            "/get_epoch_decommitment_data/by_epoch/:epoch_id",
+            get(handle_get_decommitment_data_by_epoch),
+        )
+        .route(
+            "/get_epoch_decommitment_data/by_slot/:slot",
+            get(handle_get_decommitment_data_by_slot),
+        )
+        .route(
+            "/get_epoch_decommitment_data/by_execution_height/:execution_layer_height",
+            get(handle_get_decommitment_data_by_execution_height),
+        )
+        // ASCI-Art dashboard
+        .route("/dashboard", get(handle_get_dashboard))
+        // Some debug routes
+        .route("/get_pending_atlantic_jobs", get(handle_get_epoch_proof))
+        .route(
             "/get_verified_epoch_proof/:epoch",
             get(handle_get_epoch_proof),
         )
@@ -182,8 +198,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             get(handle_get_latest_verified_committee),
         )
         .route("/debug/get_job_status", get(handle_get_job_status))
-        // Add dashboard route here
-        .route("/dashboard", get(handle_get_dashboard))
         // .route("/get-merkle-inclusion-proof", get(handle_get_merkle_inclusion_proof))
         .layer(DefaultBodyLimit::disable())
         .layer(
@@ -283,13 +297,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                                 parsed_event.slot, parsed_event.block, epoch_id, sync_committee_id, parsed_event.epoch_transition
                                             );
 
-                                            handle_beacon_chain_head_event(
+                                            match handle_beacon_chain_head_event(
                                                 parsed_event,
                                                 bankai_for_listener.clone(),
                                                 db_manager_for_listener.clone(),
                                                 tx_for_listener.clone(),
                                             )
-                                            .await;
+                                            .await
+                                            {
+                                                Ok(()) => {
+                                                    // Event was handled successfully.
+                                                }
+                                                Err(e) => {
+                                                    error!("Error handling beacon chain head event: {:?}", e);
+                                                }
+                                            }
                                         }
                                         Err(err) => {
                                             warn!("Failed to parse JSON data: {}", err);
@@ -343,7 +365,7 @@ async fn handle_beacon_chain_head_event(
     bankai: Arc<BankaiClient>,
     db_manager: Arc<DatabaseManager>,
     tx: mpsc::Sender<Job>,
-) -> () {
+) -> Result<(), Error> {
     let current_epoch_id = helpers::slot_to_epoch_id(parsed_event.slot);
     let current_sync_committee_id = helpers::slot_to_sync_committee_id(parsed_event.slot);
 
@@ -536,7 +558,7 @@ async fn handle_beacon_chain_head_event(
                     "Currently not starting new batch epoch job, MAX_CONCURRENT_JOBS_IN_PROGRESS limit reached, jobs in progress: {}",
                     in_progress_jobs_count.unwrap()
                 );
-                return;
+                return Ok(());
             }
 
             let epoch_to_start_from = latest_scheduled_epoch + 1;
@@ -645,6 +667,7 @@ async fn handle_beacon_chain_head_event(
     // So for each batch update we takin into account effectiviely the latest slot from given batch
 
     //let db_client = db_client.clone();
+    Ok(())
 }
 
 // // This function will enqueue sync committee jobs in database with status CREATED up to the latest sync committee
@@ -787,12 +810,13 @@ async fn resume_unfinished_jobs(
     db_manager: Arc<DatabaseManager>,
     tx: mpsc::Sender<Job>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    info!("Checking for unfinished jobs at daemon start...");
+    info!("Checking for unfinished jobs...");
 
     // Fetch jobs that were in progress before shutdown
     let unfinished_jobs = db_manager
         .get_jobs_with_statuses(vec![
             JobStatus::Created,
+            JobStatus::StartedFetchingInputs,
             JobStatus::ProgramInputsPrepared,
             JobStatus::StartedTraceGeneration,
             JobStatus::PieGenerated,
@@ -860,7 +884,7 @@ async fn retry_failed_jobs(
     db_manager: Arc<DatabaseManager>,
     tx: mpsc::Sender<Job>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    info!("Checking for failed jobs at daemon start...");
+    info!("Checking for failed jobs...");
 
     // Fetch failed jobs
     let errored_jobs = db_manager
@@ -879,16 +903,18 @@ async fn retry_failed_jobs(
 
     for job in errored_jobs {
         let job_id = job.job_uuid;
+
+        let failed_at_step = job.failed_at_step.unwrap_or(JobStatus::Created);
+
         let job_to_retry = Job {
             job_id,
             job_type: job.job_type,
-            job_status: JobStatus::Created,
+            job_status: failed_at_step.clone(),
             slot: Some(job.slot.to_u64().unwrap()),
             batch_range_begin_epoch: job.batch_range_begin_epoch.to_u64(),
             batch_range_end_epoch: job.batch_range_end_epoch.to_u64(),
         };
 
-        let failed_at_step = job.failed_at_step.unwrap_or(JobStatus::Created);
         let db_clone = db_manager.clone();
         let tx_clone = tx.clone();
         tokio::spawn(async move {
@@ -1006,8 +1032,25 @@ async fn broadcast_onchain_ready_jobs(
                         for (index, epoch) in
                             circuit_inputs.circuit_inputs.epochs.iter().enumerate()
                         {
-                            println!("Epoch {}: {:?}", index, epoch.expected_circuit_outputs);
+                            debug!(
+                                "Inserting epoch data to DB: {}: {:?}",
+                                index, epoch.expected_circuit_outputs
+                            );
+                            db_manager
+                                .insert_verified_epoch_circuit_outputs(
+                                    index.to_u64().unwrap(),
+                                    epoch.expected_circuit_outputs.beacon_header_root,
+                                    epoch.expected_circuit_outputs.beacon_state_root,
+                                    epoch.expected_circuit_outputs.slot,
+                                    epoch.expected_circuit_outputs.committee_hash,
+                                    epoch.expected_circuit_outputs.n_signers,
+                                    epoch.expected_circuit_outputs.execution_header_hash,
+                                    epoch.expected_circuit_outputs.execution_header_height,
+                                )
+                                .await?;
                         }
+
+                        // Remove the related PIE file since it is no longer needed after the verification is successfult onchain
                     }
                     Err(e) => {
                         error!("[EPOCH BATCH JOB] Transaction failed or timed out: {:?}", e);

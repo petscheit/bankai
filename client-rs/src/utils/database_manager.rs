@@ -1,3 +1,4 @@
+use crate::epoch_update::ExpectedEpochUpdateOutputs;
 use crate::helpers;
 use crate::state::{AtlanticJobType, Error, Job, JobStatus, JobType};
 use crate::utils::starknet_client::EpochProof;
@@ -83,6 +84,37 @@ impl DatabaseManager {
                     &epoch_proof.n_signers.to_string(),
                     &epoch_proof.execution_hash.to_string(),
                     &epoch_proof.execution_height.to_string(),
+                ],
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn insert_verified_epoch_circuit_outputs(
+        &self,
+        epoch_id: u64,
+        beacon_header_root: FixedBytes<32>,
+        beacon_state_root: FixedBytes<32>,
+        slot: u64,
+        committee_hash: FixedBytes<32>,
+        n_signers: u64,
+        execution_header_hash: FixedBytes<32>,
+        execution_header_height: u64,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.client
+            .execute(
+                "INSERT INTO verified_epoch (epoch_id, beacon_header_root, beacon_state_root, slot, committee_hash, n_signers, execution_header_hash, execution_header_height)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                &[
+                    &epoch_id.to_string(),
+                    &beacon_header_root.to_string(),
+                    &beacon_state_root.to_string(),
+                    &slot.to_string(),
+                    &committee_hash.to_string(),
+                    &n_signers.to_string(),
+                    &execution_header_hash.to_string(),
+                    &execution_header_height.to_string(),
                 ],
             )
             .await?;
@@ -375,6 +407,40 @@ impl DatabaseManager {
             .collect();
 
         Ok(paths)
+    }
+
+    pub async fn get_epoch_decommitment_data(
+        &self,
+        epoch_id: i32,
+    ) -> Result<ExpectedEpochUpdateOutputs, Box<dyn std::error::Error + Send + Sync>> {
+        let row = self
+            .client
+            .query_one(
+                r#"
+                SELECT
+                    beacon_header_root,
+                    beacon_state_root,
+                    slot,
+                    committee_hash,
+                    n_signers,
+                    execution_header_hash,
+                    execution_header_height
+                FROM verified_epoch
+                WHERE epoch_id = $1
+                "#,
+                &[&epoch_id],
+            )
+            .await?;
+
+        Ok(ExpectedEpochUpdateOutputs {
+            beacon_header_root: row.get("beacon_header_root"),
+            beacon_state_root: row.get("beacon_state_root"),
+            slot: row.get("slot"),
+            committee_hash: row.get("committee_hash"),
+            n_signers: row.get("n_signers"),
+            execution_header_hash: row.get("execution_header_hash"),
+            execution_header_height: row.get("execution_header_height"),
+        })
     }
 
     // pub async fn get_compute_finsihed_jobs_to_proccess_onchain_call(
@@ -905,8 +971,9 @@ impl DatabaseManager {
 
         let all_possible_statuses = vec![
             JobStatus::Created,
-            JobStatus::StartedTraceGeneration,
+            JobStatus::StartedFetchingInputs,
             JobStatus::ProgramInputsPrepared,
+            JobStatus::StartedTraceGeneration,
             JobStatus::PieGenerated,
             JobStatus::AtlanticProofRequested,
             JobStatus::AtlanticProofRetrieved,

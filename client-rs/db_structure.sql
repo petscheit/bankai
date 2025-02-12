@@ -24,11 +24,13 @@ CREATE TABLE epoch_merkle_paths (
 
 CREATE TABLE verified_epoch (
     epoch_id UUID PRIMARY KEY,
-    header_root TEXT NOT NULL, -- Header root hash of the Beacon chain header
-    state_root TEXT NOT NULL, -- State root hash of the Beacon chain state
-    n_signers INTEGER NOT NULL, -- Number of epoch signers
-    execution_hash TEXT NOT NULL, -- Execution layer blockhash
-    execution_height BIGINT NOT NULL -- Execution layer height
+    beacon_header_root TEXT NOT NULL, -- Header root hash of the Beacon chain header
+    beacon_state_root TEXT NOT NULL, -- State root hash of the Beacon chain state
+    slot BIGINT NOT NULL, -- The number of slot at which this epoch was verified
+    committee_hash TEXT NOT NULL, -- Sync committee hash of the sync commitee related to this epoch
+    n_signers BIGINT NOT NULL, -- Number of epoch signers
+    execution_header_hash TEXT NOT NULL, -- Execution layer blockhash
+    execution_header_height BIGINT NOT NULL -- Execution layer height
 );
 
 CREATE TABLE verified_sync_committee (
