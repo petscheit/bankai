@@ -23,7 +23,7 @@ CREATE TABLE epoch_merkle_paths (
 );
 
 CREATE TABLE verified_epoch (
-    epoch_id UUID PRIMARY KEY,
+    epoch_id BIGINT PRIMARY KEY,
     beacon_header_root TEXT NOT NULL, -- Header root hash of the Beacon chain header
     beacon_state_root TEXT NOT NULL, -- State root hash of the Beacon chain state
     slot BIGINT NOT NULL, -- The number of slot at which this epoch was verified
@@ -34,7 +34,7 @@ CREATE TABLE verified_epoch (
 );
 
 CREATE TABLE verified_sync_committee (
-    sync_committee_id UUID PRIMARY KEY, -- Unique identifier for sync committee  (slot number/0x2000)
+    sync_committee_id BIGINT PRIMARY KEY, -- Unique identifier for sync committee  (slot number/0x2000)
     sync_committee_hash TEXT NOT NULL -- Sync committee hash that we are creating inside bankai
 );
 

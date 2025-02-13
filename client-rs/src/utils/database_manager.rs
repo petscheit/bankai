@@ -2,6 +2,7 @@ use crate::epoch_update::ExpectedEpochUpdateOutputs;
 use crate::helpers;
 use crate::state::{AtlanticJobType, Error, Job, JobStatus, JobType};
 use crate::utils::starknet_client::EpochProof;
+use alloy_primitives::hex::{FromHex, ToHexExt};
 use alloy_primitives::FixedBytes;
 use starknet::core::types::Felt;
 use std::str::FromStr;
@@ -107,14 +108,14 @@ impl DatabaseManager {
                 "INSERT INTO verified_epoch (epoch_id, beacon_header_root, beacon_state_root, slot, committee_hash, n_signers, execution_header_hash, execution_header_height)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
                 &[
-                    &epoch_id.to_string(),
-                    &beacon_header_root.to_string(),
-                    &beacon_state_root.to_string(),
-                    &slot.to_string(),
-                    &committee_hash.to_string(),
-                    &n_signers.to_string(),
-                    &execution_header_hash.to_string(),
-                    &execution_header_height.to_string(),
+                    &epoch_id.to_i64(),
+                    &beacon_header_root.encode_hex_with_prefix(),
+                    &beacon_state_root.encode_hex_with_prefix(),
+                    &slot.to_i64(),
+                    &committee_hash.encode_hex_with_prefix(),
+                    &n_signers.to_i64(),
+                    &execution_header_hash.encode_hex_with_prefix(),
+                    &execution_header_height.to_i64(),
                 ],
             )
             .await?;
@@ -397,7 +398,7 @@ impl DatabaseManager {
                 "SELECT merkle_path FROM epoch_merkle_paths
                  WHERE epoch_id = $1
                  ORDER BY path_index ASC",
-                &[&epoch_id],
+                &[&epoch_id.to_i64()],
             )
             .await?;
 
@@ -428,18 +429,23 @@ impl DatabaseManager {
                 FROM verified_epoch
                 WHERE epoch_id = $1
                 "#,
-                &[&epoch_id],
+                &[&epoch_id.to_i64()],
             )
             .await?;
 
         Ok(ExpectedEpochUpdateOutputs {
-            beacon_header_root: row.get("beacon_header_root"),
-            beacon_state_root: row.get("beacon_state_root"),
-            slot: row.get("slot"),
-            committee_hash: row.get("committee_hash"),
-            n_signers: row.get("n_signers"),
-            execution_header_hash: row.get("execution_header_hash"),
-            execution_header_height: row.get("execution_header_height"),
+            beacon_header_root: FixedBytes::from_hex(row.get::<_, String>("beacon_header_root"))
+                .unwrap(),
+            beacon_state_root: FixedBytes::from_hex(row.get::<_, String>("beacon_state_root"))
+                .unwrap(),
+            slot: row.get::<_, i64>("slot") as u64,
+            committee_hash: FixedBytes::from_hex(row.get::<_, String>("committee_hash")).unwrap(),
+            n_signers: row.get::<_, i64>("n_signers") as u64,
+            execution_header_hash: FixedBytes::from_hex(
+                row.get::<_, String>("execution_header_hash"),
+            )
+            .unwrap(),
+            execution_header_height: row.get::<_, i64>("execution_header_height") as u64,
         })
     }
 

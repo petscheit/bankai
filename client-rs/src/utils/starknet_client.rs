@@ -279,7 +279,7 @@ impl StarknetClient {
             )
             .await
             .map_err(StarknetError::ProviderError)?;
-        println!("latest_committee_id: {:?}", latest_committee_id);
+        //println!("latest_committee_id: {:?}", latest_committee_id);
         Ok(*latest_committee_id.first().unwrap())
     }
 
@@ -287,24 +287,39 @@ impl StarknetClient {
         let max_retries = 20;
         let delay = Duration::from_secs(5);
 
-        for _ in 0..max_retries {
-            let status = self.get_transaction_status(tx_hash).await.unwrap();
-
-            info!("Starknet transaction status: {:?}", status);
-
-            match status {
-                TransactionStatus::AcceptedOnL1(TransactionExecutionStatus::Succeeded)
-                | TransactionStatus::AcceptedOnL2(TransactionExecutionStatus::Succeeded) => {
-                    info!("Starknet transaction confirmed: {:?}", tx_hash);
-                    return Ok(());
+        for attempt in 0..max_retries {
+            match self.get_transaction_status(tx_hash).await {
+                Ok(status) => {
+                    info!("Starknet transaction status: {:?}", status);
+                    match status {
+                        TransactionStatus::AcceptedOnL1(TransactionExecutionStatus::Succeeded)
+                        | TransactionStatus::AcceptedOnL2(TransactionExecutionStatus::Succeeded) => {
+                            info!("Starknet transaction confirmed: {:?}", tx_hash);
+                            return Ok(());
+                        }
+                        TransactionStatus::Rejected => {
+                            return Err(StarknetError::TransactionError(
+                                "Transaction rejected".to_string(),
+                            ));
+                        }
+                        _ => {
+                            info!(
+                                "Transaction is still pending (attempt {} of {}), sleeping...",
+                                attempt + 1,
+                                max_retries
+                            );
+                            sleep(delay).await;
+                        }
+                    }
                 }
-                TransactionStatus::Rejected => {
-                    return Err(StarknetError::TransactionError(
-                        "Transaction rejected".to_string(),
-                    ));
-                }
-                _ => {
-                    // Still pending, wait and retry
+                Err(err) => {
+                    // If the transaction hash is not even found yet, or other unknown error
+
+                    error!(
+                        "Error fetching transaction status for tx_hash={:?}: {:?}",
+                        tx_hash, err
+                    );
+
                     sleep(delay).await;
                 }
             }

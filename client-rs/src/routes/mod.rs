@@ -1,4 +1,4 @@
-use crate::state::AppState;
+use crate::{helpers, state::AppState};
 use alloy_primitives::map::HashMap;
 use axum::{
     extract::{Path, State},
@@ -237,9 +237,13 @@ pub async fn handle_get_decommitment_data_by_epoch(
                     .await
                     .unwrap(); //ExpectedEpochUpdateOutputs
 
-                Json(
-                    json!({ "epoch_id": epoch_id, "merkle_paths": merkle_paths, "circuit_outputs_decommitment_data": circuit_outputs_decommitment_data}),
-                )
+                Json(json!({
+                    "epoch_id": epoch_id,
+                    "decommitment_data_for_epoch": {
+                        "merkle_paths": merkle_paths,
+                        "circuit_outputs": circuit_outputs_decommitment_data
+                    }
+                }))
             } else {
                 Json(json!({ "error": "Epoch not available now" }))
             }
@@ -249,4 +253,23 @@ pub async fn handle_get_decommitment_data_by_epoch(
             Json(json!({ "error": "Failed to fetch latest epoch" }))
         }
     }
+}
+
+pub async fn handle_get_decommitment_data_by_slot(
+    Path(slot_id): Path<i32>,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    let epoch_id = helpers::slot_to_epoch_id(slot_id.to_u64().unwrap());
+
+    handle_get_decommitment_data_by_epoch(Path(epoch_id.to_i32().unwrap()), State(state)).await
+}
+
+pub async fn handle_get_decommitment_data_by_execution_height(
+    Path(slot_id): Path<i32>,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    // Convert slot -> epoch
+    let epoch_id = helpers::slot_to_epoch_id(slot_id.to_u64().unwrap());
+
+    handle_get_decommitment_data_by_epoch(Path(epoch_id.to_i32().unwrap()), State(state)).await
 }

@@ -51,6 +51,9 @@ use utils::{cairo_runner::CairoRunner, database_manager::DatabaseManager};
 use epoch_batch::EpochUpdateBatch;
 use routes::{
     handle_get_committee_hash,
+    handle_get_decommitment_data_by_epoch,
+    handle_get_decommitment_data_by_execution_height,
+    handle_get_decommitment_data_by_slot,
     handle_get_epoch_proof, // handle_get_epoch_update,
     handle_get_job_status,
     handle_get_latest_verified_committee,
@@ -240,9 +243,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Listen for the new slots on BeaconChain
     // Create an HTTP client
-    let http_stream_client = reqwest::Client::new();
+
     if slot_listener_toggle {
-        tokio::spawn(async move {
+        // loop {
+        //     let bankai_for_listener = bankai_for_listener.clone();
+        //     let db_manager_for_listener = db_manager_for_listener.clone();
+        //     let tx_for_listener = tx_for_listener.clone();
+        //     let events_endpoint = events_endpoint.clone();
+        let http_stream_client = reqwest::Client::new();
+
+        let _listener_worker_handle = tokio::spawn(async move {
             loop {
                 // Send the request to the Beacon node
                 let response = match http_stream_client
@@ -341,16 +351,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 info!("Timeout waiting for next event, reconnecting to beacon node...");
             }
         });
+        // Handle panics inside listener worker(this also can be done other ways, but this for now)
+        // match listener_worker_handle.await {
+        //     Ok(_) => warn!("Listener worker finished normally."),
+        //     Err(e) if e.is_panic() => {
+        //         error!("Listener worker panicked! Restarting...");
+        //         tokio::time::sleep(Duration::from_secs(1)).await;
+        //     }
+        //     Err(_) => error!("Listener worker failed for some reason."),
+        // }
+        //}
     }
 
     // Run check and retry failed jobs periodicially
     tokio::spawn(async move {
         loop {
-            retry_failed_jobs(db_manager_for_watcher.clone(), tx_for_watcher.clone()).await;
             tokio::time::sleep(std::time::Duration::from_secs(
                 constants::JOBS_RETRY_CHECK_INTERVAL,
             ))
             .await;
+            retry_failed_jobs(db_manager_for_watcher.clone(), tx_for_watcher.clone()).await;
         }
     });
 
@@ -775,7 +795,7 @@ async fn run_sync_committee_update_job(
 async fn evaluate_jobs_statuses(
     db_manager: Arc<DatabaseManager>,
     latest_verified_sync_committee_id: u64,
-    latest_verified_epoch_slot: u64,
+    _latest_verified_epoch_slot: u64,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // The purpose of this function is to manage the sequential nature of onchain verification of epochs and sync committees
     // Firstly we get all jobs with status OFFCHAIN_COMPUTATION_FINISHED
@@ -1032,13 +1052,13 @@ async fn broadcast_onchain_ready_jobs(
                         for (index, epoch) in
                             circuit_inputs.circuit_inputs.epochs.iter().enumerate()
                         {
-                            debug!(
-                                "Inserting epoch data to DB: {}: {:?}",
+                            info!(
+                                "Inserting epoch data to DB: Index in batch: {}: {:?}",
                                 index, epoch.expected_circuit_outputs
                             );
                             db_manager
                                 .insert_verified_epoch_circuit_outputs(
-                                    index.to_u64().unwrap(),
+                                    helpers::slot_to_epoch_id(epoch.expected_circuit_outputs.slot), //index.to_u64().unwrap(),
                                     epoch.expected_circuit_outputs.beacon_header_root,
                                     epoch.expected_circuit_outputs.beacon_state_root,
                                     epoch.expected_circuit_outputs.slot,
