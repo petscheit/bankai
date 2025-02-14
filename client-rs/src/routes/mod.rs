@@ -230,7 +230,7 @@ pub async fn handle_get_decommitment_data_by_epoch(
 ) -> impl IntoResponse {
     match state.db_manager.get_merkle_paths_for_epoch(epoch_id).await {
         Ok(merkle_paths) => {
-            if merkle_paths.len() > 0 {
+            if !merkle_paths.is_empty() {
                 let circuit_outputs_decommitment_data = state
                     .db_manager
                     .get_epoch_decommitment_data(epoch_id)

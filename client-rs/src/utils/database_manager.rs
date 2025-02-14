@@ -1,6 +1,7 @@
 use crate::epoch_update::ExpectedEpochUpdateOutputs;
 use crate::helpers;
 use crate::state::{AtlanticJobType, Error, Job, JobStatus, JobType};
+use crate::utils::merkle::MerklePath;
 use crate::utils::starknet_client::EpochProof;
 use alloy_primitives::hex::{FromHex, ToHexExt};
 use alloy_primitives::FixedBytes;
@@ -390,21 +391,25 @@ impl DatabaseManager {
     pub async fn get_merkle_paths_for_epoch(
         &self,
         epoch_id: i32,
-    ) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<Vec<MerklePath>, Box<dyn std::error::Error + Send + Sync>> {
         // Query all merkle paths for the given epoch_id
         let rows = self
             .client
             .query(
-                "SELECT merkle_path FROM epoch_merkle_paths
+                "SELECT path_index, merkle_path
+                 FROM epoch_merkle_paths
                  WHERE epoch_id = $1
                  ORDER BY path_index ASC",
                 &[&epoch_id.to_i64()],
             )
             .await?;
 
-        let paths: Vec<String> = rows
+        let paths: Vec<MerklePath> = rows
             .iter()
-            .map(|row| row.get::<_, String>("merkle_path"))
+            .map(|row| MerklePath {
+                leaf_index: row.get::<_, i64>("path_index").to_u64().unwrap(),
+                value: Felt::from_hex(row.get("merkle_path")).unwrap(),
+            })
             .collect();
 
         Ok(paths)
@@ -652,6 +657,19 @@ impl DatabaseManager {
             .execute(
                 "UPDATE jobs SET tx_hash = $1, updated_at = NOW() WHERE job_uuid = $2",
                 &[&txhash.to_hex_string(), &job_id],
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub async fn increment_job_retry_counter(
+        &self,
+        job_id: Uuid,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.client
+            .execute(
+                "UPDATE jobs SET retries_count = COALESCE(retries_count, 0) + 1, updated_at = NOW() WHERE job_uuid = $1",
+                &[ &job_id],
             )
             .await?;
         Ok(())

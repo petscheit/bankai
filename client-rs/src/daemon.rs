@@ -92,7 +92,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (tx, mut rx): (mpsc::Sender<Job>, mpsc::Receiver<Job>) = mpsc::channel(32);
 
     //let (tx, mut rx) = mpsc::channel(32);
-
     let connection_string = format!(
         "host={} user={} password={} dbname={}",
         env::var("POSTGRESQL_HOST").unwrap().as_str(),
@@ -370,7 +369,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 constants::JOBS_RETRY_CHECK_INTERVAL,
             ))
             .await;
-            retry_failed_jobs(db_manager_for_watcher.clone(), tx_for_watcher.clone()).await;
+            let _ = retry_failed_jobs(db_manager_for_watcher.clone(), tx_for_watcher.clone()).await;
         }
     });
 
@@ -923,6 +922,10 @@ async fn retry_failed_jobs(
 
     for job in errored_jobs {
         let job_id = job.job_uuid;
+        if job.retries_count.unwrap_or(0).to_u64().unwrap() >= constants::MAX_JOB_RETRIES_COUNT {
+            warn!("Job {} reached max retries count. Not retrying", job_id);
+            continue;
+        }
 
         let failed_at_step = job.failed_at_step.unwrap_or(JobStatus::Created);
 
@@ -941,17 +944,19 @@ async fn retry_failed_jobs(
             match job_to_retry.job_type {
                 JobType::SyncCommitteeUpdate => {
                     info!(
-                        "Requesting retry of failed job {} failed previously at step {}... (sync committee update job for sync committee {})",
+                        "Requesting retry of failed job {} failed previously at step {}, current retries count: {}... (sync committee update job for sync committee {})",
                         job_id,
                         failed_at_step.to_string(),
+                        job.retries_count.unwrap_or(0),
                         helpers::slot_to_sync_committee_id(job.slot.to_u64().unwrap())
                     );
                 }
                 JobType::EpochBatchUpdate => {
                     info!(
-                        "Requesting retry of failed job {} failed previously at step {} ... (batch epoch update job for epochs from {} to {})",
+                        "Requesting retry of failed job {} failed previously at step {}, current retries count: {} ... (batch epoch update job for epochs from {} to {})",
                         job_id,
                         failed_at_step.to_string(),
+                        job.retries_count.unwrap_or(0),
                         job.batch_range_begin_epoch,
                         job.batch_range_end_epoch
                     );
@@ -966,6 +971,12 @@ async fn retry_failed_jobs(
                 && failed_at_step != JobStatus::ProofVerifyCalledOnchain
             // These jobs are done sequentially, not in parallel
             {
+                let _ = db_clone
+                    .increment_job_retry_counter(job_id)
+                    .await
+                    .map_err(|e| {
+                        error!("Error incrementing job retry counter {}", e);
+                    });
                 if tx_clone.send(job_to_retry).await.is_err() {
                     // return Err("Failed to send job".into());
                     // Update the status to status what was at the error occurene time

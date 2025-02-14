@@ -1,3 +1,12 @@
+use serde::{Deserialize, Serialize};
+use starknet::core::types::Felt;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MerklePath {
+    pub leaf_index: u64,
+    pub value: Felt,
+}
+
 pub(crate) mod sha256 {
     use crate::Error;
     use alloy_primitives::FixedBytes;
