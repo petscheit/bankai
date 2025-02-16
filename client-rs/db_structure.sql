@@ -30,7 +30,9 @@ CREATE TABLE verified_epoch (
     committee_hash TEXT NOT NULL, -- Sync committee hash of the sync commitee related to this epoch
     n_signers BIGINT NOT NULL, -- Number of epoch signers
     execution_header_hash TEXT NOT NULL, -- Execution layer blockhash
-    execution_header_height BIGINT NOT NULL -- Execution layer height
+    execution_header_height BIGINT NOT NULL, -- Execution layer height
+    epoch_index BIGINT NOT NULL, -- `Index of the epoch inside the batch
+    batch_root TEXT NOT NULL, -- Epochs batch root hash
 );
 
 CREATE TABLE verified_sync_committee (

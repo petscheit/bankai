@@ -37,7 +37,7 @@ pub struct EpochUpdateBatchInputs {
     pub epochs: Vec<EpochUpdate>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExpectedEpochBatchOutputs {
     pub batch_root: Felt,
     pub latest_batch_output: ExpectedEpochUpdateOutputs,

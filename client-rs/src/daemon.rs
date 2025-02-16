@@ -1017,7 +1017,7 @@ async fn broadcast_onchain_ready_jobs(
                 // Submit to Starknet
                 let send_result = bankai
                     .starknet_client
-                    .submit_update(circuit_inputs.expected_circuit_outputs, &bankai.config)
+                    .submit_update(circuit_inputs.expected_circuit_outputs.clone(), &bankai.config)
                     .await;
 
                 let txhash = match send_result {
@@ -1052,6 +1052,8 @@ async fn broadcast_onchain_ready_jobs(
                 let confirmation_result =
                     bankai.starknet_client.wait_for_confirmation(txhash).await;
 
+                let batch_root = circuit_inputs.expected_circuit_outputs.batch_root;
+
                 match confirmation_result {
                     Ok(_) => {
                         info!("[EPOCH BATCH JOB] Transaction is confirmed on-chain!");
@@ -1060,6 +1062,7 @@ async fn broadcast_onchain_ready_jobs(
                             .await?;
 
                         // Iterate over and insert epochs proofs to db
+                        // index - this is index of the epoch inside batch
                         for (index, epoch) in
                             circuit_inputs.circuit_inputs.epochs.iter().enumerate()
                         {
@@ -1077,6 +1080,8 @@ async fn broadcast_onchain_ready_jobs(
                                     epoch.expected_circuit_outputs.n_signers,
                                     epoch.expected_circuit_outputs.execution_header_hash,
                                     epoch.expected_circuit_outputs.execution_header_height,
+                                    index,
+                                    batch_root
                                 )
                                 .await?;
                         }

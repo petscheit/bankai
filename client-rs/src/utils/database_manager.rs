@@ -16,6 +16,14 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 #[derive(Debug)]
+pub struct EpochDecommitmentData {
+    pub epoch_update_outputs: ExpectedEpochUpdateOutputs,
+    pub batch_root: FixedBytes<32>,
+    pub epoch_index: u64,
+}
+
+
+#[derive(Debug)]
 pub struct JobSchema {
     pub job_uuid: uuid::Uuid,
     pub job_status: JobStatus,
@@ -103,11 +111,13 @@ impl DatabaseManager {
         n_signers: u64,
         execution_header_hash: FixedBytes<32>,
         execution_header_height: u64,
+        epoch_index: usize,
+        batch_root: Felt
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         self.client
             .execute(
-                "INSERT INTO verified_epoch (epoch_id, beacon_header_root, beacon_state_root, slot, committee_hash, n_signers, execution_header_hash, execution_header_height)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                "INSERT INTO verified_epoch (epoch_id, beacon_header_root, beacon_state_root, slot, committee_hash, n_signers, execution_header_hash, execution_header_height, epoch_index, batch_root)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
                 &[
                     &epoch_id.to_i64(),
                     &beacon_header_root.encode_hex_with_prefix(),
@@ -117,6 +127,8 @@ impl DatabaseManager {
                     &n_signers.to_i64(),
                     &execution_header_hash.encode_hex_with_prefix(),
                     &execution_header_height.to_i64(),
+                    &epoch_index.to_i64(),
+                    &batch_root.to_hex_string(),
                 ],
             )
             .await?;
@@ -418,7 +430,7 @@ impl DatabaseManager {
     pub async fn get_epoch_decommitment_data(
         &self,
         epoch_id: i32,
-    ) -> Result<ExpectedEpochUpdateOutputs, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<EpochDecommitmentData, Box<dyn std::error::Error + Send + Sync>> {
         let row = self
             .client
             .query_one(
@@ -430,29 +442,36 @@ impl DatabaseManager {
                     committee_hash,
                     n_signers,
                     execution_header_hash,
-                    execution_header_height
+                    execution_header_height,
+                    batch_root,
+                    epoch_index
                 FROM verified_epoch
                 WHERE epoch_id = $1
                 "#,
                 &[&epoch_id.to_i64()],
             )
             .await?;
-
-        Ok(ExpectedEpochUpdateOutputs {
-            beacon_header_root: FixedBytes::from_hex(row.get::<_, String>("beacon_header_root"))
+    
+        Ok(EpochDecommitmentData {
+            epoch_update_outputs: ExpectedEpochUpdateOutputs {
+                beacon_header_root: FixedBytes::from_hex(row.get::<_, String>("beacon_header_root"))
+                    .unwrap(),
+                beacon_state_root: FixedBytes::from_hex(row.get::<_, String>("beacon_state_root"))
+                    .unwrap(),
+                slot: row.get::<_, i64>("slot") as u64,
+                committee_hash: FixedBytes::from_hex(row.get::<_, String>("committee_hash")).unwrap(),
+                n_signers: row.get::<_, i64>("n_signers") as u64,
+                execution_header_hash: FixedBytes::from_hex(
+                    row.get::<_, String>("execution_header_hash"),
+                )
                 .unwrap(),
-            beacon_state_root: FixedBytes::from_hex(row.get::<_, String>("beacon_state_root"))
-                .unwrap(),
-            slot: row.get::<_, i64>("slot") as u64,
-            committee_hash: FixedBytes::from_hex(row.get::<_, String>("committee_hash")).unwrap(),
-            n_signers: row.get::<_, i64>("n_signers") as u64,
-            execution_header_hash: FixedBytes::from_hex(
-                row.get::<_, String>("execution_header_hash"),
-            )
-            .unwrap(),
-            execution_header_height: row.get::<_, i64>("execution_header_height") as u64,
+                execution_header_height: row.get::<_, i64>("execution_header_height") as u64,
+            },
+            batch_root: FixedBytes::from_hex(row.get::<_, String>("batch_root")).unwrap(),
+            epoch_index: row.get::<_, i64>("epoch_index") as u64,
         })
     }
+    
 
     // pub async fn get_compute_finsihed_jobs_to_proccess_onchain_call(
     //     &self,

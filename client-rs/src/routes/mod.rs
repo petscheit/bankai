@@ -231,16 +231,22 @@ pub async fn handle_get_decommitment_data_by_epoch(
     match state.db_manager.get_merkle_paths_for_epoch(epoch_id).await {
         Ok(merkle_paths) => {
             if !merkle_paths.is_empty() {
-                let circuit_outputs_decommitment_data = state
+                let epoch_decommitment_data = state
                     .db_manager
                     .get_epoch_decommitment_data(epoch_id)
                     .await
                     .unwrap(); //ExpectedEpochUpdateOutputs
 
+                let circuit_outputs_decommitment_data = epoch_decommitment_data.epoch_update_outputs;
+
                 Json(json!({
                     "epoch_id": epoch_id,
                     "decommitment_data_for_epoch": {
-                        "merkle_paths": merkle_paths,
+                        "merkle_tree": {
+                            "epoch_index": epoch_decommitment_data.epoch_index,
+                            "batch_root": epoch_decommitment_data.batch_root,
+                            "path": merkle_paths,
+                        },
                         "circuit_outputs": circuit_outputs_decommitment_data
                     }
                 }))
@@ -254,6 +260,7 @@ pub async fn handle_get_decommitment_data_by_epoch(
         }
     }
 }
+
 
 pub async fn handle_get_decommitment_data_by_slot(
     Path(slot_id): Path<i32>,
