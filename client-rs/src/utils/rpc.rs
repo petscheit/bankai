@@ -1,14 +1,25 @@
-use crate::constants;
-use crate::epoch_update::SyncCommitteeValidatorPubs;
-use crate::Error;
-use alloy_rpc_types_beacon::events::light_client_finality::SyncAggregate;
-use alloy_rpc_types_beacon::header::HeaderResponse;
+use tracing::warn;
 use itertools::Itertools;
 use reqwest::Client;
 use serde_json::Value;
-use tracing::warn;
-use types::eth_spec::MainnetEthSpec;
-use types::{BeaconBlockBody, FullPayload};
+
+use alloy_rpc_types_beacon::{
+    events::light_client_finality::SyncAggregate,
+    header::HeaderResponse,
+};
+
+use types::{
+    eth_spec::MainnetEthSpec,
+    BeaconBlockBody,
+    FullPayload,
+};
+
+use crate::{
+    constants,
+    epoch_update::SyncCommitteeValidatorPubs,
+    Error,
+};
+
 
 /// A client for interacting with the Ethereum Beacon Chain RPC endpoints.
 /// Provides methods to fetch headers, sync aggregates, and validator information.

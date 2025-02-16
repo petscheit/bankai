@@ -1,15 +1,26 @@
-use crate::traits::{ProofType, Provable};
-use crate::Error;
+use std::{
+    env,
+    path::PathBuf,
+};
+
 use futures::StreamExt;
-use reqwest::multipart::{Form, Part};
-use reqwest::Body;
+use reqwest::{
+    multipart::{Form, Part},
+    Body,
+};
 use serde::{Deserialize, Serialize};
-use std::env;
-use std::path::PathBuf;
-use tokio::fs;
-use tokio::time::{sleep, Duration};
+use tokio::{
+    fs,
+    time::{sleep, Duration},
+};
 use tokio_util::io::ReaderStream;
 use tracing::{debug, error, info, trace};
+
+use crate::{
+    traits::{ProofType, Provable},
+    Error,
+};
+
 
 #[derive(Debug)]
 pub struct AtlanticClient {

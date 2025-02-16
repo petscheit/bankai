@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-#![allow(unused_imports)]
 mod bankai_client;
 mod config;
 mod constants;
@@ -32,14 +31,11 @@ use helpers::{
 use num_traits::cast::ToPrimitive;
 use reqwest;
 use routes::dashboard::handle_get_dashboard;
-use starknet::core::types::Felt;
-use state::check_env_vars;
-use state::{AppState, Job};
-use state::{AtlanticJobType, Error, JobStatus, JobType};
-use std::env;
-use std::sync::Arc;
-use tokio::sync::mpsc;
-use tokio::{signal, task};
+use state::{
+    AppState, Job, check_env_vars, AtlanticJobType, 
+    Error, JobStatus, JobType
+};
+use std::{env, sync::Arc};
 use tokio_stream::StreamExt;
 use tower::ServiceBuilder;
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
@@ -64,7 +60,14 @@ use routes::{
 };
 use std::net::SocketAddr;
 use sync_committee::SyncCommitteeUpdate;
-use tokio::time::{timeout, Duration};
+use tokio::{
+    signal,
+    sync::mpsc,
+    time::{
+        timeout, Duration
+    },
+};
+
 use uuid::Uuid;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
@@ -944,8 +947,9 @@ async fn retry_failed_jobs(
             match job_to_retry.job_type {
                 JobType::SyncCommitteeUpdate => {
                     info!(
-                        "Requesting retry of failed job {} failed previously at step {}, current retries count: {}... (sync committee update job for sync committee {})",
+                        "Requesting retry of failed job {} failed previously at {:?} on step {}, current retries count: {}... (sync committee update job for sync committee {})",
                         job_id,
+                        job.last_failure_time,
                         failed_at_step.to_string(),
                         job.retries_count.unwrap_or(0),
                         helpers::slot_to_sync_committee_id(job.slot.to_u64().unwrap())

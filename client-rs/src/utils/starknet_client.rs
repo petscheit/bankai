@@ -1,13 +1,13 @@
-use alloy_primitives::FixedBytes;
+use std::sync::Arc;
+use tokio::time::{sleep, Duration};
+use tracing::{error, info};
+
 use serde::{Deserialize, Serialize};
-use starknet::accounts::{Account, ConnectedAccount};
-use starknet::core::types::{Call, FunctionCall};
-use starknet::macros::selector;
-use starknet::providers::{Provider, ProviderError};
-use tracing::{debug, error, info, trace};
+
+use alloy_primitives::FixedBytes;
 
 use starknet::{
-    accounts::{ExecutionEncoding, SingleOwnerAccount},
+    accounts::{Account, ConnectedAccount, ExecutionEncoding, SingleOwnerAccount},
     contract::ContractFactory,
     core::{
         chain_id,
@@ -16,19 +16,21 @@ use starknet::{
             TransactionStatus,
         },
     },
-    macros::felt,
+    macros::{felt, selector},
     providers::{
         jsonrpc::{HttpTransport, JsonRpcClient},
-        Url,
+        Provider, ProviderError, Url,
     },
     signers::{LocalWallet, SigningKey},
+    core::types::{Call, FunctionCall},
 };
-use std::sync::Arc;
-use tokio::time::{sleep, Duration};
 
-use crate::contract_init::ContractInitializationData;
-use crate::traits::Submittable;
-use crate::BankaiConfig;
+use crate::{
+    contract_init::ContractInitializationData,
+    traits::Submittable,
+    BankaiConfig,
+};
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochProof {

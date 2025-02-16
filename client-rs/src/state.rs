@@ -1,14 +1,18 @@
-use crate::bankai_client::BankaiClient;
-use crate::utils::database_manager::DatabaseManager;
-use crate::utils::starknet_client::StarknetError;
+use crate::{
+    bankai_client::BankaiClient,
+    utils::{
+        database_manager::DatabaseManager,
+        starknet_client::StarknetError,
+    },
+};
 use postgres_types::{FromSql, ToSql};
 use starknet::core::types::Felt;
-use std::env;
-use std::fmt;
-use std::str::FromStr;
-use std::sync::Arc;
+use std::{
+    env, fmt, str::FromStr, sync::Arc,
+};
 use tokio::sync::mpsc;
 use uuid::Uuid;
+
 
 #[derive(Clone, Debug)]
 pub struct Job {

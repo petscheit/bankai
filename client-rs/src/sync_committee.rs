@@ -1,20 +1,24 @@
 use std::fs;
 
-use crate::traits::{ProofType, Provable};
-use crate::utils::rpc::BeaconRpcClient;
-use crate::Error;
 use crate::{
-    traits::Submittable,
-    utils::{hashing::get_committee_hash, merkle},
+    traits::{ProofType, Provable, Submittable},
+    utils::{
+        hashing::get_committee_hash,
+        merkle,
+        rpc::BeaconRpcClient,
+    },
+    Error,
 };
 use alloy_primitives::FixedBytes;
-use beacon_state_proof::state_proof_fetcher::StateProofFetcher;
-use beacon_state_proof::state_proof_fetcher::{SyncCommitteeProof, TreeHash};
+use beacon_state_proof::state_proof_fetcher::{StateProofFetcher, SyncCommitteeProof, TreeHash};
 use bls12_381::G1Affine;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use starknet::core::types::Felt;
-use starknet::macros::selector;
+use starknet::{
+    core::types::Felt,
+    macros::selector,
+};
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SyncCommitteeUpdate {

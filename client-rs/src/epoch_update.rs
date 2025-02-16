@@ -1,12 +1,13 @@
 use std::fs;
 
-use crate::constants;
 use crate::{
+    constants,
     execution_header::ExecutionHeaderProof,
     traits::{ProofType, Provable, Submittable},
     utils::{hashing::get_committee_hash, rpc::BeaconRpcClient},
     Error,
 };
+
 use alloy_primitives::FixedBytes;
 use alloy_rpc_types_beacon::{
     events::light_client_finality::SyncAggregate, header::HeaderResponse,

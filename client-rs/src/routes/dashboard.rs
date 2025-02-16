@@ -3,7 +3,7 @@ use crate::{
     state::{AppState, JobStatus},
 };
 use axum::extract::State;
-use num_traits::{SaturatingSub, ToPrimitive};
+use num_traits::{ToPrimitive};
 
 pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
     let db = state.db_manager.clone();

@@ -32,7 +32,7 @@ CREATE TABLE verified_epoch (
     execution_header_hash TEXT NOT NULL, -- Execution layer blockhash
     execution_header_height BIGINT NOT NULL, -- Execution layer height
     epoch_index BIGINT NOT NULL, -- `Index of the epoch inside the batch
-    batch_root TEXT NOT NULL, -- Epochs batch root hash
+    batch_root TEXT NOT NULL -- Epochs batch root hash
 );
 
 CREATE TABLE verified_sync_committee (

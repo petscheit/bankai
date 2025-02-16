@@ -4,8 +4,6 @@ use crate::{
     },
     Error,
 };
-use alloy_primitives::FixedBytes;
-use starknet::core::types::Felt;
 use tracing::info;
 
 pub fn slot_to_epoch_id(slot: u64) -> u64 {

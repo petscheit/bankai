@@ -5,7 +5,7 @@ use reqwest::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::time::{sleep, Duration};
-use tracing::{debug, error, info, trace};
+use tracing::{debug, trace};
 
 #[derive(Debug)]
 pub struct TransactorClient {

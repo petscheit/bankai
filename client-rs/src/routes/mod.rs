@@ -3,11 +3,10 @@ use alloy_primitives::map::HashMap;
 use axum::{
     extract::{Path, State},
     response::IntoResponse,
-    routing::{get, post},
-    Json, Router,
+    Json,
 };
 use num_traits::cast::ToPrimitive;
-use serde_json::{json, Value};
+use serde_json::{json};
 use tracing::error;
 use uuid::Uuid;
 

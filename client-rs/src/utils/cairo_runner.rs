@@ -1,13 +1,16 @@
 use std::sync::Arc;
 
-use crate::state::JobStatus;
-use crate::traits::ProofType;
-use crate::BankaiConfig;
-use crate::{traits::Provable, Error};
-use tokio::task;
-use tokio::task::JoinError;
+use tokio::task::{self, JoinError};
 use tracing::info;
 use uuid::Uuid;
+
+use crate::{
+    state::JobStatus,
+    traits::{ProofType, Provable},
+    BankaiConfig,
+    Error,
+};
+
 
 use super::database_manager::DatabaseManager;
 

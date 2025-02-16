@@ -1,19 +1,31 @@
-use crate::epoch_update::ExpectedEpochUpdateOutputs;
-use crate::helpers;
-use crate::state::{AtlanticJobType, Error, Job, JobStatus, JobType};
-use crate::utils::merkle::MerklePath;
-use crate::utils::starknet_client::EpochProof;
-use alloy_primitives::hex::{FromHex, ToHexExt};
-use alloy_primitives::FixedBytes;
-use starknet::core::types::Felt;
-use std::str::FromStr;
-//use std::error::Error;
+use std::{
+    collections::HashMap,
+    str::FromStr,
+};
+
 use chrono::NaiveDateTime;
 use num_traits::ToPrimitive;
-use std::collections::HashMap;
 use tokio_postgres::{Client, Row};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+use alloy_primitives::{
+    hex::{FromHex, ToHexExt},
+    FixedBytes,
+};
+
+use starknet::core::types::Felt;
+
+use crate::{
+    epoch_update::ExpectedEpochUpdateOutputs,
+    helpers,
+    state::{AtlanticJobType, Error, Job, JobStatus, JobType},
+    utils::{
+        merkle::MerklePath,
+        starknet_client::EpochProof,
+    },
+};
+
 
 #[derive(Debug)]
 pub struct EpochDecommitmentData {

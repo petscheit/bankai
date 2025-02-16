@@ -1,15 +1,20 @@
-use crate::constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE};
-use crate::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs};
-use crate::helpers::{
-    self, calculate_slots_range_for_batch, get_first_slot_for_epoch,
-    get_sync_committee_id_by_epoch, slot_to_epoch_id,
+use crate::{
+    constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE},
+    epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs},
+    helpers::{
+        self, get_first_slot_for_epoch, get_sync_committee_id_by_epoch, slot_to_epoch_id,
+    },
+    state::JobStatus,
+    traits::{Provable, Submittable},
+    utils::{
+        database_manager::DatabaseManager,
+        hashing::get_committee_hash,
+        merkle::poseidon::{compute_paths, compute_root, hash_path},
+    },
+    BankaiClient,
+    Error,
 };
-use crate::state::JobStatus;
-use crate::traits::{Provable, Submittable};
-use crate::utils::hashing::get_committee_hash;
 
-use crate::utils::merkle::poseidon::{compute_paths, compute_root, hash_path};
-use crate::{BankaiClient, Error};
 use alloy_primitives::FixedBytes;
 use hex;
 use num_traits::ToPrimitive;
@@ -20,7 +25,6 @@ use starknet_crypto::Felt;
 use std::fs;
 use uuid::Uuid;
 
-use crate::utils::database_manager::DatabaseManager;
 use std::sync::Arc;
 use tracing::{debug, info, trace};
 
