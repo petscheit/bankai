@@ -1075,7 +1075,7 @@ async fn broadcast_onchain_ready_jobs(
                                 index, epoch.expected_circuit_outputs
                             );
                             db_manager
-                                .insert_verified_epoch_circuit_outputs(
+                                .insert_verified_epoch_decommitment_data(
                                     helpers::slot_to_epoch_id(epoch.expected_circuit_outputs.slot), //index.to_u64().unwrap(),
                                     epoch.expected_circuit_outputs.beacon_header_root,
                                     epoch.expected_circuit_outputs.beacon_state_root,

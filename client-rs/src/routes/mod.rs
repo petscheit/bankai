@@ -165,9 +165,9 @@ pub async fn handle_get_latest_verified_committee(
         .get_latest_committee_id(&state.bankai.config)
         .await
     {
-        Ok(latest_epoch) => {
+        Ok(latest_verified_committee) => {
             // Convert `Felt` to a string and parse it as a hexadecimal number
-            let hex_string = latest_epoch.to_string(); // Ensure this converts to a "0x..." string
+            let hex_string = latest_verified_committee.to_string(); // Ensure this converts to a "0x..." string
             match u64::from_str_radix(hex_string.trim_start_matches("0x"), 16) {
                 Ok(committee_hash) => Json(json!({ "latest_verified_committee": committee_hash })),
                 Err(err) => {
@@ -271,11 +271,15 @@ pub async fn handle_get_decommitment_data_by_slot(
 }
 
 pub async fn handle_get_decommitment_data_by_execution_height(
-    Path(slot_id): Path<i32>,
+    Path(execution_height): Path<i32>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    // Convert slot -> epoch
-    let epoch_id = helpers::slot_to_epoch_id(slot_id.to_u64().unwrap());
+    let epoch_id = state
+        .db_manager
+        .get_verified_epoch_by_execution_height(execution_height)
+        .await
+        .unwrap()
+        .unwrap();
 
     handle_get_decommitment_data_by_epoch(Path(epoch_id.to_i32().unwrap()), State(state)).await
 }

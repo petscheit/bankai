@@ -113,7 +113,7 @@ impl DatabaseManager {
         Ok(())
     }
 
-    pub async fn insert_verified_epoch_circuit_outputs(
+    pub async fn insert_verified_epoch_decommitment_data(
         &self,
         epoch_id: u64,
         beacon_header_root: FixedBytes<32>,
@@ -167,7 +167,7 @@ impl DatabaseManager {
     pub async fn set_atlantic_job_queryid(
         &self,
         job_id: Uuid,
-        batch_id: String,
+        atlantic_batch_job_id: String,
         atlantic_job_type: AtlanticJobType,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         match atlantic_job_type {
@@ -175,7 +175,7 @@ impl DatabaseManager {
                 self.client
                 .execute(
                     "UPDATE jobs SET atlantic_proof_generate_batch_id = $1, updated_at = NOW() WHERE job_uuid = $2",
-                    &[&batch_id.to_string(), &job_id],
+                    &[&atlantic_batch_job_id.to_string(), &job_id],
                 )
                 .await?;
             }
@@ -183,7 +183,7 @@ impl DatabaseManager {
                 self.client
                 .execute(
                     "UPDATE jobs SET atlantic_proof_wrapper_batch_id = $1, updated_at = NOW() WHERE job_uuid = $2",
-                    &[&batch_id.to_string(), &job_id],
+                    &[&atlantic_batch_job_id.to_string(), &job_id],
                 )
                 .await?;
             } // _ => {
@@ -1000,6 +1000,28 @@ impl DatabaseManager {
             .collect();
 
         Ok(jobs)
+    }
+
+    pub async fn get_verified_epoch_by_execution_height(
+        &self,
+        execution_header_height: i32,
+    ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
+        let row_opt = self
+            .client
+            .query_opt(
+                "SELECT epoch_id FROM verified_epoch WHERE execution_header_height = $1
+                 LIMIT 1",
+                 &[&execution_header_height],
+            )
+            .await?;
+
+        if let Some(row) = row_opt {
+            Ok(Some(
+                row.get::<_, i64>("epoch_id").to_u64().unwrap(),
+            ))
+        } else {
+            Ok(Some(0))
+        }
     }
 
     pub async fn get_jobs_count_by_status(
