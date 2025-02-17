@@ -882,10 +882,14 @@ impl DatabaseManager {
         let row = self
             .client
             .query_one(
-                "SELECT EXTRACT(EPOCH FROM AVG(updated_at - created_at))::INTEGER as avg_duration
-                 FROM jobs
-                 WHERE job_status = 'DONE'
-                 LIMIT 20",
+                "SELECT EXTRACT(EPOCH FROM AVG(updated_at - created_at))::INTEGER AS avg_duration
+                 FROM (                    
+                    SELECT updated_at, created_at
+                    FROM jobs
+                    WHERE job_status = 'DONE'
+                    ORDER BY updated_at DESC
+                    LIMIT 20
+                 ) subquery",
                 &[],
             )
             .await?;
