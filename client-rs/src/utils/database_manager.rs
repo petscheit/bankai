@@ -30,7 +30,7 @@ use crate::{
 #[derive(Debug)]
 pub struct EpochDecommitmentData {
     pub epoch_update_outputs: ExpectedEpochUpdateOutputs,
-    pub batch_root: FixedBytes<32>,
+    pub batch_root: Felt,
     pub epoch_index: u64,
 }
 
@@ -479,7 +479,7 @@ impl DatabaseManager {
                 .unwrap(),
                 execution_header_height: row.get::<_, i64>("execution_header_height") as u64,
             },
-            batch_root: FixedBytes::from_hex(row.get::<_, String>("batch_root")).unwrap(),
+            batch_root: Felt::from_hex(row.get::<_, &str>("batch_root")).unwrap(),
             epoch_index: row.get::<_, i64>("epoch_index") as u64,
         })
     }
@@ -493,7 +493,7 @@ impl DatabaseManager {
     //         .client
     //         .query(
     //             "SELECT * FROM jobs
-    //              WHERE job_status = 'OFFCHAIN_COMPUTATION_FINISHED' AND job_type = 'EPOCH_BATCH_UPDATE'  AND batch_range_end_epoch <= $1",
+    //              WHERE job_status = 'OFFCHAIN_COMPUTATION_FINISHED' AND job_type = 'EPOCH_BATCH_UPDATE'  AND  <= $1",
     //             &[&last_epoch],
     //         )
     //         .await?;
