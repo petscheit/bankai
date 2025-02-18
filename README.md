@@ -160,3 +160,4 @@ make run-committee
 
 ## Acknowledgments
 All of this wouldnt be possible without [Garaga](https://github.com/keep-starknet-strange/garaga). Amazing stuff! Thx for your support Felt!
+Bankai is proven using the [Altantic Prover](https://atlanticprover.com/) and verified using the [Integrity Verifier](https://github.com/HerodotusDev/integrity)
