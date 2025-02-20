@@ -1,20 +1,24 @@
 use std::fs;
 
-use crate::traits::{ProofType, Provable};
-use crate::utils::rpc::BeaconRpcClient;
-use crate::Error;
 use crate::{
-    traits::Submittable,
-    utils::{hashing::get_committee_hash, merkle},
+    traits::{ProofType, Provable, Submittable},
+    utils::{
+        hashing::get_committee_hash,
+        merkle,
+        rpc::BeaconRpcClient,
+    },
+    Error,
 };
 use alloy_primitives::FixedBytes;
-use beacon_state_proof::state_proof_fetcher::StateProofFetcher;
-use beacon_state_proof::state_proof_fetcher::{SyncCommitteeProof, TreeHash};
+use beacon_state_proof::state_proof_fetcher::{StateProofFetcher, SyncCommitteeProof, TreeHash};
 use bls12_381::G1Affine;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use starknet::core::types::Felt;
-use starknet::macros::selector;
+use starknet::{
+    core::types::Felt,
+    macros::selector,
+};
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SyncCommitteeUpdate {
@@ -40,6 +44,15 @@ impl SyncCommitteeUpdate {
             expected_circuit_outputs,
         })
     }
+
+    pub fn from_json<T>(slot: u64) -> Result<T, Error>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let path = format!("batches/committee/{}/input_{}.json", slot, slot);
+        let json: String = fs::read_to_string(path).map_err(Error::IoError)?;
+        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
+    }
 }
 
 impl Provable for SyncCommitteeUpdate {
@@ -63,20 +76,18 @@ impl Provable for SyncCommitteeUpdate {
         Ok(path)
     }
 
-    fn from_json<T>(slot: u64) -> Result<T, Error>
-    where
-        T: serde::de::DeserializeOwned,
-    {
-        let path = format!("batches/committee/{}/input_{}.json", slot, slot);
-        let json: String = fs::read_to_string(path).map_err(Error::IoError)?;
-        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
-    }
-
     fn pie_path(&self) -> String {
         format!(
             "batches/committee/{}/pie_{}.zip",
             self.circuit_inputs.beacon_slot,
             self.id()
+        )
+    }
+
+    fn inputs_path(&self) -> String {
+        format!(
+            "batches/committee/{}/input_{}.json",
+            self.circuit_inputs.beacon_slot, self.circuit_inputs.beacon_slot,
         )
     }
 
