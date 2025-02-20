@@ -211,6 +211,7 @@ pub enum Error {
     RequiresNewerEpoch(Felt),
     CairoRunError(String),
     AtlanticError(reqwest::Error),
+    BankaiRPCClientError(reqwest::Error),
     InvalidResponse(String),
     PoolingTimeout(String),
     InvalidMerkleTree,
@@ -235,6 +236,7 @@ impl fmt::Display for Error {
             Error::RequiresNewerEpoch(felt) => write!(f, "Requires newer epoch: {}", felt),
             Error::CairoRunError(msg) => write!(f, "Cairo run error: {}", msg),
             Error::AtlanticError(err) => write!(f, "Atlantic RPC error: {}", err),
+            Error::BankaiRPCClientError(err) => write!(f, "Bankai RPC client error: {}", err),
             Error::InvalidResponse(msg) => write!(f, "Invalid response: {}", msg),
             Error::PoolingTimeout(msg) => write!(f, "Pooling timeout: {}", msg),
             Error::InvalidMerkleTree => write!(f, "Invalid Merkle Tree"),
@@ -251,6 +253,8 @@ impl std::error::Error for Error {
             Error::IoError(err) => Some(err),
             Error::StarknetError(err) => Some(err),
             Error::AtlanticError(err) => Some(err),
+            Error::BankaiRPCClientError(err) => Some(err),
+            
             _ => None, // No underlying source for other variants
         }
     }

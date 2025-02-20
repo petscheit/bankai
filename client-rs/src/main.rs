@@ -432,6 +432,31 @@ async fn main() -> Result<(), Error> {
 
             println!("Retrieved epoch proof from contract: {:?}", epoch_proof);
         }
+        // Decommit epoch using the data from Bankai RPC
+        Commands::DecommitEpoch { epoch_id } => {
+            let bankaiRPCClient = atlantic_client: BankaiRPCClient::new(
+                                 "https://sepolia.rpc.bankai.herodotus.dev",
+                                 "dummy_api_key",
+                             );
+
+            info!("Getting decommitment data fro epoch: {:?}", epoch_id);
+
+            let decommitment_data = bankaiRPCClient
+                .get_decommitment_data_for_epoch(epoch_id)
+                .await?;
+
+            info!("Decommitment data received, sending transaction...");
+
+            let tx_hash = bankai
+                .starknet_client
+                .submit_epoch_decommitment(decommitment_data);
+
+            info!("Decommitment proccess finished for epoch {:?}", epoch_id);
+            
+
+            
+        }
+
     }
 
     Ok(())

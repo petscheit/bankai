@@ -6,3 +6,5 @@ pub mod merkle;
 pub mod rpc;
 pub mod starknet_client;
 pub mod transactor_client;
+pub mod bankai_rpc_client;
+

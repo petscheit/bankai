@@ -66,6 +66,7 @@ pub struct JobStatusCount {
 #[derive(Debug)]
 pub struct DatabaseManager {
     client: Client,
+   // db_url: String
 }
 
 impl DatabaseManager {
@@ -157,7 +158,7 @@ impl DatabaseManager {
             .execute(
                 "INSERT INTO verified_sync_committee (sync_committee_id, sync_committee_hash)
              VALUES ($1, $2)",
-                &[&sync_committee_id.to_string(), &sync_committee_hash],
+                &[&sync_committee_id.to_i64(), &sync_committee_hash],
             )
             .await?;
 
@@ -536,6 +537,23 @@ impl DatabaseManager {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(jobs)
+    }
+
+    pub async fn count_jobs_with_status(
+        &self,
+        desired_status: JobStatus,
+    ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+        // Query all jobs with the given job_status
+        let row = self
+            .client
+            .query_one(
+                "SELECT  COUNT(*) FROM jobs
+                 WHERE job_status = $1",
+                &[&desired_status.to_string()],
+            )
+            .await?;
+
+            Ok(row.get::<_, i64>("count").to_u64().unwrap_or(0))
     }
 
     pub async fn update_job_status(

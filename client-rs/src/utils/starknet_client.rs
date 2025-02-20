@@ -29,6 +29,8 @@ use crate::{
     contract_init::ContractInitializationData,
     traits::Submittable,
     BankaiConfig,
+    constants,
+    utils::bankai_rpc_client::EpochDecommitmentData
 };
 
 
@@ -285,9 +287,40 @@ impl StarknetClient {
         Ok(*latest_committee_id.first().unwrap())
     }
 
+    pub async fn submit_epoch_decommitment(
+        &self,
+        config: &BankaiConfig,
+        decommitment_data: EpochDecommitmentData,
+    ) -> Result<Felt, StarknetError> {
+        let calldata = decommitment_data.to_calldata();
+
+        let call = Call {
+            to: config.contract_address,
+            selector: selector!("decommit_batched_epoch"),
+            calldata,
+        };
+
+        let send_result = self.account.execute_v1(vec![call]).send().await;
+
+        match send_result {
+            Ok(tx_response) => {
+                let tx_hash = tx_response.transaction_hash;
+                info!("Transaction sent successfully! Hash: {:#x}", tx_hash);
+                Ok(tx_hash)
+            }
+            Err(e) => {
+                error!("Transaction execution error: {:#?}", e);
+                return Err(StarknetError::TransactionError(format!(
+                    "TransactionExecutionError: {:#?}",
+                    e
+                )));
+            }
+        }
+    }
+
     pub async fn wait_for_confirmation(&self, tx_hash: Felt) -> Result<(), StarknetError> {
-        let max_retries = 20;
-        let delay = Duration::from_secs(5);
+        let max_retries = constants::STARKNET_TX_CONFIRMATION_MAX_RETRIES;
+        let delay = Duration::from_secs(constants::STARKNET_TX_CONFIRMATION_CHECK_DELAY);
 
         for attempt in 0..max_retries {
             match self.get_transaction_status(tx_hash).await {

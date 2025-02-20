@@ -146,7 +146,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             tokio::spawn(async move {
                 match process_job(job, db_clone.clone(), bankai_clone.clone()).await {
                     Ok(_) => {
-                        info!("Job {} completed successfully", job_id);
+                        info!("Job {} stage 1 completed successfully", job_id);
                     }
                     Err(e) => {
                         let job_data = db_clone.get_job_by_id(job_id).await.unwrap().unwrap();
@@ -388,6 +388,7 @@ async fn handle_beacon_chain_head_event(
     db_manager: Arc<DatabaseManager>,
     tx: mpsc::Sender<Job>,
 ) -> Result<(), Error> {
+    let current_slot_id = parsed_event.slot;
     let current_epoch_id = helpers::slot_to_epoch_id(parsed_event.slot);
     let current_sync_committee_id = helpers::slot_to_sync_committee_id(parsed_event.slot);
 
@@ -652,9 +653,11 @@ async fn handle_beacon_chain_head_event(
     } else if epochs_behind == constants::TARGET_BATCH_SIZE {
         if last_epoch_in_progress < current_epoch_id {
             // This is when we are synced properly and new epoch batch needs to be inserted
+            let slots_left_to_start_new_epoch =
+                helpers::get_last_slot_for_epoch(current_epoch_id) - current_slot_id;
             info!(
-                "Target batch size reached. Starting processing next epoch batch. Current Beacon Chain epoch: {} Latest verified epoch: {}",
-                current_epoch_id, latest_verified_epoch_id
+                "Target batch size reached. Starting processing next epoch batch. Current Beacon Chain epoch: {} Latest verified epoch: {}. {} slots left to start new epoch",
+                current_epoch_id, latest_verified_epoch_id, slots_left_to_start_new_epoch
             );
 
             let epoch_to_start_from = latest_scheduled_epoch + 1;

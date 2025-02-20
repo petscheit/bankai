@@ -54,6 +54,11 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
     // Fetch last 20 batch jobs
     let recent_batches = db.get_recent_batch_jobs(20).await.unwrap_or_default();
 
+    let in_progress_jobs_count = db.count_jobs_in_progress().await.unwrap().unwrap();
+    let success_jobs_count = db.count_jobs_with_status(JobStatus::Done).await.unwrap();
+    let time_to_start_new_epoch_job = 0;
+    let time_to_start_new_committee_job = 0;
+
     // Format batch information
     let batch_info = recent_batches
         .iter()
@@ -154,6 +159,10 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
         beacon_status,
         &batch_display,
         &sync_committee_jobs_display,
+        success_jobs_count,
+        time_to_start_new_epoch_job,
+        time_to_start_new_committee_job,
+        in_progress_jobs_count
     )
 }
 
@@ -171,6 +180,10 @@ pub fn create_ascii_dashboard(
     beacon_status: &str,
     batch_display: &str,
     sync_committee_jobs_display: &str,
+    success_jobs_count: u64,
+    time_to_start_new_epoch_job: u64,
+    time_to_start_new_committee_job: u64,
+    in_progress_jobs: u64,
 ) -> String {
     format!(
         r#"
@@ -202,9 +215,9 @@ BBBBBBBBBBBBBBBBB     aaaaaaaaaa  aaaa  nnnnnn    nnnnnnkkkkkkkk    kkkkkkk  aaa
 ║     • Daemon:    {daemon_status:<12}  • Database:  {db_status:<12}  • Beacon: {beacon_status:<12}                                                                                 ║
 ║                                                                                                                                                                  ║
 ║   Metrics:                                                                                                                                                       ║
-║     • Success Rate:        {success_rate:<10}                                                                                                                            ║
-║     • Average Duration:    {avg_duration:<10}                                                                                                                            ║
-║     • Jobs in Progress:    {jobs_in_progress:<10}                                                                                                                            ║
+║     • Success Rate:        {success_rate:<10}     • Successful jobs count:  {success_jobs_count:<10}                  • In progress jobs:  {in_progress_jobs:<10}                                                                                                            ║
+║     • Average Duration:    {avg_duration:<10}     • Estimated time to start new epoch job:    {time_to_start_new_epoch_job:<10}                                                                                          ║
+║     • Jobs in Progress:    {jobs_in_progress:<10}     • Estimated time to start new committee job:    {time_to_start_new_committee_job:<10}                                                                                                                               ║
 ║                                                                                                                                                                  ║
 ║   Beacon Info:                                                                                                                                                   ║
 ║     • Latest Beacon Slot:    {latest_beacon_slot:<12}   • Latest Beacon Committee:    {latest_beacon_committee:<12}                                                                           ║
@@ -251,6 +264,10 @@ BBBBBBBBBBBBBBBBB     aaaaaaaaaa  aaaa  nnnnnn    nnnnnnkkkkkkkk    kkkkkkk  aaa
         latest_verified_committee = latest_verified_committee,
         epoch_gap = epoch_gap,
         batch_display_block = batch_display,
-        sync_committee_jobs_display_block = sync_committee_jobs_display
+        sync_committee_jobs_display_block = sync_committee_jobs_display,
+        success_jobs_count = success_jobs_count,
+        time_to_start_new_epoch_job = time_to_start_new_epoch_job,
+        time_to_start_new_committee_job = time_to_start_new_committee_job,
+        in_progress_jobs = in_progress_jobs,        
     )
 }
