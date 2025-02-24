@@ -1,7 +1,4 @@
-use std::{
-    env,
-    path::PathBuf,
-};
+use std::{env, path::PathBuf};
 
 use futures::StreamExt;
 use reqwest::{
@@ -20,7 +17,6 @@ use crate::{
     traits::{ProofType, Provable},
     Error,
 };
-
 
 #[derive(Debug)]
 pub struct AtlanticClient {
@@ -255,7 +251,7 @@ impl AtlanticClient {
             }
 
             if status == "FAILED" {
-                return Err(Error::InvalidResponse(format!(
+                return Err(Error::AtlanticProcessingError(format!(
                     "Atlantic processing failed for query {}",
                     batch_id
                 )));
@@ -271,7 +267,7 @@ impl AtlanticClient {
             sleep(sleep_duration).await;
         }
 
-        return Err(Error::InvalidResponse(format!(
+        return Err(Error::AtlanticPoolingTimeout(format!(
             "Pooling timeout for batch {}",
             batch_id
         )));
