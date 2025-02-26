@@ -31,10 +31,7 @@ use helpers::{
 use num_traits::cast::ToPrimitive;
 use reqwest;
 use routes::dashboard::handle_get_dashboard;
-use state::{
-    AppState, Job, check_env_vars, AtlanticJobType, 
-    Error, JobStatus, JobType
-};
+use state::{check_env_vars, AppState, AtlanticJobType, Error, Job, JobStatus, JobType};
 use std::{env, sync::Arc};
 use tokio_stream::StreamExt;
 use tower::ServiceBuilder;
@@ -63,9 +60,7 @@ use sync_committee::SyncCommitteeUpdate;
 use tokio::{
     signal,
     sync::mpsc,
-    time::{
-        timeout, Duration
-    },
+    time::{timeout, Duration},
 };
 
 use uuid::Uuid;
@@ -1024,7 +1019,10 @@ async fn broadcast_onchain_ready_jobs(
                 // Submit to Starknet
                 let send_result = bankai
                     .starknet_client
-                    .submit_update(circuit_inputs.expected_circuit_outputs.clone(), &bankai.config)
+                    .submit_update(
+                        circuit_inputs.expected_circuit_outputs.clone(),
+                        &bankai.config,
+                    )
                     .await;
 
                 let txhash = match send_result {
@@ -1088,7 +1086,7 @@ async fn broadcast_onchain_ready_jobs(
                                     epoch.expected_circuit_outputs.execution_header_hash,
                                     epoch.expected_circuit_outputs.execution_header_height,
                                     index,
-                                    batch_root
+                                    batch_root,
                                 )
                                 .await?;
                         }
@@ -1387,14 +1385,27 @@ async fn process_job(
                             wrapping_batch_id
                         );
                         // Pool for Atlantic execution done
-                        bankai
+                        let result = bankai
                             .atlantic_client
                             .poll_batch_status_until_done(
                                 &wrapping_batch_id,
                                 Duration::new(10, 0),
                                 usize::MAX,
                             )
-                            .await?;
+                            .await;
+
+                        if let Err(Error::AtlanticProcessingError(msg)) = &result {
+                            error!("Atlantic processing failed: {}", msg);
+                            db_manager
+                                .update_job_status(job.job_id, JobStatus::AtlanticProofRetrieved)
+                                .await?; // Go back to state before Atlantic proof wrapping query to send it again
+                            continue;
+                        } else if let Err(Error::AtlanticPoolingTimeout(msg)) = &result {
+                            error!("Batch polling timed out: {}", msg);
+                            continue; // Try next pooling round if timeout this time
+                        } else {
+                            result?; // Propagate other errors
+                        }
 
                         db_manager
                             .update_job_status(job.job_id, JobStatus::WrappedProofDone)
@@ -1553,14 +1564,28 @@ async fn process_job(
                          wrapping_batch_id
                         );
 
-                        bankai
+                        let result = bankai
                             .atlantic_client
                             .poll_batch_status_until_done(
                                 &wrapping_batch_id,
                                 Duration::new(10, 0),
                                 usize::MAX,
                             )
-                            .await?;
+                            .await;
+
+                        if let Err(Error::AtlanticProcessingError(msg)) = &result {
+                            error!("Atlantic processing failed: {}", msg);
+                            db_manager
+                                .update_job_status(job.job_id, JobStatus::AtlanticProofRetrieved)
+                                .await?; // Go back to state before Atlantic proof wrapping query to send it again
+                            current_status = JobStatus::AtlanticProofRetrieved;
+                            continue;
+                        } else if let Err(Error::AtlanticPoolingTimeout(msg)) = &result {
+                            error!("Batch polling timed out: {}", msg);
+                            continue; // Try next pooling round if timeout this time
+                        } else {
+                            result?; // Propagate other errors
+                        }
 
                         db_manager
                             .update_job_status(job.job_id, JobStatus::WrappedProofDone)

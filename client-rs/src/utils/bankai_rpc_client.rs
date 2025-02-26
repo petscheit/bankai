@@ -1,40 +1,10 @@
-use std::{
-    env,
-    path::PathBuf,
-};
-use alloy_primitives::FixedBytes;
+use serde::{Deserialize, Serialize};
 
-use futures::StreamExt;
-use reqwest::{
-    multipart::{Form, Part},
-    Body,
-};
-use serde::{Deserialize, Deserializer, Serialize};
-use tokio::{
-    fs,
-    time::{sleep, Duration},
-};
-use tokio_util::io::ReaderStream;
-use tracing::{debug, error, info, trace};
+use crate::Error;
 
-use crate::{
-    traits::{ProofType, Provable},
-    Error,
-};
+use starknet::core::types::Felt;
 
-use starknet::{
-    core::{
-        types::{
-             Felt
-        },
-    },
-};
-
-use crate::{
-   epoch_update::ExpectedEpochUpdateOutputs,
-   utils::merkle::MerklePath
-};
-
+use crate::{epoch_update::ExpectedEpochUpdateOutputs, utils::merkle::MerklePath};
 
 #[derive(Debug)]
 pub struct BankaiRPCClient {
@@ -62,14 +32,25 @@ pub struct EpochDecommitmentDataResponse {
     pub epoch_id: u64,
 }
 
-
 impl EpochDecommitmentData {
     pub fn to_calldata(&self) -> Vec<Felt> {
-        let (header_root_high, header_root_low) = self.circuit_outputs.beacon_header_root.as_slice().split_at(16);
-        let (beacon_state_root_high, beacon_state_root_low) = self.circuit_outputs.beacon_state_root.as_slice().split_at(16);
-        let (committee_hash_high, committee_hash_low) = self.circuit_outputs.committee_hash.as_slice().split_at(16);
-        let (execution_hash_high, execution_hash_low) = self.circuit_outputs.execution_header_hash.as_slice().split_at(16);
-        
+        let (header_root_high, header_root_low) = self
+            .circuit_outputs
+            .beacon_header_root
+            .as_slice()
+            .split_at(16);
+        let (beacon_state_root_high, beacon_state_root_low) = self
+            .circuit_outputs
+            .beacon_state_root
+            .as_slice()
+            .split_at(16);
+        let (committee_hash_high, committee_hash_low) =
+            self.circuit_outputs.committee_hash.as_slice().split_at(16);
+        let (execution_hash_high, execution_hash_low) = self
+            .circuit_outputs
+            .execution_header_hash
+            .as_slice()
+            .split_at(16);
 
         let merkle_path_felts: Vec<Felt> = self
             .merkle_tree
@@ -77,39 +58,36 @@ impl EpochDecommitmentData {
             .iter()
             .flat_map(|p| {
                 //let (value_high, value_low) = p.value.as_slice().split_at(16);
-                vec![
-                    p.value
-                ]
+                vec![p.value]
             })
             .collect();
 
-            let mut calldata = vec![
-                self.merkle_tree.batch_root,
-                Felt::from(self.merkle_tree.epoch_index),
-            ];
-    
-            // Append merkle path felts
-            calldata.extend(merkle_path_felts);
-    
-            // Append other fields
-            calldata.extend([
-                Felt::from_bytes_be_slice(header_root_low),
-                Felt::from_bytes_be_slice(header_root_high),
-                Felt::from_bytes_be_slice(beacon_state_root_low),
-                Felt::from_bytes_be_slice(beacon_state_root_high),
-                self.circuit_outputs.slot.into(),
-                Felt::from_bytes_be_slice(committee_hash_low),
-                Felt::from_bytes_be_slice(committee_hash_high),
-                self.circuit_outputs.n_signers.into(),
-                Felt::from_bytes_be_slice(execution_hash_low),
-                Felt::from_bytes_be_slice(execution_hash_high),
-                self.circuit_outputs.execution_header_height.into(),
-            ]);
-    
-            calldata
+        let mut calldata = vec![
+            self.merkle_tree.batch_root,
+            Felt::from(self.merkle_tree.epoch_index),
+        ];
+
+        // Append merkle path felts
+        calldata.extend(merkle_path_felts);
+
+        // Append other fields
+        calldata.extend([
+            Felt::from_bytes_be_slice(header_root_low),
+            Felt::from_bytes_be_slice(header_root_high),
+            Felt::from_bytes_be_slice(beacon_state_root_low),
+            Felt::from_bytes_be_slice(beacon_state_root_high),
+            self.circuit_outputs.slot.into(),
+            Felt::from_bytes_be_slice(committee_hash_low),
+            Felt::from_bytes_be_slice(committee_hash_high),
+            self.circuit_outputs.n_signers.into(),
+            Felt::from_bytes_be_slice(execution_hash_low),
+            Felt::from_bytes_be_slice(execution_hash_high),
+            self.circuit_outputs.execution_header_height.into(),
+        ]);
+
+        calldata
     }
 }
-
 
 impl BankaiRPCClient {
     pub fn new(endpoint: String, api_key: String) -> Self {
@@ -120,22 +98,24 @@ impl BankaiRPCClient {
         }
     }
 
-    pub async fn get_decommitment_data_for_epoch(&self, epoch_id: u64) -> Result<EpochDecommitmentDataResponse, Error> {
+    pub async fn get_decommitment_data_for_epoch(
+        &self,
+        epoch_id: u64,
+    ) -> Result<EpochDecommitmentDataResponse, Error> {
         let response = self
             .client
             .get(format!(
                 "{}/get_epoch_decommitment_data/by_epoch/{}",
-                self.endpoint,
-                epoch_id
+                self.endpoint, epoch_id
             ))
             .header("accept", "application/json")
             .send()
             .await
             .map_err(Error::BankaiRPCClientError)?;
 
-        let response_data: EpochDecommitmentDataResponse = response.json().await.map_err(Error::BankaiRPCClientError)?;
+        let response_data: EpochDecommitmentDataResponse =
+            response.json().await.map_err(Error::BankaiRPCClientError)?;
 
         Ok(response_data)
-
     }
 }

@@ -1,18 +1,12 @@
 use crate::{
     bankai_client::BankaiClient,
-    utils::{
-        database_manager::DatabaseManager,
-        starknet_client::StarknetError,
-    },
+    utils::{database_manager::DatabaseManager, starknet_client::StarknetError},
 };
 use postgres_types::{FromSql, ToSql};
 use starknet::core::types::Felt;
-use std::{
-    env, fmt, str::FromStr, sync::Arc,
-};
+use std::{env, fmt, str::FromStr, sync::Arc};
 use tokio::sync::mpsc;
 use uuid::Uuid;
-
 
 #[derive(Clone, Debug)]
 pub struct Job {
@@ -211,6 +205,8 @@ pub enum Error {
     RequiresNewerEpoch(Felt),
     CairoRunError(String),
     AtlanticError(reqwest::Error),
+    AtlanticProcessingError(String),
+    AtlanticPoolingTimeout(String),
     BankaiRPCClientError(reqwest::Error),
     InvalidResponse(String),
     PoolingTimeout(String),
@@ -236,6 +232,12 @@ impl fmt::Display for Error {
             Error::RequiresNewerEpoch(felt) => write!(f, "Requires newer epoch: {}", felt),
             Error::CairoRunError(msg) => write!(f, "Cairo run error: {}", msg),
             Error::AtlanticError(err) => write!(f, "Atlantic RPC error: {}", err),
+            Error::AtlanticProcessingError(err) => {
+                write!(f, "Atlantic query processing error: {}", err)
+            }
+            Error::AtlanticPoolingTimeout(err) => {
+                write!(f, "Atlantic query processing error: {}", err)
+            }
             Error::BankaiRPCClientError(err) => write!(f, "Bankai RPC client error: {}", err),
             Error::InvalidResponse(msg) => write!(f, "Invalid response: {}", msg),
             Error::PoolingTimeout(msg) => write!(f, "Pooling timeout: {}", msg),
@@ -254,7 +256,7 @@ impl std::error::Error for Error {
             Error::StarknetError(err) => Some(err),
             Error::AtlanticError(err) => Some(err),
             Error::BankaiRPCClientError(err) => Some(err),
-            
+
             _ => None, // No underlying source for other variants
         }
     }

@@ -3,7 +3,7 @@ use crate::{
     state::{AppState, JobStatus},
 };
 use axum::extract::State;
-use num_traits::{ToPrimitive};
+use num_traits::ToPrimitive;
 
 pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
     let db = state.db_manager.clone();
@@ -162,7 +162,7 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
         success_jobs_count,
         time_to_start_new_epoch_job,
         time_to_start_new_committee_job,
-        in_progress_jobs_count
+        in_progress_jobs_count,
     )
 }
 
@@ -215,9 +215,9 @@ BBBBBBBBBBBBBBBBB     aaaaaaaaaa  aaaa  nnnnnn    nnnnnnkkkkkkkk    kkkkkkk  aaa
 ║     • Daemon:    {daemon_status:<12}  • Database:  {db_status:<12}  • Beacon: {beacon_status:<12}                                                                                 ║
 ║                                                                                                                                                                  ║
 ║   Metrics:                                                                                                                                                       ║
-║     • Success Rate:        {success_rate:<10}     • Successful jobs count:  {success_jobs_count:<10}                  • In progress jobs:  {in_progress_jobs:<10}                                                                                                            ║
-║     • Average Duration:    {avg_duration:<10}     • Estimated time to start new epoch job:    {time_to_start_new_epoch_job:<10}                                                                                          ║
-║     • Jobs in Progress:    {jobs_in_progress:<10}     • Estimated time to start new committee job:    {time_to_start_new_committee_job:<10}                                                                                                                               ║
+║     • Success Rate:        {success_rate:<10}     • Successful jobs count:  {success_jobs_count:<10}                  • In progress jobs:  {in_progress_jobs:<10}                                  ║
+║     • Average Duration:    {avg_duration:<10}     • Estimated time to start new epoch job:    {time_to_start_new_epoch_job:<10}                                                                 ║
+║     • Jobs in Progress:    {jobs_in_progress:<10}     • Estimated time to start new committee job:    {time_to_start_new_committee_job:<10}                                                             ║
 ║                                                                                                                                                                  ║
 ║   Beacon Info:                                                                                                                                                   ║
 ║     • Latest Beacon Slot:    {latest_beacon_slot:<12}   • Latest Beacon Committee:    {latest_beacon_committee:<12}                                                                           ║
@@ -268,6 +268,6 @@ BBBBBBBBBBBBBBBBB     aaaaaaaaaa  aaaa  nnnnnn    nnnnnnkkkkkkkk    kkkkkkk  aaa
         success_jobs_count = success_jobs_count,
         time_to_start_new_epoch_job = time_to_start_new_epoch_job,
         time_to_start_new_committee_job = time_to_start_new_committee_job,
-        in_progress_jobs = in_progress_jobs,        
+        in_progress_jobs = in_progress_jobs,
     )
 }
