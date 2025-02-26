@@ -1578,6 +1578,7 @@ async fn process_job(
                             db_manager
                                 .update_job_status(job.job_id, JobStatus::AtlanticProofRetrieved)
                                 .await?; // Go back to state before Atlantic proof wrapping query to send it again
+                            current_status = JobStatus::AtlanticProofRetrieved;
                             continue;
                         } else if let Err(Error::AtlanticPoolingTimeout(msg)) = &result {
                             error!("Batch polling timed out: {}", msg);
