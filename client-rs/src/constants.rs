@@ -16,4 +16,4 @@ pub const JOB_RETRY_DELAY_MS: u64 = 300_0000;
 pub const MAX_SKIPPED_SLOTS_RETRY_ATTEMPTS: u64 = 5; // How many skipped slots in row can be on Beacon Chain before we throw error
 pub const JOBS_RETRY_CHECK_INTERVAL: u64 = 600; // In seconds
 pub const STARKNET_TX_CONFIRMATION_MAX_RETRIES: u64  = 20;
-pub const STARKNET_TX_CONFIRMATION_CHECK_DELAY: u64  = 5000;
+pub const STARKNET_TX_CONFIRMATION_CHECK_DELAY: u64  = 5; // In seconds

@@ -992,7 +992,7 @@ async fn retry_failed_jobs(
             }
         });
 
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(Duration::from_millis(constants::JOB_RETRY_DELAY_MS)).await;
     }
 
     Ok(())
