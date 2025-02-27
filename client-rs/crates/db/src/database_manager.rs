@@ -17,15 +17,11 @@ use serde::{Deserialize, Serialize};
 
 use starknet::core::types::Felt;
 
-use crate::{
-    epoch_update::ExpectedEpochUpdateOutputs,
-    helpers,
-    state::{AtlanticJobType, Error, Job, JobStatus, JobType},
-    utils::{
-        merkle::MerklePath,
-        starknet_client::EpochProof,
-    },
-};
+use proofs::epoch_update::ExpectedEpochUpdateOutputs;
+use crate::state::{AtlanticJobType, Error, Job, JobStatus, JobType};
+
+use utils::merkle::MerklePath;
+use proofs::epoch_proof::EpochProof;
 
 
 #[derive(Debug)]

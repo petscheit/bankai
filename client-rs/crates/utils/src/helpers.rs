@@ -1,8 +1,8 @@
-use crate::{
+use types::{
     constants::{
         EPOCHS_PER_SYNC_COMMITTEE, SLOTS_PER_EPOCH, SLOTS_PER_SYNC_COMMITTEE, TARGET_BATCH_SIZE,
     },
-    Error,
+    error::Error
 };
 use tracing::info;
 

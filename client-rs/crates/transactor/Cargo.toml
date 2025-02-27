@@ -1,0 +1,11 @@
+[package]
+name = "transactor"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+types.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true

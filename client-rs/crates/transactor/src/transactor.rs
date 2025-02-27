@@ -1,4 +1,4 @@
-use crate::{config::BankaiConfig, traits::Submittable, Error};
+use types::{config::BankaiConfig, traits::Submittable, Error};
 use reqwest::{
     header::{AUTHORIZATION, CONTENT_TYPE},
     Client,

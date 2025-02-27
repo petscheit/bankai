@@ -1,0 +1,16 @@
+[package]
+name = "atlantic-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+# External dependencies
+futures = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+types = { workspace = true }

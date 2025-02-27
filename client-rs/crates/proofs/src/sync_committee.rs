@@ -1,14 +1,11 @@
 use std::fs;
 
-use crate::{
-    traits::{ProofType, Provable, Submittable},
-    utils::{
-        hashing::get_committee_hash,
-        merkle,
-        rpc::BeaconRpcClient,
-    },
-    Error,
+use crate::utils::{
+    hashing::get_committee_hash,
+    merkle,
+    rpc::BeaconRpcClient,
 };
+
 use alloy_primitives::FixedBytes;
 use beacon_state_proof::state_proof_fetcher::{StateProofFetcher, SyncCommitteeProof, TreeHash};
 use bls12_381::G1Affine;
@@ -17,6 +14,11 @@ use sha2::{Digest, Sha256};
 use starknet::{
     core::types::Felt,
     macros::selector,
+};
+use types::{
+    constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE},
+    error::Error,
+    traits::{Provable, Submittable, ProofType},
 };
 
 

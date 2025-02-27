@@ -1,0 +1,19 @@
+[package]
+name = "db"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+postgres_types.workspace = true
+starknet.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+serde.workspace = true
+chrono.workspace = true
+num_traits.workspace = true
+tokio_postgres.workspace = true
+alloy_primitives.workspace = true
+proofs.workspace = true
+utils.workspace = true
+proofs.workspace = true

@@ -13,9 +13,9 @@ use tokio::{
 use tokio_util::io::ReaderStream;
 use tracing::{debug, error, info, trace};
 
-use crate::{
+use types::{
     traits::{ProofType, Provable},
-    Error,
+    error::Error,
 };
 
 #[derive(Debug)]
@@ -80,12 +80,6 @@ impl AtlanticClient {
             },
         );
 
-        // Read the file as bytes
-        // let file_bytes = fs::read(&pie_path).map_err(Error::IoError)?;
-        // let file_part = Part::bytes(file_bytes)
-        //     .file_name(pie_path) // Provide a filename
-        //     .mime_str("application/zip") // Specify MIME type
-        //     .map_err(Error::AtlanticError)?;
         let file_part = Part::stream(Body::wrap_stream(progress_stream))
             .file_name(
                 pie_path

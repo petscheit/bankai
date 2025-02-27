@@ -1,0 +1,13 @@
+[package]
+name = "utils"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+types.workspace = true
+alloy-primitives.workspace = true
+bls12_381.workspace = true
+sha2.workspace = true
+tracing.workspace = true
+serde.workspace = true
+starknet.workspace = true
