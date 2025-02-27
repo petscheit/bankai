@@ -46,6 +46,7 @@ uuid = { version = "1.11.0", features = [
     "v4",
     "fast-rng",
     "macro-diagnostics",
+    "serde"
 ] }
 postgres-types = { version = "0.2.8", features = ["derive"] }
 num_cpus = "1.16.0"

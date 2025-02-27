@@ -1,4 +1,8 @@
-use crate::{helpers, state::AppState};
+use crate::{helpers,
+    state::{
+        AppState, JobStatus
+    }
+};
 use alloy_primitives::map::HashMap;
 use axum::{
     extract::{Path, State},
@@ -9,6 +13,7 @@ use num_traits::cast::ToPrimitive;
 use serde_json::{json};
 use tracing::error;
 use uuid::Uuid;
+
 
 pub mod dashboard;
 
@@ -35,6 +40,13 @@ pub async fn handle_get_status(State(state): State<AppState>) -> impl IntoRespon
         .unwrap()
         .unwrap();
 
+    let errored_jobs = state
+        .db_manager
+        .get_jobs_with_statuses(vec![JobStatus::Error])
+        .await
+        .unwrap_or_default();
+
+
     // let beacon_chain_state = state
     //     .db_manager
     //     .get_latest_known_beacon_chain_state()
@@ -56,7 +68,8 @@ pub async fn handle_get_status(State(state): State<AppState>) -> impl IntoRespon
         "last_epoch_in_progress": last_epoch_in_progress,
         "last_sync_committee_in_progress": last_sync_committee_in_progress,
         "jobs_in_progress_count": in_progress_jobs_count,
-        "jobs_statuses": jobs_status_map
+        "jobs_statuses": jobs_status_map,
+        "errored": errored_jobs
     } }))
 }
 

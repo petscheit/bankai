@@ -231,7 +231,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Retry any failed jobs before processing new ones
     if constants::JOBS_RETRY_ENABLED {
-        retry_failed_jobs(db_manager_for_listener.clone(), tx_for_listener.clone()).await?;
+        retry_failed_jobs(db_manager_for_listener.clone(), tx_for_listener.clone(), false).await?;
     }
 
     //enqueue_sync_committee_jobs();
@@ -367,7 +367,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 constants::JOBS_RETRY_CHECK_INTERVAL,
             ))
             .await;
-            let _ = retry_failed_jobs(db_manager_for_watcher.clone(), tx_for_watcher.clone()).await;
+            let _ = retry_failed_jobs(db_manager_for_watcher.clone(), tx_for_watcher.clone(), true).await;
         }
     });
 
@@ -903,6 +903,7 @@ async fn resume_unfinished_jobs(
 async fn retry_failed_jobs(
     db_manager: Arc<DatabaseManager>,
     tx: mpsc::Sender<Job>,
+    retry_forever: bool
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Checking for failed jobs...");
 
@@ -987,7 +988,9 @@ async fn retry_failed_jobs(
             }
         });
 
-        tokio::time::sleep(Duration::from_millis(constants::JOB_RETRY_DELAY_MS)).await;
+        if retry_forever {
+            tokio::time::sleep(Duration::from_millis(constants::JOB_RETRY_DELAY_MS)).await;
+        }
     }
 
     Ok(())

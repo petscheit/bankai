@@ -7,6 +7,8 @@ use starknet::core::types::Felt;
 use std::{env, fmt, str::FromStr, sync::Arc};
 use tokio::sync::mpsc;
 use uuid::Uuid;
+use serde::{Deserialize, Serialize};
+
 
 #[derive(Clone, Debug)]
 pub struct Job {
@@ -25,7 +27,7 @@ pub struct AppState {
     pub bankai: Arc<BankaiClient>,
 }
 
-#[derive(Debug, FromSql, ToSql, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, FromSql, ToSql, Clone, Eq, Hash, PartialEq, Serialize)]
 #[postgres(name = "job_status")]
 pub enum JobStatus {
     #[postgres(name = "CREATED")]
@@ -107,7 +109,7 @@ impl FromStr for JobStatus {
     }
 }
 
-#[derive(Debug, FromSql, ToSql, Clone)]
+#[derive(Debug, FromSql, ToSql, Clone, Serialize)]
 pub enum JobType {
     //EpochUpdate,
     EpochBatchUpdate,

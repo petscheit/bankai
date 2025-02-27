@@ -13,6 +13,7 @@ use alloy_primitives::{
     hex::{FromHex, ToHexExt},
     FixedBytes,
 };
+use serde::{Deserialize, Serialize};
 
 use starknet::core::types::Felt;
 
@@ -35,7 +36,7 @@ pub struct EpochDecommitmentData {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct JobSchema {
     pub job_uuid: uuid::Uuid,
     pub job_status: JobStatus,
@@ -43,6 +44,7 @@ pub struct JobSchema {
     pub batch_range_begin_epoch: i64,
     pub batch_range_end_epoch: i64,
     pub job_type: JobType,
+    pub tx_hash: Option<String>,
     pub atlantic_proof_generate_batch_id: Option<String>,
     pub atlantic_proof_wrapper_batch_id: Option<String>,
     pub failed_at_step: Option<JobStatus>,
@@ -1128,6 +1130,8 @@ impl DatabaseManager {
                 .get::<&str, Option<i64>>("batch_range_end_epoch")
                 .unwrap_or(0),
             job_type,
+            tx_hash: row
+                .get("tx_hash"),
             atlantic_proof_generate_batch_id: row.get("atlantic_proof_generate_batch_id"),
             atlantic_proof_wrapper_batch_id: row.get("atlantic_proof_wrapper_batch_id"),
             failed_at_step,
