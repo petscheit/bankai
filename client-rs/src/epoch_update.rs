@@ -1,11 +1,13 @@
 use std::fs;
 
 use crate::{
+    constants,
     execution_header::ExecutionHeaderProof,
     traits::{ProofType, Provable, Submittable},
     utils::{hashing::get_committee_hash, rpc::BeaconRpcClient},
     Error,
 };
+
 use alloy_primitives::FixedBytes;
 use alloy_rpc_types_beacon::{
     events::light_client_finality::SyncAggregate, header::HeaderResponse,
@@ -15,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use starknet::{core::types::Felt, macros::selector};
 use starknet_crypto::poseidon_hash_many;
+use tracing::info;
 use tree_hash::TreeHash;
 use tree_hash_derive::TreeHash;
 
@@ -32,6 +35,17 @@ impl EpochUpdate {
             circuit_inputs,
             expected_circuit_outputs,
         })
+    }
+}
+
+impl EpochUpdate {
+    pub fn from_json<T>(slot: u64) -> Result<T, Error>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let path = format!("batches/epoch/{}/input_{}.json", slot, slot);
+        let json = fs::read_to_string(path).map_err(Error::IoError)?;
+        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
     }
 }
 
@@ -55,15 +69,6 @@ impl Provable for EpochUpdate {
         Ok(path)
     }
 
-    fn from_json<T>(slot: u64) -> Result<T, Error>
-    where
-        T: serde::de::DeserializeOwned,
-    {
-        let path = format!("batches/epoch/{}/input_{}.json", slot, slot);
-        let json = fs::read_to_string(path).map_err(Error::IoError)?;
-        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
-    }
-
     fn pie_path(&self) -> String {
         format!(
             "batches/epoch/{}/pie_{}.zip",
@@ -73,6 +78,13 @@ impl Provable for EpochUpdate {
 
     fn proof_type(&self) -> ProofType {
         ProofType::Epoch
+    }
+
+    fn inputs_path(&self) -> String {
+        format!(
+            "batches/epoch/{}/input_{}.json",
+            self.circuit_inputs.header.slot, self.circuit_inputs.header.slot
+        )
     }
 }
 
@@ -163,18 +175,22 @@ impl EpochCircuitInputs {
         mut slot: u64,
     ) -> Result<EpochCircuitInputs, Error> {
         let mut attempts = 0;
-        const MAX_ATTEMPTS: u8 = 3;
 
         let header = loop {
             match client.get_header(slot).await {
                 Ok(header) => break header,
                 Err(Error::EmptySlotDetected(_)) => {
                     attempts += 1;
-                    if attempts >= MAX_ATTEMPTS {
+                    if attempts >= constants::MAX_SKIPPED_SLOTS_RETRY_ATTEMPTS {
                         return Err(Error::EmptySlotDetected(slot));
                     }
                     slot += 1;
-                    println!("Empty slot detected! Attempt {}/{}. Fetching slot: {}", attempts, MAX_ATTEMPTS, slot);
+                    info!(
+                        "Empty slot detected! Attempt {}/{}. Fetching slot: {}",
+                        attempts,
+                        constants::MAX_SKIPPED_SLOTS_RETRY_ATTEMPTS,
+                        slot
+                    );
                 }
                 Err(e) => return Err(e), // Propagate other errors immediately
             }
@@ -182,7 +198,6 @@ impl EpochCircuitInputs {
 
         let sync_agg = client.get_sync_aggregate(slot).await?;
         let validator_pubs = client.get_sync_committee_validator_pubs(slot).await?;
-
         // Process the sync committee data
         let signature_point = Self::extract_signature_point(&sync_agg)?;
         let non_signers = Self::derive_non_signers(&sync_agg, &validator_pubs);
