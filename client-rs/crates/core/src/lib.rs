@@ -8,9 +8,10 @@ use crate::utils::constants;
 use crate::{
     clients::atlantic::AtlanticClient, clients::beacon_chain::BeaconRpcClient,
     clients::starknet::StarknetClient, clients::transactor::TransactorClient,
-    types::contract::contract_init::ContractInitializationData, types::error::BankaiCoreError,
-    types::proofs::epoch_update::EpochUpdate, types::proofs::sync_committee::SyncCommitteeUpdate,
-    utils::config::BankaiConfig, types::proofs::ProofError, types::contract::ContractError,
+    types::contract::contract_init::ContractInitializationData, types::contract::ContractError,
+    types::error::BankaiCoreError, types::proofs::epoch_update::EpochUpdate,
+    types::proofs::sync_committee::SyncCommitteeUpdate, types::proofs::ProofError,
+    utils::config::BankaiConfig,
 };
 use clients::beacon_chain::BeaconError;
 use clients::ClientError;
@@ -65,7 +66,9 @@ impl BankaiClient {
                 Err(BeaconError::EmptySlot(_)) => {
                     attempts += 1;
                     if attempts >= constants::MAX_SKIPPED_SLOTS_RETRY_ATTEMPTS {
-                        return Err(BankaiCoreError::Client(ClientError::Beacon(BeaconError::EmptySlot(slot))));
+                        return Err(BankaiCoreError::Client(ClientError::Beacon(
+                            BeaconError::EmptySlot(slot),
+                        )));
                     }
                     slot += 1;
                     info!(
@@ -79,13 +82,17 @@ impl BankaiClient {
             }
         };
 
-        let proof = SyncCommitteeUpdate::new(&self.client, slot).await.map_err(|e| BankaiCoreError::Proof(ProofError::SyncCommittee(e)))?;
+        let proof = SyncCommitteeUpdate::new(&self.client, slot)
+            .await
+            .map_err(|e| BankaiCoreError::Proof(ProofError::SyncCommittee(e)))?;
 
         Ok(proof)
     }
 
     pub async fn get_epoch_proof(&self, slot: u64) -> Result<EpochUpdate, BankaiCoreError> {
-        let epoch_proof = EpochUpdate::new(&self.client, slot).await.map_err(|e| BankaiCoreError::Proof(ProofError::EpochUpdate(e)))?;
+        let epoch_proof = EpochUpdate::new(&self.client, slot)
+            .await
+            .map_err(|e| BankaiCoreError::Proof(ProofError::EpochUpdate(e)))?;
         Ok(epoch_proof)
     }
 
@@ -94,7 +101,9 @@ impl BankaiClient {
         slot: u64,
         config: &BankaiConfig,
     ) -> Result<ContractInitializationData, BankaiCoreError> {
-        let contract_init = ContractInitializationData::new(&self.client, slot, config).await.map_err(|e| BankaiCoreError::Contract(ContractError::Initialization(e)))?;
+        let contract_init = ContractInitializationData::new(&self.client, slot, config)
+            .await
+            .map_err(|e| BankaiCoreError::Contract(ContractError::Initialization(e)))?;
         Ok(contract_init)
     }
 }

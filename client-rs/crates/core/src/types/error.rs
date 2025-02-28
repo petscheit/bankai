@@ -1,7 +1,9 @@
 use thiserror::Error;
 
 use crate::{
-    clients::ClientError, db::manager::DatabaseError, types::{contract::ContractError, proofs::ProofError},
+    clients::ClientError,
+    db::manager::DatabaseError,
+    types::{contract::ContractError, proofs::ProofError},
     utils::UtilsError,
 };
 

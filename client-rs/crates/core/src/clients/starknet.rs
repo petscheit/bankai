@@ -1,3 +1,9 @@
+//! StarkNet Client Implementation
+//! 
+//! This module provides a high-level client for interacting with the StarkNet blockchain.
+//! It handles contract deployment, transaction submission, and various query operations
+//! through a StarkNet RPC endpoint.
+
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info};
@@ -27,12 +33,18 @@ use crate::{
 };
 use thiserror::Error;
 
+/// Main client struct for interacting with StarkNet
+/// 
+/// Provides high-level access to StarkNet operations through a connected account.
+/// The client handles transaction signing, submission and status tracking.
 #[derive(Debug)]
 pub struct StarknetClient {
+    /// Connected account with signing capabilities
     account: Arc<SingleOwnerAccount<JsonRpcClient<HttpTransport>, LocalWallet>>,
     // provider: Arc<JsonRpcClient<HttpTransport>>,
 }
 
+/// Possible errors that can occur during StarkNet operations
 #[derive(Debug, Error)]
 pub enum StarknetError {
     #[error("Provider error: {0}")]
@@ -54,6 +66,15 @@ pub enum StarknetError {
 }
 
 impl StarknetClient {
+    /// Creates a new StarkNet client instance
+    ///
+    /// # Arguments
+    /// * `rpc_url` - URL of the StarkNet RPC endpoint
+    /// * `address` - Account address in hex format
+    /// * `priv_key` - Private key in hex format
+    ///
+    /// # Returns
+    /// * `Result<Self, StarknetError>` - New client instance or error
     pub async fn new(rpc_url: &str, address: &str, priv_key: &str) -> Result<Self, StarknetError> {
         let url = Url::parse(rpc_url).map_err(|_| StarknetError::UrlParseError)?;
         let provider = JsonRpcClient::new(HttpTransport::new(url));
@@ -75,6 +96,14 @@ impl StarknetClient {
         })
     }
 
+    /// Deploys a new contract to StarkNet
+    ///
+    /// # Arguments
+    /// * `init_data` - Contract initialization data
+    /// * `config` - Configuration containing contract details
+    ///
+    /// # Returns
+    /// * `Result<Felt, StarknetError>` - Contract address or error
     pub async fn deploy_contract(
         &self,
         init_data: ContractInitializationData,
@@ -115,6 +144,14 @@ impl StarknetClient {
         }
     }
 
+    /// Submits an update transaction to a deployed contract
+    ///
+    /// # Arguments
+    /// * `update` - Update data implementing the Submittable trait
+    /// * `config` - Configuration containing contract address
+    ///
+    /// # Returns
+    /// * `Result<Felt, StarknetError>` - Transaction hash or error
     pub async fn submit_update<T>(
         &self,
         update: impl Submittable<T>,
@@ -139,14 +176,22 @@ impl StarknetClient {
             }
             Err(e) => {
                 error!("Transaction execution error: {:#?}", e);
-                return Err(StarknetError::TransactionError(format!(
+                Err(StarknetError::TransactionError(format!(
                     "TransactionExecutionError: {:#?}",
                     e
-                )));
+                )))
             }
         }
     }
 
+    /// Retrieves the committee hash for a given slot
+    ///
+    /// # Arguments
+    /// * `slot` - Slot number to query
+    /// * `config` - Configuration containing contract address
+    ///
+    /// # Returns
+    /// * `Result<Vec<Felt>, StarknetError>` - Committee hash or error
     pub async fn get_committee_hash(
         &self,
         slot: u64,
@@ -169,6 +214,14 @@ impl StarknetClient {
         Ok(committee_hash)
     }
 
+    /// Retrieves epoch proof for a given slot
+    ///
+    /// # Arguments
+    /// * `slot` - Slot number to query
+    /// * `config` - Configuration containing contract address
+    ///
+    /// # Returns
+    /// * `Result<EpochProof, StarknetError>` - Epoch proof or error
     pub async fn get_epoch_proof(
         &self,
         slot: u64,
@@ -190,6 +243,13 @@ impl StarknetClient {
         Ok(EpochProof::from_contract_return_value(epoch_proof).unwrap())
     }
 
+    /// Gets the latest epoch slot number from the contract
+    ///
+    /// # Arguments
+    /// * `config` - Configuration containing contract address
+    ///
+    /// # Returns
+    /// * `Result<Felt, StarknetError>` - Latest epoch slot or error
     pub async fn get_latest_epoch_slot(
         &self,
         config: &BankaiConfig,
@@ -209,7 +269,13 @@ impl StarknetClient {
         Ok(*latest_epoch.first().unwrap())
     }
 
-    // Computes the slot numbers for the current term.
+    /// Computes the slot range for the current term
+    ///
+    /// # Arguments
+    /// * `config` - Configuration containing contract address
+    ///
+    /// # Returns
+    /// * `Result<(u64, u64), StarknetError>` - Tuple of (next_epoch_slot, terms_last_epoch_slot)
     pub async fn get_batching_range(
         &self,
         config: &BankaiConfig,
@@ -221,6 +287,13 @@ impl StarknetClient {
         Ok((next_epoch_slot, terms_last_epoch_slot))
     }
 
+    /// Gets the latest committee ID from the contract
+    ///
+    /// # Arguments
+    /// * `config` - Configuration containing contract address
+    ///
+    /// # Returns
+    /// * `Result<Felt, StarknetError>` - Latest committee ID or error
     pub async fn get_latest_committee_id(
         &self,
         config: &BankaiConfig,
@@ -241,6 +314,13 @@ impl StarknetClient {
         Ok(*latest_committee_id.first().unwrap())
     }
 
+    /// Waits for transaction confirmation with retries
+    ///
+    /// # Arguments
+    /// * `tx_hash` - Transaction hash to monitor
+    ///
+    /// # Returns
+    /// * `Result<(), StarknetError>` - Success or error after max retries
     pub async fn wait_for_confirmation(&self, tx_hash: Felt) -> Result<(), StarknetError> {
         let max_retries = constants::STARKNET_TX_CONFIRMATION_MAX_RETRIES;
         let delay = Duration::from_secs(constants::STARKNET_TX_CONFIRMATION_CHECK_DELAY);
@@ -286,6 +366,13 @@ impl StarknetClient {
         Err(StarknetError::TimeoutError)
     }
 
+    /// Gets the current status of a transaction
+    ///
+    /// # Arguments
+    /// * `tx_hash` - Transaction hash to query
+    ///
+    /// # Returns
+    /// * `Result<TransactionStatus, StarknetError>` - Transaction status or error
     pub async fn get_transaction_status(
         &self,
         tx_hash: Felt,

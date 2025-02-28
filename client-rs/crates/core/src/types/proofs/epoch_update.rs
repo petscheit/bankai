@@ -1,3 +1,9 @@
+//! Epoch Update Processing Implementation
+//! 
+//! This module handles individual epoch updates and their verification on the StarkNet blockchain.
+//! It provides functionality to process beacon chain headers, sync committee signatures, and execution
+//! payload proofs, generating the necessary data for verification on StarkNet.
+
 use std::fs;
 
 use crate::{
@@ -28,16 +34,29 @@ use tree_hash_derive::TreeHash;
 
 use super::{execution_header::ExecutionHeaderError, ProofError};
 
+/// Represents a verified epoch proof from StarkNet
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochProof {
+    /// Root hash of the beacon chain header
     pub header_root: FixedBytes<32>,
+    /// Root hash of the beacon chain state
     pub state_root: FixedBytes<32>,
+    /// Number of validators who signed
     pub n_signers: u64,
+    /// Hash of the execution payload header
     pub execution_hash: FixedBytes<32>,
+    /// Block height of the execution payload
     pub execution_height: u64,
 }
 
 impl EpochProof {
+    /// Creates an EpochProof from StarkNet contract return data
+    ///
+    /// # Arguments
+    /// * `calldata` - Vector of field elements returned from the contract
+    ///
+    /// # Returns
+    /// * `Result<Self, String>` - Constructed proof or error message
     pub fn from_contract_return_value(calldata: Vec<Felt>) -> Result<Self, String> {
         if calldata.len() != 8 {
             return Err("Invalid return value length. Expected 8 elements.".to_string());
@@ -59,10 +78,14 @@ impl EpochProof {
     }
 }
 
+/// Contains decommitment data for epoch verification
 #[derive(Debug)]
 pub struct EpochDecommitmentData {
+    /// Expected outputs from the epoch update
     pub epoch_update_outputs: ExpectedEpochUpdateOutputs,
+    /// Root hash of the batch containing this epoch
     pub batch_root: Felt,
+    /// Index of this epoch
     pub epoch_index: u64,
 }
 
@@ -77,13 +100,24 @@ fn combine_to_fixed_bytes(high: Felt, low: Felt) -> Result<FixedBytes<32>, Strin
     Ok(FixedBytes::from_slice(bytes.as_slice()))
 }
 
+/// Represents a single epoch update with its inputs and expected outputs
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdate {
+    /// Input data for the epoch circuit
     pub circuit_inputs: EpochCircuitInputs,
+    /// Expected outputs after processing
     pub expected_circuit_outputs: ExpectedEpochUpdateOutputs,
 }
 
 impl EpochUpdate {
+    /// Creates a new epoch update for a given slot
+    ///
+    /// # Arguments
+    /// * `client` - Reference to the beacon chain client
+    /// * `slot` - Slot number to create update for
+    ///
+    /// # Returns
+    /// * `Result<Self, EpochUpdateError>` - New epoch update or error
     pub async fn new(client: &BeaconRpcClient, slot: u64) -> Result<Self, EpochUpdateError> {
         let circuit_inputs = EpochCircuitInputs::generate_epoch_proof(client, slot).await?;
         let expected_circuit_outputs = ExpectedEpochUpdateOutputs::from_inputs(&circuit_inputs);
@@ -186,7 +220,10 @@ pub struct SyncCommitteeValidatorPubs {
 }
 
 impl SyncCommitteeValidatorPubs {
-    // computes the committee hash we use thoughout the project to identify the committee
+    /// Computes the committee hash used throughout the project
+    ///
+    /// # Returns
+    /// * `FixedBytes<32>` - Hash identifying the committee
     pub fn get_committee_hash(&self) -> FixedBytes<32> {
         get_committee_hash(self.aggregate_pub)
     }
@@ -227,6 +264,14 @@ impl From<Vec<String>> for SyncCommitteeValidatorPubs {
 }
 
 impl EpochCircuitInputs {
+    /// Generates an epoch proof by fetching and processing beacon chain data
+    ///
+    /// # Arguments
+    /// * `client` - Reference to the beacon chain client
+    /// * `slot` - Slot number to generate proof for
+    ///
+    /// # Returns
+    /// * `Result<EpochCircuitInputs, EpochUpdateError>` - Generated inputs or error
     pub(crate) async fn generate_epoch_proof(
         client: &BeaconRpcClient,
         mut slot: u64,
@@ -277,6 +322,12 @@ impl EpochCircuitInputs {
     }
 
     /// Extracts and validates the BLS signature point from the sync aggregate
+    ///
+    /// # Arguments
+    /// * `sync_agg` - Sync aggregate containing the signature
+    ///
+    /// # Returns
+    /// * `Result<G2Point, EpochUpdateError>` - Validated signature point or error
     fn extract_signature_point(sync_agg: &SyncAggregate) -> Result<G2Point, EpochUpdateError> {
         let mut bytes = [0u8; 96];
         bytes.copy_from_slice(&sync_agg.sync_committee_signature.0);
@@ -287,7 +338,13 @@ impl EpochCircuitInputs {
     }
 
     /// Identifies validators who didn't sign the sync committee message
-    /// Returns their public keys as G1Affine points
+    ///
+    /// # Arguments
+    /// * `sync_aggregate` - Sync aggregate containing participation bits
+    /// * `validator_pubs` - Public keys of all validators
+    ///
+    /// # Returns
+    /// * `Vec<G1Affine>` - Public keys of non-signing validators
     fn derive_non_signers(
         sync_aggregate: &SyncAggregate,
         validator_pubs: &SyncCommitteeValidatorPubs,
@@ -302,7 +359,12 @@ impl EpochCircuitInputs {
     }
 
     /// Converts a byte array of participation bits into a boolean array
-    /// Each bit represents whether a validator signed (true) or didn't sign (false)
+    ///
+    /// # Arguments
+    /// * `bits` - Byte array of participation bits
+    ///
+    /// # Returns
+    /// * `Vec<bool>` - Array where true indicates a validator signed
     fn convert_bits_to_bool_array(bits: &[u8]) -> Vec<bool> {
         bits.iter()
             .flat_map(|byte| (0..8).map(move |i| (byte & (1 << i)) != 0))
@@ -322,12 +384,18 @@ impl From<HeaderResponse> for BeaconHeader {
     }
 }
 
+/// Point on the G1 curve used for public keys
 #[derive(Debug)]
 pub struct G1Point(pub G1Affine);
+
+/// Point on the G2 curve used for signatures
 #[derive(Debug)]
 pub struct G2Point(pub G2Affine);
 
 impl Serialize for G1Point {
+    /// Serializes a G1 point to its uncompressed form
+    ///
+    /// Outputs x and y coordinates as hex strings
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -348,6 +416,9 @@ impl Serialize for G1Point {
 }
 
 impl Serialize for G2Point {
+    /// Serializes a G2 point to its uncompressed form
+    ///
+    /// Outputs x0, x1, y0, y1 coordinates as hex strings
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -372,6 +443,9 @@ impl Serialize for G2Point {
 }
 
 impl<'de> Deserialize<'de> for G1Point {
+    /// Deserializes a G1 point from its uncompressed form
+    ///
+    /// Expects x and y coordinates as hex strings
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -409,6 +483,9 @@ impl<'de> Deserialize<'de> for G1Point {
 }
 
 impl<'de> Deserialize<'de> for G2Point {
+    /// Deserializes a G2 point from its uncompressed form
+    ///
+    /// Expects x0, x1, y0, y1 coordinates as hex strings
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -460,18 +537,30 @@ impl<'de> Deserialize<'de> for G2Point {
     }
 }
 
+/// Expected outputs after processing an epoch update
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExpectedEpochUpdateOutputs {
+    /// Root hash of the beacon chain header
     pub beacon_header_root: FixedBytes<32>,
+    /// Root hash of the beacon chain state
     pub beacon_state_root: FixedBytes<32>,
+    /// Slot number of the epoch
     pub slot: u64,
+    /// Hash of the sync committee
     pub committee_hash: FixedBytes<32>,
+    /// Number of validators who signed
     pub n_signers: u64,
+    /// Hash of the execution payload header
     pub execution_header_hash: FixedBytes<32>,
+    /// Block height of the execution payload
     pub execution_header_height: u64,
 }
 
 impl ExpectedEpochUpdateOutputs {
+    /// Computes the Poseidon hash of the outputs
+    ///
+    /// # Returns
+    /// * `Felt` - Hash of the outputs as a field element
     pub fn hash(&self) -> Felt {
         let felts = self.to_calldata();
         poseidon_hash_many(&felts)
@@ -479,6 +568,13 @@ impl ExpectedEpochUpdateOutputs {
 }
 
 impl Submittable<EpochCircuitInputs> for ExpectedEpochUpdateOutputs {
+    /// Creates expected outputs from circuit inputs
+    ///
+    /// # Arguments
+    /// * `circuit_inputs` - Input data for the epoch circuit
+    ///
+    /// # Returns
+    /// * `Self` - Expected outputs after processing
     fn from_inputs(circuit_inputs: &EpochCircuitInputs) -> Self {
         let block_hash: FixedBytes<32> = FixedBytes::from_slice(
             circuit_inputs
@@ -502,6 +598,10 @@ impl Submittable<EpochCircuitInputs> for ExpectedEpochUpdateOutputs {
         }
     }
 
+    /// Converts the outputs to calldata format for contract interaction
+    ///
+    /// # Returns
+    /// * `Vec<Felt>` - Calldata as field elements
     fn to_calldata(&self) -> Vec<Felt> {
         let (header_root_high, header_root_low) = self.beacon_header_root.as_slice().split_at(16);
         let (beacon_state_root_high, beacon_state_root_low) =
@@ -524,25 +624,37 @@ impl Submittable<EpochCircuitInputs> for ExpectedEpochUpdateOutputs {
         ]
     }
 
+    /// Gets the contract selector for epoch verification
+    ///
+    /// # Returns
+    /// * `Felt` - Contract selector as a field element
     fn get_contract_selector(&self) -> Felt {
         selector!("verify_epoch_update")
     }
 }
 
+/// Possible errors that can occur during epoch update operations
 #[derive(Debug, Error)]
 pub enum EpochUpdateError {
+    /// Error during Cairo program execution
     #[error("Cairo run error: {0}")]
     CairoRun(#[from] CairoRunnerError),
+    /// Database operation error
     #[error("Database error: {0}")]
     Database(#[from] DatabaseError),
+    /// File system operation error
     #[error("Io error: {0}")]
     Io(#[from] std::io::Error),
+    /// JSON serialization/deserialization error
     #[error("Deserialize error: {0}")]
     Deserialize(#[from] serde_json::Error),
+    /// Client communication error
     #[error("Beacon error: {0}")]
     Client(#[from] ClientError),
+    /// Error processing execution header
     #[error("Execution header error: {0}")]
     ExecutionHeader(#[from] ExecutionHeaderError),
+    /// Invalid BLS cryptographic point
     #[error("Invalid BLS point")]
     InvalidBLSPoint,
 }

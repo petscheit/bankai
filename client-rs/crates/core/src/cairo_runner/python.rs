@@ -10,7 +10,10 @@ use uuid::Uuid;
 
 use crate::{
     db::manager::DatabaseManager,
-    types::{job::JobStatus, proofs::ProofError, traits::{ProofType, Provable}},
+    types::{
+        job::JobStatus,
+        traits::{ProofType, Provable},
+    },
     utils::config::BankaiConfig,
 };
 
@@ -40,7 +43,9 @@ impl CairoRunner {
             }
         }
 
-        let input_path = input.export().map_err(|e| CairoRunnerError::Run(e.to_string()))?;
+        let input_path = input
+            .export()
+            .map_err(|e| CairoRunnerError::Run(e.to_string()))?;
 
         let program_path = match input.proof_type() {
             ProofType::Epoch => config.epoch_circuit_path.clone(),

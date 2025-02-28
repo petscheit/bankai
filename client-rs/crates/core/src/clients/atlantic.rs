@@ -1,3 +1,9 @@
+//! Atlantic Client Module
+//! 
+//! This module provides functionality to interact with the Atlantic API for proof generation
+//! and verification. It handles file uploads, proof submissions, and status polling for
+//! batch processing operations.
+
 use std::{env, path::PathBuf};
 
 use futures::StreamExt;
@@ -14,10 +20,12 @@ use tokio::{
 use tokio_util::io::ReaderStream;
 use tracing::{debug, error, info, trace};
 
-use crate::{
-    types::traits::{ProofType, Provable},
-};
+use crate::types::traits::{ProofType, Provable};
 
+/// Client for interacting with the Atlantic API service.
+/// 
+/// Provides methods for submitting proofs, checking batch statuses,
+/// and retrieving generated proofs from the Atlantic service.
 #[derive(Debug)]
 pub struct AtlanticClient {
     endpoint: String,
@@ -25,28 +33,41 @@ pub struct AtlanticClient {
     pub client: reqwest::Client,
 }
 
+/// Represents a STARK proof structure returned by the Atlantic service.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StarkProof {
     pub proof: serde_json::Value,
 }
 
+/// Possible errors that can occur during Atlantic API operations.
 #[derive(Debug, Error)]
 pub enum AtlanticError {
+    /// IO-related errors
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+    /// HTTP request errors
     #[error("Atlantic error: {0}")]
     Request(#[from] reqwest::Error),
+    /// Invalid API response errors
     #[error("Invalid response: {0}")]
     InvalidResponse(String),
+    /// Errors during proof processing
     #[error("Atlantic processing error: {0}")]
     AtlanticProcessingError(String),
+    /// Timeout errors during batch processing
     #[error("Pooling timeout for batch: {0}")]
     AtlanticPoolingTimeout(String),
+    /// JSON decoding errors
     #[error("Decoding Error: {0}")]
     Decoding(#[from] serde_json::Error),
 }
 
 impl AtlanticClient {
+    /// Creates a new Atlantic client instance.
+    /// 
+    /// # Arguments
+    /// * `endpoint` - The base URL for the Atlantic API
+    /// * `api_key` - Authentication key for API access
     pub fn new(endpoint: String, api_key: String) -> Self {
         Self {
             endpoint,
@@ -55,6 +76,16 @@ impl AtlanticClient {
         }
     }
 
+    /// Submits a batch for proof generation.
+    /// 
+    /// Uploads a PIE file to the Atlantic API and initiates proof generation.
+    /// Displays progress during file upload.
+    /// 
+    /// # Arguments
+    /// * `batch` - The batch implementing the Provable trait
+    /// 
+    /// # Returns
+    /// * `Result<String, AtlanticError>` - The Atlantic query ID on success
     pub async fn submit_batch(&self, batch: impl Provable) -> Result<String, AtlanticError> {
         let pie_path: PathBuf = batch.pie_path().into();
 
@@ -92,12 +123,6 @@ impl AtlanticClient {
             },
         );
 
-        // Read the file as bytes
-        // let file_bytes = fs::read(&pie_path).map_err(Error::IoError)?;
-        // let file_part = Part::bytes(file_bytes)
-        //     .file_name(pie_path) // Provide a filename
-        //     .mime_str("application/zip") // Specify MIME type
-        //     .map_err(Error::AtlanticError)?;
         let file_part = Part::stream(Body::wrap_stream(progress_stream))
             .file_name(
                 pie_path
@@ -150,6 +175,13 @@ impl AtlanticClient {
             .to_string())
     }
 
+    /// Submits a wrapped proof to the Atlantic API.
+    /// 
+    /// # Arguments
+    /// * `proof` - The STARK proof to be wrapped
+    /// 
+    /// # Returns
+    /// * `Result<String, AtlanticError>` - The Atlantic query ID on success
     pub async fn submit_wrapped_proof(&self, proof: StarkProof) -> Result<String, AtlanticError> {
         info!("Uploading to Atlantic...");
         // Serialize the proof to JSON string
@@ -198,6 +230,13 @@ impl AtlanticClient {
             .to_string())
     }
 
+    /// Fetches a generated proof from the proof registry.
+    /// 
+    /// # Arguments
+    /// * `batch_id` - The ID of the batch to fetch the proof for
+    /// 
+    /// # Returns
+    /// * `Result<StarkProof, AtlanticError>` - The generated STARK proof
     pub async fn fetch_proof(&self, batch_id: &str) -> Result<StarkProof, AtlanticError> {
         let response = self
             .client
@@ -210,14 +249,20 @@ impl AtlanticClient {
             .send()
             .await?;
 
-        let response_data: serde_json::Value =
-            response.json().await?;
+        let response_data: serde_json::Value = response.json().await?;
 
         Ok(StarkProof {
             proof: response_data,
         })
     }
 
+    /// Checks the current status of a batch processing request.
+    /// 
+    /// # Arguments
+    /// * `batch_id` - The ID of the batch to check
+    /// 
+    /// # Returns
+    /// * `Result<String, AtlanticError>` - The current status of the batch
     pub async fn check_batch_status(&self, batch_id: &str) -> Result<String, AtlanticError> {
         let response = self
             .client
@@ -236,6 +281,15 @@ impl AtlanticClient {
         Ok(status.to_string())
     }
 
+    /// Polls the batch status until completion or failure.
+    /// 
+    /// # Arguments
+    /// * `batch_id` - The ID of the batch to poll
+    /// * `sleep_duration` - Duration to wait between polling attempts
+    /// * `max_retries` - Maximum number of polling attempts
+    /// 
+    /// # Returns
+    /// * `Result<bool, AtlanticError>` - True if batch completed successfully
     pub async fn poll_batch_status_until_done(
         &self,
         batch_id: &str,
@@ -267,9 +321,9 @@ impl AtlanticClient {
             sleep(sleep_duration).await;
         }
 
-        return Err(AtlanticError::AtlanticPoolingTimeout(format!(
+        Err(AtlanticError::AtlanticPoolingTimeout(format!(
             "Pooling timeout for batch {}",
             batch_id
-        )));
+        )))
     }
 }

@@ -1,3 +1,9 @@
+//! Epoch Batch Processing Implementation
+//! 
+//! This module handles the batching of epoch updates for efficient processing and verification.
+//! It provides functionality to create, manage, and process batches of epoch updates,
+//! including merkle tree generation and proof verification.
+
 use crate::{
     cairo_runner::python::CairoRunnerError,
     clients::ClientError,
@@ -34,26 +40,46 @@ use tracing::{debug, info, trace};
 
 use super::{epoch_update::EpochUpdateError, ProofError};
 
+/// Represents a batch of epoch updates with associated proofs
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdateBatch {
+    /// Input data for the batch processing
     pub circuit_inputs: EpochUpdateBatchInputs,
+    /// Expected outputs after batch processing
     pub expected_circuit_outputs: ExpectedEpochBatchOutputs,
+    /// Merkle paths for verification
     pub merkle_paths: Vec<Vec<Felt>>,
 }
 
+/// Input data for batch processing of epoch updates
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdateBatchInputs {
+    /// Hash of the committee for this batch
     pub committee_hash: FixedBytes<32>,
+    /// List of epoch updates to process
     pub epochs: Vec<EpochUpdate>,
 }
 
+/// Expected outputs after batch processing
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExpectedEpochBatchOutputs {
+    /// Root hash of the batch merkle tree
     pub batch_root: Felt,
+    /// Output data from the latest epoch in the batch
     pub latest_batch_output: ExpectedEpochUpdateOutputs,
 }
 
 impl EpochUpdateBatch {
+    /// Creates a new epoch update batch
+    ///
+    /// Fetches epoch data from the start slot to end slot and creates a batch
+    /// with appropriate merkle proofs.
+    ///
+    /// # Arguments
+    /// * `bankai` - Reference to the Bankai client
+    ///
+    /// # Returns
+    /// * `Result<EpochUpdateBatch, EpochBatchError>` - New batch or error
     pub async fn new(bankai: &BankaiClient) -> Result<EpochUpdateBatch, EpochBatchError> {
         let (start_slot, mut end_slot) = bankai
             .starknet_client
@@ -124,6 +150,17 @@ impl EpochUpdateBatch {
         Ok(batch)
     }
 
+    /// Creates a new epoch update batch for a specific epoch range
+    ///
+    /// # Arguments
+    /// * `bankai` - Reference to the Bankai client
+    /// * `db_manager` - Reference to the database manager
+    /// * `start_epoch` - First epoch in the range
+    /// * `end_epoch` - Last epoch in the range
+    /// * `job_id` - UUID of the associated job
+    ///
+    /// # Returns
+    /// * `Result<EpochUpdateBatch, EpochBatchError>` - New batch or error
     pub(crate) async fn new_by_epoch_range(
         bankai: &BankaiClient,
         db_manager: Arc<DatabaseManager>,
@@ -212,6 +249,14 @@ impl EpochUpdateBatch {
 }
 
 impl EpochUpdateBatch {
+    /// Loads batch data from a JSON file
+    ///
+    /// # Arguments
+    /// * `first_epoch` - First epoch in the batch
+    /// * `last_epoch` - Last epoch in the batch
+    ///
+    /// # Returns
+    /// * `Result<T, EpochBatchError>` - Deserialized data or error
     pub fn from_json<T>(first_epoch: u64, last_epoch: u64) -> Result<T, EpochBatchError>
     where
         T: serde::de::DeserializeOwned,
@@ -244,6 +289,10 @@ impl EpochUpdateBatch {
 }
 
 impl Provable for EpochUpdateBatch {
+    /// Generates a unique identifier for the batch
+    ///
+    /// # Returns
+    /// * `String` - Unique identifier based on batch root
     fn id(&self) -> String {
         let mut hasher = Sha256::new();
         hasher.update(b"epoch_update_batch");
@@ -251,6 +300,10 @@ impl Provable for EpochUpdateBatch {
         hex::encode(hasher.finalize().as_slice())
     }
 
+    /// Exports the batch data to a JSON file
+    ///
+    /// # Returns
+    /// * `Result<String, ProofError>` - Path to the exported file or error
     fn export(&self) -> Result<String, ProofError> {
         let json = serde_json::to_string_pretty(&self).unwrap();
         let first_slot = self
@@ -281,10 +334,18 @@ impl Provable for EpochUpdateBatch {
         Ok(path)
     }
 
+    /// Gets the type of proof for this batch
+    ///
+    /// # Returns
+    /// * `ProofType` - Type of proof (EpochBatch)
     fn proof_type(&self) -> ProofType {
         ProofType::EpochBatch
     }
 
+    /// Gets the path to the PIE file for this batch
+    ///
+    /// # Returns
+    /// * `String` - Path to the PIE file
     fn pie_path(&self) -> String {
         let first_slot = self
             .circuit_inputs
@@ -310,6 +371,10 @@ impl Provable for EpochUpdateBatch {
         )
     }
 
+    /// Gets the path to the inputs file for this batch
+    ///
+    /// # Returns
+    /// * `String` - Path to the inputs file
     fn inputs_path(&self) -> String {
         let first_slot = self
             .circuit_inputs
@@ -337,10 +402,18 @@ impl Provable for EpochUpdateBatch {
 }
 
 impl Submittable<EpochUpdateBatchInputs> for ExpectedEpochBatchOutputs {
+    /// Gets the contract selector for batch verification
+    ///
+    /// # Returns
+    /// * `Felt` - Contract selector
     fn get_contract_selector(&self) -> Felt {
         selector!("verify_epoch_batch")
     }
 
+    /// Converts the batch outputs to calldata format
+    ///
+    /// # Returns
+    /// * `Vec<Felt>` - Calldata for contract interaction
     fn to_calldata(&self) -> Vec<Felt> {
         let (header_root_high, header_root_low) = self
             .latest_batch_output
@@ -378,6 +451,13 @@ impl Submittable<EpochUpdateBatchInputs> for ExpectedEpochBatchOutputs {
         ]
     }
 
+    /// Creates expected outputs from batch inputs
+    ///
+    /// # Arguments
+    /// * `circuit_inputs` - Batch input data
+    ///
+    /// # Returns
+    /// * `Self` - Expected outputs
     fn from_inputs(circuit_inputs: &EpochUpdateBatchInputs) -> Self {
         let epoch_hashes = circuit_inputs
             .epochs
@@ -401,22 +481,31 @@ impl Submittable<EpochUpdateBatchInputs> for ExpectedEpochBatchOutputs {
     }
 }
 
+/// Possible errors that can occur during epoch batch operations
 #[derive(Debug, Error)]
 pub enum EpochBatchError {
+    /// Error during Cairo program execution
     #[error("Cairo run error: {0}")]
     CairoRun(#[from] CairoRunnerError),
+    /// Database operation error
     #[error("Database error: {0}")]
     Database(#[from] DatabaseError),
+    /// Client communication error
     #[error("Client error: {0}")]
     Client(#[from] ClientError),
+    /// File system operation error
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+    /// Resource acquisition error
     #[error("Acquire error: {0}")]
     Acquire(#[from] tokio::sync::AcquireError),
+    /// Error processing epoch update
     #[error("Epoch update error: {0}")]
     EpochUpdate(#[from] EpochUpdateError),
+    /// JSON serialization/deserialization error
     #[error("Serde json error: {0}")]
     SerdeJson(#[from] serde_json::Error),
+    /// File pattern matching error
     #[error("Pattern error: {0}")]
     Pattern(#[from] glob::PatternError),
 }

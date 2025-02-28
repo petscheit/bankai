@@ -1,10 +1,14 @@
+//! Sync Committee Update Processing Implementation
+//! 
+//! This module handles the verification and processing of sync committee updates on the beacon chain.
+//! It provides functionality to create, manage, and verify sync committee transitions, including
+//! merkle proof generation and verification for committee membership.
+
 use std::fs;
 
 use crate::{
     clients::beacon_chain::{BeaconError, BeaconRpcClient},
-    types::{
-        traits::{ProofType, Provable, Submittable},
-    },
+    types::traits::{ProofType, Provable, Submittable},
     utils::{hashing::get_committee_hash, merkle},
 };
 use alloy_primitives::FixedBytes;
@@ -17,15 +21,24 @@ use thiserror::Error;
 
 use super::ProofError;
 
+/// Represents a sync committee update with associated proofs and verification data
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SyncCommitteeUpdate {
-    /// The circuit inputs
+    /// Input data for the circuit verification
     pub circuit_inputs: CommitteeCircuitInputs,
-    /// The circuit outputs
+    /// Expected outputs after processing
     pub expected_circuit_outputs: ExpectedCircuitOutputs,
 }
 
 impl SyncCommitteeUpdate {
+    /// Creates a new sync committee update for a given slot
+    ///
+    /// # Arguments
+    /// * `client` - Reference to the beacon chain client
+    /// * `slot` - Slot number to create update for
+    ///
+    /// # Returns
+    /// * `Result<SyncCommitteeUpdate, SyncCommitteeError>` - New update or error
     pub async fn new(
         client: &BeaconRpcClient,
         slot: u64,
@@ -44,6 +57,13 @@ impl SyncCommitteeUpdate {
         })
     }
 
+    /// Loads sync committee update data from a JSON file
+    ///
+    /// # Arguments
+    /// * `slot` - Slot number to load data for
+    ///
+    /// # Returns
+    /// * `Result<T, SyncCommitteeError>` - Deserialized data or error
     pub fn from_json<T>(slot: u64) -> Result<T, SyncCommitteeError>
     where
         T: serde::de::DeserializeOwned,
@@ -56,6 +76,10 @@ impl SyncCommitteeUpdate {
 }
 
 impl Provable for SyncCommitteeUpdate {
+    /// Generates a unique identifier for the update
+    ///
+    /// # Returns
+    /// * `String` - Unique identifier based on slot number
     fn id(&self) -> String {
         let mut hasher = Sha256::new();
         hasher.update(b"committee_update");
@@ -63,6 +87,10 @@ impl Provable for SyncCommitteeUpdate {
         hex::encode(hasher.finalize().as_slice())
     }
 
+    /// Exports the update data to a JSON file
+    ///
+    /// # Returns
+    /// * `Result<String, ProofError>` - Path to the exported file or error
     fn export(&self) -> Result<String, ProofError> {
         let json = serde_json::to_string_pretty(&self).unwrap();
         let dir_path = format!("batches/committee/{}", self.circuit_inputs.beacon_slot);
@@ -76,6 +104,10 @@ impl Provable for SyncCommitteeUpdate {
         Ok(path)
     }
 
+    /// Gets the path to the PIE file for this update
+    ///
+    /// # Returns
+    /// * `String` - Path to the PIE file
     fn pie_path(&self) -> String {
         format!(
             "batches/committee/{}/pie_{}.zip",
@@ -84,6 +116,10 @@ impl Provable for SyncCommitteeUpdate {
         )
     }
 
+    /// Gets the path to the inputs file for this update
+    ///
+    /// # Returns
+    /// * `String` - Path to the inputs file
     fn inputs_path(&self) -> String {
         format!(
             "batches/committee/{}/input_{}.json",
@@ -91,6 +127,10 @@ impl Provable for SyncCommitteeUpdate {
         )
     }
 
+    /// Gets the type of proof for this update
+    ///
+    /// # Returns
+    /// * `ProofType` - Type of proof (SyncCommittee)
     fn proof_type(&self) -> ProofType {
         ProofType::SyncCommittee
     }
@@ -114,9 +154,7 @@ impl CommitteeCircuitInputs {
     /// Computes the state root by hashing the committee keys root and the aggregate pubkey.
     ///
     /// # Returns
-    ///
-    /// * `Ok(FixedBytes<32>)` - The computed state root as a 32-byte hash.
-    /// * `Err(SyncCommitteeUpdateError)` - If an error occurs during computation.
+    /// * `FixedBytes<32>` - The computed state root
     pub fn compute_state_root(&self) -> FixedBytes<32> {
         // Pad the 48-byte aggregate pubkey to 64 bytes for hashing
         let mut padded_aggregate = vec![0u8; 64];
@@ -131,14 +169,14 @@ impl CommitteeCircuitInputs {
         let leaf = FixedBytes::from_slice(&Sha256::digest(leaf_data));
 
         // Compute the state root using the Merkle path
-
         merkle::sha256::hash_path(self.next_sync_committee_branch.clone(), leaf, 55)
     }
 }
 
+/// Expected outputs after processing a sync committee update
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExpectedCircuitOutputs {
-    /// The state root containing the new sync committee.
+    /// The state root containing the new sync committee
     pub state_root: FixedBytes<32>,
     /// The slot containing the state_root
     pub slot: u64,
@@ -147,6 +185,13 @@ pub struct ExpectedCircuitOutputs {
 }
 
 impl Submittable<CommitteeCircuitInputs> for ExpectedCircuitOutputs {
+    /// Creates expected outputs from circuit inputs
+    ///
+    /// # Arguments
+    /// * `circuit_inputs` - Input data for the circuit
+    ///
+    /// # Returns
+    /// * `Self` - Expected outputs after processing
     fn from_inputs(circuit_inputs: &CommitteeCircuitInputs) -> Self {
         let mut compressed_aggregate_pubkey = [0u8; 48];
         compressed_aggregate_pubkey
@@ -160,6 +205,10 @@ impl Submittable<CommitteeCircuitInputs> for ExpectedCircuitOutputs {
         }
     }
 
+    /// Converts the outputs to calldata format for contract interaction
+    ///
+    /// # Returns
+    /// * `Vec<Felt>` - Calldata as field elements
     fn to_calldata(&self) -> Vec<Felt> {
         let (state_root_high, state_root_low) = self.state_root.as_slice().split_at(16);
         let (committee_hash_high, committee_hash_low) = self.committee_hash.as_slice().split_at(16);
@@ -172,6 +221,10 @@ impl Submittable<CommitteeCircuitInputs> for ExpectedCircuitOutputs {
         ]
     }
 
+    /// Gets the contract selector for committee verification
+    ///
+    /// # Returns
+    /// * `Felt` - Contract selector as a field element
     fn get_contract_selector(&self) -> Felt {
         selector!("verify_committee_update")
     }
@@ -181,12 +234,10 @@ impl From<SyncCommitteeProof> for CommitteeCircuitInputs {
     /// Converts a `SyncCommitteeProof` into a `CommitteeCircuitInputs`.
     ///
     /// # Arguments
-    ///
-    /// * `committee_proof` - The original sync committee proof to convert.
+    /// * `committee_proof` - The original sync committee proof to convert
     ///
     /// # Returns
-    ///
-    /// A new `CommitteeCircuitInputs` instance.
+    /// * `Self` - New circuit inputs instance
     fn from(committee_proof: SyncCommitteeProof) -> Self {
         let committee_keys_root = &committee_proof.next_sync_committee.pubkeys.tree_hash_root();
 
@@ -208,14 +259,19 @@ impl From<SyncCommitteeProof> for CommitteeCircuitInputs {
     }
 }
 
+/// Possible errors that can occur during sync committee operations
 #[derive(Debug, Error)]
 pub enum SyncCommitteeError {
+    /// Error communicating with beacon node
     #[error("Beacon error: {0}")]
     Beacon(#[from] BeaconError),
+    /// File system operation error
     #[error("Io error: {0}")]
     Io(#[from] std::io::Error),
+    /// Error processing beacon state proof
     #[error("Beacon state proof error")]
     BeaconStateProof(beacon_state_proof::error::Error),
+    /// JSON serialization/deserialization error
     #[error("Deserialize error: {0}")]
     DeserializeError(#[from] serde_json::Error),
 }

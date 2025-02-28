@@ -1,3 +1,9 @@
+//! Database Manager Implementation
+//! 
+//! This module provides a PostgreSQL database interface for managing jobs, epochs, and sync committees.
+//! It handles all database operations including job tracking, status updates, and verification data storage.
+//! The manager provides a robust interface for tracking the state of various blockchain operations.
+
 use std::{collections::HashMap, str::FromStr};
 
 use chrono::NaiveDateTime;
@@ -22,42 +28,71 @@ use crate::{
     utils::merkle::MerklePath,
 };
 
+/// Schema for job data stored in the database
 #[derive(Debug, Serialize)]
 pub struct JobSchema {
+    /// Unique identifier for the job
     pub job_uuid: uuid::Uuid,
+    /// Current status of the job
     pub job_status: JobStatus,
+    /// Slot number associated with the job
     pub slot: i64,
+    /// Starting epoch for batch operations
     pub batch_range_begin_epoch: i64,
+    /// Ending epoch for batch operations
     pub batch_range_end_epoch: i64,
+    /// Type of job (epoch update or sync committee update)
     pub job_type: JobType,
+    /// Transaction hash if the job has been submitted
     pub tx_hash: Option<String>,
+    /// Atlantic proof generation batch ID
     pub atlantic_proof_generate_batch_id: Option<String>,
+    /// Atlantic proof wrapper batch ID
     pub atlantic_proof_wrapper_batch_id: Option<String>,
+    /// Status at which the job failed, if applicable
     pub failed_at_step: Option<JobStatus>,
+    /// Number of retry attempts
     pub retries_count: Option<i64>,
-    pub last_failure_time: Option<NaiveDateTime>, //pub updated_at: i64,
+    /// Timestamp of the last failure
+    pub last_failure_time: Option<NaiveDateTime>,
 }
 
+/// Extended job information including timestamps
 #[derive(Debug)]
 pub struct JobWithTimestamps {
+    /// Job schema information
     pub job: JobSchema,
+    /// Creation timestamp
     pub created_at: String,
+    /// Last update timestamp
     pub updated_at: String,
+    /// Transaction hash if available
     pub tx_hash: Option<String>,
 }
 
+/// Count of jobs in a particular status
 pub struct JobStatusCount {
+    /// Job status
     pub status: JobStatus,
+    /// Number of jobs in this status
     pub count: i64,
 }
 
+/// Main database manager for handling all database operations
 #[derive(Debug)]
 pub struct DatabaseManager {
+    /// PostgreSQL client connection
     client: Client,
-    // db_url: String
 }
 
 impl DatabaseManager {
+    /// Creates a new database manager instance
+    ///
+    /// # Arguments
+    /// * `db_url` - PostgreSQL connection URL
+    ///
+    /// # Returns
+    /// * `Self` - New database manager instance
     pub async fn new(db_url: &str) -> Self {
         let client = match tokio_postgres::connect(db_url, tokio_postgres::NoTls).await {
             Ok((client, connection)) => {
@@ -79,6 +114,14 @@ impl DatabaseManager {
         Self { client }
     }
 
+    /// Inserts a verified epoch into the database
+    ///
+    /// # Arguments
+    /// * `epoch_id` - ID of the epoch
+    /// * `epoch_proof` - Proof data for the epoch
+    ///
+    /// # Returns
+    /// * `Result<(), DatabaseError>` - Success or error
     pub async fn insert_verified_epoch(
         &self,
         epoch_id: u64,
@@ -102,6 +145,22 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Inserts verified epoch decommitment data
+    ///
+    /// # Arguments
+    /// * `epoch_id` - ID of the epoch
+    /// * `beacon_header_root` - Root hash of the beacon header
+    /// * `beacon_state_root` - Root hash of the beacon state
+    /// * `slot` - Slot number
+    /// * `committee_hash` - Hash of the committee
+    /// * `n_signers` - Number of signers
+    /// * `execution_header_hash` - Hash of the execution header
+    /// * `execution_header_height` - Height of the execution header
+    /// * `epoch_index` - Index of the epoch
+    /// * `batch_root` - Root hash of the batch
+    ///
+    /// # Returns
+    /// * `Result<(), DatabaseError>` - Success or error
     pub async fn insert_verified_epoch_decommitment_data(
         &self,
         epoch_id: u64,
@@ -137,6 +196,14 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Inserts a verified sync committee
+    ///
+    /// # Arguments
+    /// * `sync_committee_id` - ID of the sync committee
+    /// * `sync_committee_hash` - Hash of the sync committee
+    ///
+    /// # Returns
+    /// * `Result<(), DatabaseError>` - Success or error
     pub async fn insert_verified_sync_committee(
         &self,
         sync_committee_id: u64,
@@ -153,6 +220,15 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Sets the Atlantic job query ID
+    ///
+    /// # Arguments
+    /// * `job_id` - UUID of the job
+    /// * `atlantic_batch_job_id` - Atlantic batch job ID
+    /// * `atlantic_job_type` - Type of Atlantic job
+    ///
+    /// # Returns
+    /// * `Result<(), DatabaseError>` - Success or error
     pub async fn set_atlantic_job_queryid(
         &self,
         job_id: Uuid,
@@ -183,6 +259,13 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Creates a new job in the database
+    ///
+    /// # Arguments
+    /// * `job` - Job data to create
+    ///
+    /// # Returns
+    /// * `Result<(), DatabaseError>` - Success or error
     pub async fn create_job(&self, job: Job) -> Result<(), DatabaseError> {
         match job.job_type {
             JobType::EpochBatchUpdate => {
@@ -219,6 +302,13 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Fetches the status of a job
+    ///
+    /// # Arguments
+    /// * `job_id` - UUID of the job
+    ///
+    /// # Returns
+    /// * `Result<Option<JobStatus>, DatabaseError>` - Job status or error
     pub async fn fetch_job_status(&self, job_id: Uuid) -> Result<Option<JobStatus>, DatabaseError> {
         let row_opt = self
             .client
@@ -228,6 +318,13 @@ impl DatabaseManager {
         Ok(row_opt.map(|row| row.get("status")))
     }
 
+    /// Gets a job by its ID
+    ///
+    /// # Arguments
+    /// * `job_id` - UUID of the job
+    ///
+    /// # Returns
+    /// * `Result<Option<JobSchema>, DatabaseError>` - Job data or error
     pub async fn get_job_by_id(&self, job_id: Uuid) -> Result<Option<JobSchema>, DatabaseError> {
         let row_opt = self
             .client
@@ -237,6 +334,10 @@ impl DatabaseManager {
         Ok(job)
     }
 
+    /// Gets the latest epoch that is in progress
+    ///
+    /// # Returns
+    /// * `Result<Option<u64>, DatabaseError>` - Latest epoch ID or error
     pub async fn get_latest_epoch_in_progress(&self) -> Result<Option<u64>, DatabaseError> {
         // Query the latest slot with job_status in ('in_progress', 'initialized')
         // //, 'CANCELLED', 'ERROR'
@@ -264,6 +365,10 @@ impl DatabaseManager {
         }
     }
 
+    /// Gets the latest completed epoch
+    ///
+    /// # Returns
+    /// * `Result<Option<u64>, DatabaseError>` - Latest completed epoch ID or error
     pub async fn get_latest_done_epoch(&self) -> Result<Option<u64>, DatabaseError> {
         // Query the latest slot with job_status in ('in_progress', 'initialized')
         // //, 'CANCELLED', 'ERROR'
@@ -291,6 +396,10 @@ impl DatabaseManager {
         }
     }
 
+    /// Gets the latest sync committee that is in progress
+    ///
+    /// # Returns
+    /// * `Result<Option<u64>, DatabaseError>` - Latest sync committee ID or error
     pub async fn get_latest_sync_committee_in_progress(
         &self,
     ) -> Result<Option<u64>, DatabaseError> {
@@ -320,6 +429,10 @@ impl DatabaseManager {
         }
     }
 
+    /// Gets the latest completed sync committee
+    ///
+    /// # Returns
+    /// * `Result<Option<u64>, DatabaseError>` - Latest completed sync committee ID or error
     pub async fn get_latest_done_sync_committee(&self) -> Result<Option<u64>, DatabaseError> {
         // Query the latest slot with job_status in ('in_progress', 'initialized')
         let row_opt = self
@@ -347,6 +460,10 @@ impl DatabaseManager {
         }
     }
 
+    /// Counts jobs that are currently in progress
+    ///
+    /// # Returns
+    /// * `Result<Option<u64>, DatabaseError>` - Count of in-progress jobs or error
     pub async fn count_jobs_in_progress(&self) -> Result<Option<u64>, DatabaseError> {
         // Query the latest slot with job_status in ('in_progress', 'initialized')
         let row_opt = self
@@ -371,6 +488,13 @@ impl DatabaseManager {
         }
     }
 
+    /// Gets merkle paths for a specific epoch
+    ///
+    /// # Arguments
+    /// * `epoch_id` - ID of the epoch
+    ///
+    /// # Returns
+    /// * `Result<Vec<MerklePath>, DatabaseError>` - Merkle paths or error
     pub async fn get_merkle_paths_for_epoch(
         &self,
         epoch_id: i32,
@@ -398,6 +522,13 @@ impl DatabaseManager {
         Ok(paths)
     }
 
+    /// Gets epoch decommitment data
+    ///
+    /// # Arguments
+    /// * `epoch_id` - ID of the epoch
+    ///
+    /// # Returns
+    /// * `Result<EpochDecommitmentData, DatabaseError>` - Decommitment data or error
     pub async fn get_epoch_decommitment_data(
         &self,
         epoch_id: i32,
@@ -445,6 +576,13 @@ impl DatabaseManager {
         })
     }
 
+    /// Gets all jobs with a specific status
+    ///
+    /// # Arguments
+    /// * `desired_status` - Status to filter by
+    ///
+    /// # Returns
+    /// * `Result<Vec<JobSchema>, DatabaseError>` - Matching jobs or error
     pub async fn get_jobs_with_status(
         &self,
         desired_status: JobStatus,
@@ -468,6 +606,13 @@ impl DatabaseManager {
         Ok(jobs)
     }
 
+    /// Counts jobs with a specific status
+    ///
+    /// # Arguments
+    /// * `desired_status` - Status to count
+    ///
+    /// # Returns
+    /// * `Result<u64, DatabaseError>` - Count of jobs or error
     pub async fn count_jobs_with_status(
         &self,
         desired_status: JobStatus,
@@ -485,6 +630,14 @@ impl DatabaseManager {
         Ok(row.get::<_, i64>("count").to_u64().unwrap_or(0))
     }
 
+    /// Updates the status of a job
+    ///
+    /// # Arguments
+    /// * `job_id` - UUID of the job
+    /// * `new_status` - New status to set
+    ///
+    /// # Returns
+    /// * `Result<(), DatabaseError>` - Success or error
     pub async fn update_job_status(
         &self,
         job_id: Uuid,
@@ -504,6 +657,14 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Sets failure information for a job
+    ///
+    /// # Arguments
+    /// * `job_id` - UUID of the job
+    /// * `failed_at_step` - Step at which the job failed
+    ///
+    /// # Returns
+    /// * `Result<(), DatabaseError>` - Success or error
     pub async fn set_failure_info(
         &self,
         job_id: Uuid,
@@ -518,6 +679,13 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Counts epoch jobs waiting for sync committee update
+    ///
+    /// # Arguments
+    /// * `latest_verified_sync_committee` - Latest verified sync committee ID
+    ///
+    /// # Returns
+    /// * `Result<u64, DatabaseError>` - Count of waiting jobs or error
     pub async fn count_epoch_jobs_waiting_for_sync_committe_update(
         &self,
         latest_verified_sync_committee: u64,
@@ -536,6 +704,14 @@ impl DatabaseManager {
         Ok(row.get::<_, i64>("count").to_u64().unwrap_or(0))
     }
 
+    /// Sets batch epochs as ready to broadcast
+    ///
+    /// # Arguments
+    /// * `first_epoch` - First epoch in range
+    /// * `last_epoch` - Last epoch in range
+    ///
+    /// # Returns
+    /// * `Result<(), DatabaseError>` - Success or error
     pub async fn set_ready_to_broadcast_for_batch_epochs(
         &self,
         first_epoch: u64,
@@ -560,6 +736,13 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Sets batch epochs as ready to broadcast up to a specific epoch
+    ///
+    /// # Arguments
+    /// * `to_epoch` - Upper bound epoch
+    ///
+    /// # Returns
+    /// * `Result<(), DatabaseError>` - Success or error
     pub async fn set_ready_to_broadcast_for_batch_epochs_to(
         &self,
         to_epoch: u64,
@@ -584,6 +767,13 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Sets sync committee as ready to broadcast
+    ///
+    /// # Arguments
+    /// * `sync_committee_id` - ID of the sync committee
+    ///
+    /// # Returns
+    /// * `Result<(), DatabaseError>` - Success or error
     pub async fn set_ready_to_broadcast_for_sync_committee(
         &self,
         sync_committee_id: u64,
@@ -626,6 +816,14 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Sets the transaction hash for a job
+    ///
+    /// # Arguments
+    /// * `job_id` - UUID of the job
+    /// * `txhash` - Transaction hash
+    ///
+    /// # Returns
+    /// * `Result<(), DatabaseError>` - Success or error
     pub async fn set_job_txhash(&self, job_id: Uuid, txhash: Felt) -> Result<(), DatabaseError> {
         self.client
             .execute(
@@ -636,6 +834,13 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Increments the retry counter for a job
+    ///
+    /// # Arguments
+    /// * `job_id` - UUID of the job
+    ///
+    /// # Returns
+    /// * `Result<(), DatabaseError>` - Success or error
     pub async fn increment_job_retry_counter(&self, job_id: Uuid) -> Result<(), DatabaseError> {
         self.client
             .execute(
@@ -646,18 +851,15 @@ impl DatabaseManager {
         Ok(())
     }
 
-    // pub async fn cancell_all_unfinished_jobs(
-    //     &self,
-    // ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    //     self.client
-    //         .execute(
-    //             "UPDATE jobs SET status = $1, updated_at = NOW() WHERE status = 'FETCHING'",
-    //             &[&JobStatus::Cancelled.to_string()],
-    //         )
-    //         .await?;
-    //     Ok(())
-    // }
-
+    /// Inserts a merkle path for an epoch
+    ///
+    /// # Arguments
+    /// * `epoch` - Epoch ID
+    /// * `path_index` - Index of the path
+    /// * `path` - Merkle path string
+    ///
+    /// # Returns
+    /// * `Result<(), DatabaseError>` - Success or error
     pub async fn insert_merkle_path_for_epoch(
         &self,
         epoch: u64,
@@ -678,6 +880,13 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Gets jobs with specific statuses
+    ///
+    /// # Arguments
+    /// * `desired_statuses` - List of statuses to filter by
+    ///
+    /// # Returns
+    /// * `Result<Vec<JobSchema>, DatabaseError>` - Matching jobs or error
     pub async fn get_jobs_with_statuses(
         &self,
         desired_statuses: Vec<JobStatus>,
@@ -712,6 +921,14 @@ impl DatabaseManager {
         Ok(jobs)
     }
 
+    /// Updates daemon state information
+    ///
+    /// # Arguments
+    /// * `latest_known_beacon_slot` - Latest known beacon slot
+    /// * `latest_known_beacon_block` - Latest known beacon block hash
+    ///
+    /// # Returns
+    /// * `Result<(), DatabaseError>` - Success or error
     pub async fn update_daemon_state_info(
         &self,
         latest_known_beacon_slot: u64,
@@ -726,6 +943,10 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Gets the total count of jobs
+    ///
+    /// # Returns
+    /// * `Result<u64, Box<dyn std::error::Error + Send + Sync>>` - Total job count or error
     pub async fn count_total_jobs(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
         let row = self
             .client
@@ -735,6 +956,10 @@ impl DatabaseManager {
         Ok(row.get::<_, i64>("count").to_u64().unwrap_or(0))
     }
 
+    /// Gets the count of successful jobs
+    ///
+    /// # Returns
+    /// * `Result<u64, DatabaseError>` - Successful job count or error
     pub async fn count_successful_jobs(&self) -> Result<u64, DatabaseError> {
         let row = self
             .client
@@ -747,6 +972,10 @@ impl DatabaseManager {
         Ok(row.get::<_, i64>("count").to_u64().unwrap_or(0))
     }
 
+    /// Gets the average job duration
+    ///
+    /// # Returns
+    /// * `Result<i64, DatabaseError>` - Average duration in seconds or error
     pub async fn get_average_job_duration(&self) -> Result<i64, DatabaseError> {
         let row = self
             .client
@@ -768,6 +997,13 @@ impl DatabaseManager {
         ))
     }
 
+    /// Gets recent batch jobs
+    ///
+    /// # Arguments
+    /// * `limit` - Maximum number of jobs to return
+    ///
+    /// # Returns
+    /// * `Result<Vec<JobWithTimestamps>, DatabaseError>` - Recent jobs or error
     pub async fn get_recent_batch_jobs(
         &self,
         limit: i64,
@@ -802,6 +1038,13 @@ impl DatabaseManager {
         Ok(jobs)
     }
 
+    /// Gets recent sync committee jobs
+    ///
+    /// # Arguments
+    /// * `limit` - Maximum number of jobs to return
+    ///
+    /// # Returns
+    /// * `Result<Vec<JobWithTimestamps>, DatabaseError>` - Recent jobs or error
     pub async fn get_recent_sync_committee_jobs(
         &self,
         limit: i64,
@@ -836,13 +1079,21 @@ impl DatabaseManager {
         Ok(jobs)
     }
 
+    /// Checks if the database connection is alive
+    ///
+    /// # Returns
+    /// * `bool` - True if connected, false otherwise
     pub async fn is_connected(&self) -> bool {
-        match self.client.query_one("SELECT 1", &[]).await {
-            Ok(_) => true,
-            Err(_) => false,
-        }
+        self.client.query_one("SELECT 1", &[]).await.is_ok()
     }
 
+    /// Gets recent Atlantic queries in progress
+    ///
+    /// # Arguments
+    /// * `limit` - Maximum number of queries to return
+    ///
+    /// # Returns
+    /// * `Result<Vec<JobWithTimestamps>, DatabaseError>` - Recent queries or error
     pub async fn get_recent_atlantic_queries_in_progress(
         &self,
         limit: i64,
@@ -875,6 +1126,13 @@ impl DatabaseManager {
         Ok(jobs)
     }
 
+    /// Gets verified epoch by execution height
+    ///
+    /// # Arguments
+    /// * `execution_header_height` - Execution header height
+    ///
+    /// # Returns
+    /// * `Result<Option<u64>, DatabaseError>` - Epoch ID or error
     pub async fn get_verified_epoch_by_execution_height(
         &self,
         execution_header_height: i32,
@@ -895,6 +1153,10 @@ impl DatabaseManager {
         }
     }
 
+    /// Gets count of jobs by status
+    ///
+    /// # Returns
+    /// * `Result<Vec<JobStatusCount>, DatabaseError>` - Job counts by status or error
     pub async fn get_jobs_count_by_status(&self) -> Result<Vec<JobStatusCount>, DatabaseError> {
         let rows = self
             .client
@@ -976,16 +1238,22 @@ impl DatabaseManager {
     }
 }
 
+/// Possible errors that can occur during database operations
 #[derive(Debug, Error)]
 pub enum DatabaseError {
+    /// PostgreSQL connection or query error
     #[error("Database connection error: {0}")]
     Postgres(#[from] tokio_postgres::Error),
+    /// Error mapping database row to job
     #[error("Job mapping error: {0}")]
     JobMapping(#[from] Box<dyn std::error::Error + Send + Sync>),
+    /// Error converting between integer types
     #[error("Integer conversion error: {0}")]
     IntegerConversion(String),
+    /// General parsing error
     #[error("Parse error: {0}")]
     Parse(String),
+    /// Error parsing string into enum
     #[error("String parsing error: {0}")]
     StrumParse(#[from] strum::ParseError),
 }

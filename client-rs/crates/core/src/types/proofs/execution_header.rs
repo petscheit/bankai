@@ -1,4 +1,3 @@
-use crate::clients::ClientError;
 use crate::utils::merkle::sha256::{generate_path, hash_path};
 // use crate::utils::rpc::BeaconRpcClient;
 use crate::clients::beacon_chain::{BeaconError, BeaconRpcClient};
