@@ -1,11 +1,9 @@
 [package]
-name = "atlantic-client"
+name = "clients"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-
-# External dependencies
 futures = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
@@ -14,3 +12,8 @@ tokio = { workspace = true }
 tokio-util = { workspace = true }
 tracing = { workspace = true }
 types = { workspace = true }
+starknet = { workspace = true }
+alloy-primitives = { workspace = true }
+itertools = { workspace = true }
+alloy-rpc-types-beacon = { workspace = true }
+beacon-types = { workspace = true }

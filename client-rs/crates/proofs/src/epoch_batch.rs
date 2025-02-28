@@ -1,31 +1,16 @@
-use crate::{
-    constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE},
-    epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs},
-    helpers::{
-        self, get_first_slot_for_epoch, get_sync_committee_id_by_epoch, slot_to_epoch_id,
-    },
-    state::JobStatus,
-    traits::{Provable, Submittable},
-    utils::{
-        database_manager::DatabaseManager,
-        hashing::get_committee_hash,
-        merkle::poseidon::{compute_paths, compute_root, hash_path},
-    },
-    BankaiClient,
-    Error,
-};
 use crate::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs};
+use types::constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE};
+use utils::{
+    hashing::get_committee_hash,
+    merkle::poseidon::{compute_paths, compute_root, hash_path},
+    helpers::{get_first_slot_for_epoch, get_sync_committee_id_by_epoch, slot_to_epoch_id},
+};
+use db::{DatabaseManager, state::JobStatus};
 use types::{
     constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE},
     error::Error,
     traits::{Provable, Submittable},
 };
-    // utils::{
-    //     database_manager::DatabaseManager,
-    //     hashing::get_committee_hash,
-    //     merkle::poseidon::{compute_paths, compute_root, hash_path},
-    // },
-
 use alloy_primitives::FixedBytes;
 use hex;
 use num_traits::ToPrimitive;

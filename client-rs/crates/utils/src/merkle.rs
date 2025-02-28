@@ -8,7 +8,7 @@ pub struct MerklePath {
 }
 
 pub(crate) mod sha256 {
-    use crate::Error;
+    use types::error::Error;
     use alloy_primitives::FixedBytes;
     use sha2::{Digest, Sha256};
 

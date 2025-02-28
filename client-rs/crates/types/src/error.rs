@@ -1,17 +1,22 @@
-impl std::fmt::Display for StarknetError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            StarknetError::ProviderError(err) => write!(f, "Provider error: {}", err),
-            StarknetError::AccountError(msg) => write!(f, "Account error: {}", msg),
-            StarknetError::TransactionError(msg) => write!(f, "Transaction error: {}", msg),
-            StarknetError::TimeoutError => {
-                write!(f, "Waiting for transaction timeout error")
-            }
-        }
-    }
-}
+use core::fmt;
 
-impl std::error::Error for StarknetError {}
+use reqwest;
+use starknet::core::types::Felt;
+
+// impl std::fmt::Display for StarknetError {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             StarknetError::ProviderError(err) => write!(f, "Provider error: {}", err),
+//             StarknetError::AccountError(msg) => write!(f, "Account error: {}", msg),
+//             StarknetError::TransactionError(msg) => write!(f, "Transaction error: {}", msg),
+//             StarknetError::TimeoutError => {
+//                 write!(f, "Waiting for transaction timeout error")
+//             }
+//         }
+//     }
+// }
+
+// impl std::error::Error for StarknetError {}
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -20,7 +25,7 @@ pub enum Error {
     RpcError(reqwest::Error),
     DeserializeError(String),
     IoError(std::io::Error),
-    StarknetError(StarknetError),
+    // StarknetError(StarknetError),
     BlockNotFound,
     FetchSyncCommitteeError,
     FailedFetchingBeaconState,
@@ -47,7 +52,7 @@ impl fmt::Display for Error {
             Error::RpcError(err) => write!(f, "RPC error: {}", err),
             Error::DeserializeError(msg) => write!(f, "Deserialization error: {}", msg),
             Error::IoError(err) => write!(f, "I/O error: {}", err),
-            Error::StarknetError(err) => write!(f, "Starknet error: {}", err),
+            // Error::StarknetError(err) => write!(f, "Starknet error: {}", err),
             Error::BlockNotFound => write!(f, "Block not found"),
             Error::FetchSyncCommitteeError => write!(f, "Failed to fetch sync committee"),
             Error::FailedFetchingBeaconState => write!(f, "Failed to fetch beacon state"),
@@ -78,7 +83,7 @@ impl std::error::Error for Error {
         match self {
             Error::RpcError(err) => Some(err),
             Error::IoError(err) => Some(err),
-            Error::StarknetError(err) => Some(err),
+            // Error::StarknetError(err) => Some(err),
             Error::AtlanticError(err) => Some(err),
             Error::BankaiRPCClientError(err) => Some(err),
 
@@ -87,8 +92,8 @@ impl std::error::Error for Error {
     }
 }
 
-impl From<StarknetError> for Error {
-    fn from(e: StarknetError) -> Self {
-        Error::StarknetError(e)
-    }
-}
+// impl From<StarknetError> for Error {
+//     fn from(e: StarknetError) -> Self {
+//         Error::StarknetError(e)
+//     }
+// }

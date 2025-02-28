@@ -1,4 +1,5 @@
-use crate::{utils::rpc::BeaconRpcClient, BankaiConfig, Error};
+use crate::{config::BankaiConfig, error::Error};
+use clients::beacon::BeaconRpcClient;
 use alloy_primitives::FixedBytes;
 use serde::{Deserialize, Serialize};
 use starknet::core::types::Felt;
@@ -13,12 +14,12 @@ pub struct ContractInitializationData {
 }
 
 impl ContractInitializationData {
-    pub async fn new(
+    pub fn new(
         client: &BeaconRpcClient,
         slot: u64,
         config: &BankaiConfig,
+        committee: SyncCommitteeValidatorPubs
     ) -> Result<Self, Error> {
-        let committee = client.get_sync_committee_validator_pubs(slot).await?;
         Ok(Self {
             committee_id: (slot / 0x2000), // since this is the current committee, we dont increment the committee id
             committee_hash: committee.get_committee_hash(),

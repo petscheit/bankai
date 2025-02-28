@@ -5,16 +5,18 @@ edition = "2021"
 
 [dependencies]
 types.workspace = true
+utils.workspace = true
+db.workspace = true
 alloy-primitives.workspace = true
 alloy-rpc-types-beacon.workspace = true
 bls12_381.workspace = true
-tree-hash-derive.workspace = true
-tree-hash.workspace = true
+tree_hash_derive.workspace = true
+tree_hash.workspace = true
 hex.workspace = true
-num_traits.workspace = true
+num-traits.workspace = true
 serde.workspace = true
 sha2.workspace = true
 starknet.workspace = true
-starknet_crypto.workspace = true
+starknet-crypto.workspace = true
 uuid.workspace = true
 tracing.workspace = true

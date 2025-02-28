@@ -82,6 +82,13 @@ pub struct StarknetClient {
     // provider: Arc<JsonRpcClient<HttpTransport>>,
 }
 
+#[derive(Debug)]
+pub enum StarknetError {
+    ProviderError(ProviderError),
+    AccountError(String),
+    TransactionError(String),
+    TimeoutError,
+}
 
 impl StarknetClient {
     pub async fn new(rpc_url: &str, address: &str, priv_key: &str) -> Result<Self, StarknetError> {

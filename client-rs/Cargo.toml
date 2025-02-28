@@ -11,11 +11,15 @@ path = "src/daemon.rs"
 name = "cli"
 path = "src/main.rs"
 
+[workspace]
 members = [
-    "crates/atlantic-client",
     "crates/types",
+    "crates/api",
+    "crates/db",
+    "crates/utils",
+    "crates/clients",
+    "crates/proofs",
 ]
-
 
 [workspace.dependencies]
 alloy-primitives = "0.8.13"
@@ -65,3 +69,10 @@ tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["trace", "timeout"] }
 chrono = { version = "0.4.39", features = ["serde"] }
 tokio-util = "0.7.13"
+
+clients = { path = "crates/clients" }
+proofs = { path = "crates/proofs" }
+db = { path = "crates/db" }
+utils = { path = "crates/utils" }
+types = { path = "crates/types" }
+api = { path = "crates/api" }

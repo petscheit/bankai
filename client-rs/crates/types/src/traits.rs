@@ -1,7 +1,7 @@
 use serde::Serialize;
 use starknet::core::types::Felt;
 
-use crate::Error;
+use crate::error::Error;
 
 /// A trait for the types that can be submitted on-chain
 pub trait Submittable<T> {
