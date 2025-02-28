@@ -1,11 +1,11 @@
 use crate::utils::merkle::sha256::{generate_path, hash_path};
-use crate::utils::rpc::BeaconRpcClient;
-use crate::Error;
+// use crate::utils::rpc::BeaconRpcClient;
+use crate::types::error::Error;
 use alloy_primitives::FixedBytes;
 use beacon_state_proof::state_proof_fetcher::TreeHash;
 use serde::{Deserialize, Serialize};
-use types::{BeaconBlockBody, ExecPayload, ExecutionPayloadHeader, MainnetEthSpec};
-
+use beacon_types::{BeaconBlockBody, ExecPayload, ExecutionPayloadHeader, MainnetEthSpec};
+use crate::clients::beacon_chain::BeaconRpcClient;
 /// Index of the execution payload in the beacon block body merkle tree
 const EXECUTION_PAYLOAD_LEAF_INDEX: usize = 9;
 

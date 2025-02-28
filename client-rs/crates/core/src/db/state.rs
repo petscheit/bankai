@@ -1,14 +1,14 @@
 use crate::{
-    bankai_client::BankaiClient,
-    utils::{database_manager::DatabaseManager, starknet_client::StarknetError},
+    BankaiClient,
+    db::manager::DatabaseManager, 
+    clients::starknet::StarknetError,
 };
 use postgres_types::{FromSql, ToSql};
 use starknet::core::types::Felt;
 use std::{env, fmt, str::FromStr, sync::Arc};
 use tokio::sync::mpsc;
 use uuid::Uuid;
-use serde::{Deserialize, Serialize};
-
+use serde::Serialize;
 
 #[derive(Clone, Debug)]
 pub struct Job {

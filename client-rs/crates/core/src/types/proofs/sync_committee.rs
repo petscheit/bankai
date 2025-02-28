@@ -1,13 +1,13 @@
 use std::fs;
 
 use crate::{
-    traits::{ProofType, Provable, Submittable},
+    types::traits::{ProofType, Provable, Submittable},
+    types::error::Error,
     utils::{
         hashing::get_committee_hash,
-        merkle,
-        rpc::BeaconRpcClient,
+        merkle
     },
-    Error,
+    clients::beacon_chain::BeaconRpcClient
 };
 use alloy_primitives::FixedBytes;
 use beacon_state_proof::state_proof_fetcher::{StateProofFetcher, SyncCommitteeProof, TreeHash};

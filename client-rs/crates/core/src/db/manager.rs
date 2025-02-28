@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    str::FromStr,
-};
+use std::{collections::HashMap, str::FromStr};
 
 use chrono::NaiveDateTime;
 use num_traits::ToPrimitive;
@@ -13,27 +10,16 @@ use alloy_primitives::{
     hex::{FromHex, ToHexExt},
     FixedBytes,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use starknet::core::types::Felt;
 
 use crate::{
-    epoch_update::ExpectedEpochUpdateOutputs,
-    helpers,
-    state::{AtlanticJobType, Error, Job, JobStatus, JobType},
-    utils::{
-        merkle::MerklePath,
-        starknet_client::EpochProof,
-    },
+    types::proofs::epoch_update::{ExpectedEpochUpdateOutputs, EpochProof, EpochDecommitmentData},
+    utils::helpers,
+    db::state::{AtlanticJobType, Error, Job, JobStatus, JobType},
+    utils::merkle::MerklePath,
 };
-
-
-#[derive(Debug)]
-pub struct EpochDecommitmentData {
-    pub epoch_update_outputs: ExpectedEpochUpdateOutputs,
-    pub batch_root: Felt,
-    pub epoch_index: u64,
-}
 
 
 #[derive(Debug, Serialize)]
@@ -792,73 +778,6 @@ impl DatabaseManager {
         Ok(jobs)
     }
 
-    // async fn fetch_job_by_status(
-    //     client: &Client,
-    //     status: JobStatus,
-    // ) -> Result<Option<Job>, Box<dyn std::error::Error + Send + Sync>> {
-    //     let tx = client.transaction().await?;
-
-    //     let row_opt = tx
-    //         .query_opt(
-    //             r#"
-    //             SELECT job_id, status
-    //             FROM jobs
-    //             WHERE status = $1
-    //             ORDER BY updated_at ASC
-    //             LIMIT 1
-    //             FOR UPDATE SKIP LOCKED
-    //             "#,
-    //             &[&status],
-    //         )
-    //         .await?;
-
-    //     let job = if let Some(row) = row_opt {
-    //         Some(Job {
-    //             job_id: row.get("job_id"),
-    //             job_type: row.get("type"),
-    //             job_status: row.get("status"),
-    //             slot: row.get("slot"),
-    //         })
-    //     } else {
-    //         None
-    //     };
-
-    //     tx.commit().await?;
-    //     Ok(job)
-    // }
-
-    // async fn add_verified_epoch(
-    //     client: Arc<Client>,
-    //     slot: u64,
-    // ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    //     client
-    //         .execute(
-    //             "INSERT INTO verified_epochs (slot, job_status, slot, type) VALUES ($1, $2, $3, $4)",
-    //             &[&slot, &status.to_string(), &(slot as i64), &"EPOCH_UPDATE"],
-    //         )
-    //         .await?;
-
-    //     Ok(())
-    // }
-    //
-
-    // pub async fn insert_job_log_entry(
-    //     &self,
-    //     job_id: u64,
-    //     event_type: JobLogEntry,
-    //     details: String,
-    // ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    //     self.client
-    //         .execute(
-    //             "INSERT INTO job_logs (job_id, event_type, details)
-    //          VALUES ($1, $2, $3)",
-    //             &[&job_id.to_string(), &event_type.to_string(), &details],
-    //         )
-    //         .await?;
-
-    //     Ok(())
-    // }
-    //
     pub async fn update_daemon_state_info(
         &self,
         latest_known_beacon_slot: u64,

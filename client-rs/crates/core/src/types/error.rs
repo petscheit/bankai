@@ -19,6 +19,7 @@ use starknet::core::types::Felt;
 #[derive(Debug)]
 pub enum Error {
     InvalidProof,
+    Other(String),
     RpcError(reqwest::Error),
     DeserializeError(String),
     IoError(std::io::Error),
@@ -71,6 +72,7 @@ impl std::fmt::Display for Error {
             Error::InvalidMerkleTree => write!(f, "Invalid Merkle Tree"),
             Error::DatabaseError(msg) => write!(f, "Database error: {}", msg),
             Error::TransactorError(msg) => write!(f, "Transactor error: {}", msg),
+            Error::Other(msg) => write!(f, "Other Error; {:?}", msg)
         }
     }
 }
