@@ -3,15 +3,12 @@ name = "client-rs"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "daemon"
-path = "src/daemon.rs"
+[workspace]
+members = [
+    "crates/core",
+]
 
-[[bin]]
-name = "cli"
-path = "src/main.rs"
-
-[dependencies]
+[workspace.dependencies]
 alloy-primitives = "0.8.13"
 ethereum_serde_utils = "0.7.0"
 hex = "0.4.3"

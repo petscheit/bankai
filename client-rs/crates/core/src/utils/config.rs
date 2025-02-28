@@ -1,4 +1,4 @@
-use crate::constants::{
+use crate::utils::constants::{
     MAX_CONCURRENT_PIE_GENERATIONS, MAX_CONCURRENT_RPC_DATA_FETCH_JOBS, STARKNET_SEPOLIA,
 };
 use starknet::core::types::Felt;
