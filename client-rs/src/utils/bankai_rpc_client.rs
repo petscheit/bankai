@@ -89,33 +89,33 @@ impl EpochDecommitmentData {
     }
 }
 
-impl BankaiRPCClient {
-    pub fn new(endpoint: String, api_key: String) -> Self {
-        Self {
-            endpoint,
-            api_key,
-            client: reqwest::Client::new(),
-        }
-    }
+// impl BankaiRPCClient {
+//     pub fn new(endpoint: String, api_key: String) -> Self {
+//         Self {
+//             endpoint,
+//             api_key,
+//             client: reqwest::Client::new(),
+//         }
+//     }
 
-    pub async fn get_decommitment_data_for_epoch(
-        &self,
-        epoch_id: u64,
-    ) -> Result<EpochDecommitmentDataResponse, Error> {
-        let response = self
-            .client
-            .get(format!(
-                "{}/get_epoch_decommitment_data/by_epoch/{}",
-                self.endpoint, epoch_id
-            ))
-            .header("accept", "application/json")
-            .send()
-            .await
-            .map_err(Error::BankaiRPCClientError)?;
+//     pub async fn get_decommitment_data_for_epoch(
+//         &self,
+//         epoch_id: u64,
+//     ) -> Result<EpochDecommitmentDataResponse, Error> {
+//         let response = self
+//             .client
+//             .get(format!(
+//                 "{}/get_epoch_decommitment_data/by_epoch/{}",
+//                 self.endpoint, epoch_id
+//             ))
+//             .header("accept", "application/json")
+//             .send()
+//             .await
+//             .map_err(Error::BankaiRPCClientError)?;
 
-        let response_data: EpochDecommitmentDataResponse =
-            response.json().await.map_err(Error::BankaiRPCClientError)?;
+//         let response_data: EpochDecommitmentDataResponse =
+//             response.json().await.map_err(Error::BankaiRPCClientError)?;
 
-        Ok(response_data)
-    }
-}
+//         Ok(response_data)
+//     }
+// }

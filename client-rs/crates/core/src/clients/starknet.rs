@@ -8,8 +8,8 @@ use starknet::{
     core::{
         chain_id,
         types::{
-            contract::SierraClass, BlockId, BlockTag, Felt, TransactionExecutionStatus,
-            TransactionStatus,
+            contract::SierraClass, BlockId, BlockTag, Call, Felt, FromStrError, FunctionCall,
+            TransactionExecutionStatus, TransactionStatus,
         },
     },
     macros::{felt, selector},
@@ -18,17 +18,14 @@ use starknet::{
         Provider, ProviderError, Url,
     },
     signers::{LocalWallet, SigningKey},
-    core::types::{Call, FunctionCall},
 };
 
 use crate::{
-    types::proofs::contract_init::ContractInitializationData,
-    types::proofs::epoch_update::EpochProof,
-    types::traits::Submittable,
-    utils::config::BankaiConfig,
-    utils::constants,
-    // utils::bankai_rpc_client::EpochDecommitmentData
+    types::contract::contract_init::ContractInitializationData,
+    types::proofs::epoch_update::EpochProof, types::traits::Submittable,
+    utils::config::BankaiConfig, utils::constants,
 };
+use thiserror::Error;
 
 #[derive(Debug)]
 pub struct StarknetClient {
@@ -36,22 +33,33 @@ pub struct StarknetClient {
     // provider: Arc<JsonRpcClient<HttpTransport>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum StarknetError {
-    ProviderError(ProviderError),
+    #[error("Provider error: {0}")]
+    Provider(#[from] ProviderError),
+    #[error("Account error: {0}")]
     AccountError(String),
+    #[error("Transaction error: {0}")]
     TransactionError(String),
+    #[error("Timeout error")]
     TimeoutError,
+    #[error("Url parse error")]
+    UrlParseError,
+    #[error("Felt parse error")]
+    FeltParseError(#[from] FromStrError),
+    #[error("Io error")]
+    IoError(#[from] std::io::Error),
+    #[error("Serde json error")]
+    SerdeJson(#[from] serde_json::Error),
 }
 
 impl StarknetClient {
     pub async fn new(rpc_url: &str, address: &str, priv_key: &str) -> Result<Self, StarknetError> {
-        let provider = JsonRpcClient::new(HttpTransport::new(Url::parse(rpc_url).unwrap()));
+        let url = Url::parse(rpc_url).map_err(|_| StarknetError::UrlParseError)?;
+        let provider = JsonRpcClient::new(HttpTransport::new(url));
 
-        let signer = LocalWallet::from(SigningKey::from_secret_scalar(
-            Felt::from_hex(priv_key).unwrap(),
-        ));
-        let address = Felt::from_hex(address).unwrap();
+        let signer = LocalWallet::from(SigningKey::from_secret_scalar(Felt::from_hex(priv_key)?));
+        let address = Felt::from_hex(address)?;
         let mut account = SingleOwnerAccount::new(
             provider,
             signer,
@@ -73,8 +81,7 @@ impl StarknetClient {
         config: &BankaiConfig,
     ) -> Result<Felt, StarknetError> {
         let contract_artifact: SierraClass =
-            serde_json::from_reader(std::fs::File::open(config.contract_path.clone()).unwrap())
-                .unwrap();
+            serde_json::from_reader(std::fs::File::open(config.contract_path.clone())?)?;
         let class_hash = contract_artifact.class_hash().unwrap();
         assert!(
             class_hash == config.contract_class_hash,
@@ -101,13 +108,10 @@ impl StarknetClient {
                 info!("Deployment transaction sent successfully");
                 Ok(contract_address)
             }
-            Err(e) => {
-                error!("Deployment failed with error: {:#?}", e);
-                Err(StarknetError::AccountError(format!(
-                    "Deployment failed: {:#?}",
-                    e
-                )))
-            }
+            Err(e) => Err(StarknetError::AccountError(format!(
+                "Deployment failed: {:#?}",
+                e
+            ))),
         }
     }
 
@@ -160,8 +164,7 @@ impl StarknetClient {
                 },
                 BlockId::Tag(BlockTag::Latest),
             )
-            .await
-            .map_err(StarknetError::ProviderError)?;
+            .await?;
         println!("committee_hash: {:?}", committee_hash);
         Ok(committee_hash)
     }
@@ -182,8 +185,7 @@ impl StarknetClient {
                 },
                 BlockId::Tag(BlockTag::Latest),
             )
-            .await
-            .map_err(StarknetError::ProviderError)?;
+            .await?;
         println!("epoch_proof: {:?}", epoch_proof);
         Ok(EpochProof::from_contract_return_value(epoch_proof).unwrap())
     }
@@ -203,8 +205,7 @@ impl StarknetClient {
                 },
                 BlockId::Tag(BlockTag::Latest),
             )
-            .await
-            .map_err(StarknetError::ProviderError)?;
+            .await?;
         Ok(*latest_epoch.first().unwrap())
     }
 
@@ -235,42 +236,10 @@ impl StarknetClient {
                 },
                 BlockId::Tag(BlockTag::Latest),
             )
-            .await
-            .map_err(StarknetError::ProviderError)?;
-        //println!("latest_committee_id: {:?}", latest_committee_id);
+            .await?;
+
         Ok(*latest_committee_id.first().unwrap())
     }
-
-    // pub async fn submit_epoch_decommitment(
-    //     &self,
-    //     config: &BankaiConfig,
-    //     decommitment_data: EpochDecommitmentData,
-    // ) -> Result<Felt, StarknetError> {
-    //     let calldata = decommitment_data.to_calldata();
-
-    //     let call = Call {
-    //         to: config.contract_address,
-    //         selector: selector!("decommit_batched_epoch"),
-    //         calldata,
-    //     };
-
-    //     let send_result = self.account.execute_v1(vec![call]).send().await;
-
-    //     match send_result {
-    //         Ok(tx_response) => {
-    //             let tx_hash = tx_response.transaction_hash;
-    //             info!("Transaction sent successfully! Hash: {:#x}", tx_hash);
-    //             Ok(tx_hash)
-    //         }
-    //         Err(e) => {
-    //             error!("Transaction execution error: {:#?}", e);
-    //             return Err(StarknetError::TransactionError(format!(
-    //                 "TransactionExecutionError: {:#?}",
-    //                 e
-    //             )));
-    //         }
-    //     }
-    // }
 
     pub async fn wait_for_confirmation(&self, tx_hash: Felt) -> Result<(), StarknetError> {
         let max_retries = constants::STARKNET_TX_CONFIRMATION_MAX_RETRIES;
@@ -322,10 +291,7 @@ impl StarknetClient {
         tx_hash: Felt,
     ) -> Result<TransactionStatus, StarknetError> {
         let provider = self.account.provider();
-        let tx_status = provider
-            .get_transaction_status(tx_hash)
-            .await
-            .map_err(StarknetError::ProviderError)?;
+        let tx_status = provider.get_transaction_status(tx_hash).await?;
 
         Ok(tx_status)
     }

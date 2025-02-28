@@ -1,7 +1,21 @@
 use crate::{
-    db::{manager::DatabaseManager, state::JobStatus}, types::{error::Error, proofs::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs}, traits::{ProofType, Provable, Submittable}}, utils::{constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE}, hashing::get_committee_hash, helpers::{
-        self, get_first_slot_for_epoch, get_sync_committee_id_by_epoch, slot_to_epoch_id,
-    }, merkle::poseidon::{compute_paths, compute_root, hash_path}}, BankaiClient
+    cairo_runner::python::CairoRunnerError,
+    clients::ClientError,
+    db::manager::{DatabaseError, DatabaseManager},
+    types::{
+        job::JobStatus,
+        proofs::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs},
+        traits::{ProofType, Provable, Submittable},
+    },
+    utils::{
+        constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE},
+        hashing::get_committee_hash,
+        helpers::{
+            self, get_first_slot_for_epoch, get_sync_committee_id_by_epoch, slot_to_epoch_id,
+        },
+        merkle::poseidon::{compute_paths, compute_root, hash_path},
+    },
+    BankaiClient,
 };
 
 use alloy_primitives::FixedBytes;
@@ -12,10 +26,13 @@ use sha2::{Digest, Sha256};
 use starknet::macros::selector;
 use starknet_crypto::Felt;
 use std::fs;
+use thiserror::Error;
 use uuid::Uuid;
 
 use std::sync::Arc;
 use tracing::{debug, info, trace};
+
+use super::{epoch_update::EpochUpdateError, ProofError};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdateBatch {
@@ -37,12 +54,12 @@ pub struct ExpectedEpochBatchOutputs {
 }
 
 impl EpochUpdateBatch {
-    pub(crate) async fn new(bankai: &BankaiClient) -> Result<EpochUpdateBatch, Error> {
+    pub async fn new(bankai: &BankaiClient) -> Result<EpochUpdateBatch, EpochBatchError> {
         let (start_slot, mut end_slot) = bankai
             .starknet_client
             .get_batching_range(&bankai.config)
             .await
-            .map_err(|e| Error::Other(e.to_string()))?;
+            .map_err(|e| EpochBatchError::Client(ClientError::Starknet(e)))?;
         info!("Slots in Term: Start {}, End {}", start_slot, end_slot);
         let epoch_gap = (end_slot - start_slot) / SLOTS_PER_EPOCH;
         info!(
@@ -63,7 +80,6 @@ impl EpochUpdateBatch {
         // Fetch epochs sequentially from start_slot to end_slot, incrementing by 32 each time
         let mut current_slot = start_slot;
         while current_slot < end_slot {
-            // Current slot is the starting slot of epoch
             info!(
                 "Getting data for slot: {} Epoch: {} Epochs batch position {}/{}",
                 current_slot,
@@ -74,7 +90,6 @@ impl EpochUpdateBatch {
             let epoch_update = EpochUpdate::new(&bankai.client, current_slot).await?;
             epochs.push(epoch_update);
             current_slot += 32;
-            //info!("epochspush");
         }
 
         let circuit_inputs = EpochUpdateBatchInputs {
@@ -115,14 +130,13 @@ impl EpochUpdateBatch {
         start_epoch: u64,
         end_epoch: u64,
         job_id: Uuid,
-    ) -> Result<EpochUpdateBatch, Error> {
+    ) -> Result<EpochUpdateBatch, EpochBatchError> {
         let _permit = bankai
             .config
             .epoch_data_fetching_semaphore
             .clone()
             .acquire_owned()
-            .await
-            .map_err(|e| Error::CairoRunError(format!("Semaphore error: {}", e)))?;
+            .await?;
 
         let _ = db_manager
             .update_job_status(job_id, JobStatus::StartedFetchingInputs)
@@ -180,8 +194,7 @@ impl EpochUpdateBatch {
                         path_index.to_u64().unwrap(),
                         current_path.to_hex_string(),
                     )
-                    .await
-                    .map_err(|e| Error::DatabaseError(e.to_string()))?;
+                    .await?;
             }
             current_epoch += 1;
         }
@@ -199,7 +212,7 @@ impl EpochUpdateBatch {
 }
 
 impl EpochUpdateBatch {
-    pub fn from_json<T>(first_epoch: u64, last_epoch: u64) -> Result<T, Error>
+    pub fn from_json<T>(first_epoch: u64, last_epoch: u64) -> Result<T, EpochBatchError>
     where
         T: serde::de::DeserializeOwned,
     {
@@ -213,19 +226,20 @@ impl EpochUpdateBatch {
             first_epoch, last_epoch, first_epoch, last_epoch
         );
         debug!(path);
-        let glob_pattern = glob::glob(&path)
-            .map_err(|e| Error::IoError(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        let glob_pattern = glob::glob(&path)?;
 
         // Take the first matching file
         let path = glob_pattern.take(1).next().ok_or_else(|| {
-            Error::IoError(std::io::Error::new(
+            EpochBatchError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "No matching file found",
             ))
         })?;
 
-        let json = fs::read_to_string(path.unwrap()).map_err(Error::IoError)?;
-        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
+        let json = fs::read_to_string(path.unwrap()).map_err(EpochBatchError::Io)?;
+        let json = serde_json::from_str(&json)?;
+
+        Ok(json)
     }
 }
 
@@ -237,7 +251,7 @@ impl Provable for EpochUpdateBatch {
         hex::encode(hasher.finalize().as_slice())
     }
 
-    fn export(&self) -> Result<String, Error> {
+    fn export(&self) -> Result<String, ProofError> {
         let json = serde_json::to_string_pretty(&self).unwrap();
         let first_slot = self
             .circuit_inputs
@@ -258,12 +272,12 @@ impl Provable for EpochUpdateBatch {
             .slot;
         let last_epoch = helpers::slot_to_epoch_id(last_slot);
         let dir_path = format!("batches/epoch_batch/{}_to_{}", first_epoch, last_epoch);
-        fs::create_dir_all(dir_path.clone()).map_err(Error::IoError)?;
+        fs::create_dir_all(dir_path.clone());
         let path = format!(
             "{}/input_batch_{}_to_{}.json",
             dir_path, first_epoch, last_epoch
         );
-        fs::write(path.clone(), json).map_err(Error::IoError)?;
+        fs::write(path.clone(), json);
         Ok(path)
     }
 
@@ -385,4 +399,24 @@ impl Submittable<EpochUpdateBatchInputs> for ExpectedEpochBatchOutputs {
             latest_batch_output: last_epoch_output,
         }
     }
+}
+
+#[derive(Debug, Error)]
+pub enum EpochBatchError {
+    #[error("Cairo run error: {0}")]
+    CairoRun(#[from] CairoRunnerError),
+    #[error("Database error: {0}")]
+    Database(#[from] DatabaseError),
+    #[error("Client error: {0}")]
+    Client(#[from] ClientError),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Acquire error: {0}")]
+    Acquire(#[from] tokio::sync::AcquireError),
+    #[error("Epoch update error: {0}")]
+    EpochUpdate(#[from] EpochUpdateError),
+    #[error("Serde json error: {0}")]
+    SerdeJson(#[from] serde_json::Error),
+    #[error("Pattern error: {0}")]
+    Pattern(#[from] glob::PatternError),
 }

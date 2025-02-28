@@ -1,11 +1,12 @@
+use crate::clients::ClientError;
 use crate::utils::merkle::sha256::{generate_path, hash_path};
 // use crate::utils::rpc::BeaconRpcClient;
-use crate::types::error::Error;
+use crate::clients::beacon_chain::{BeaconError, BeaconRpcClient};
 use alloy_primitives::FixedBytes;
 use beacon_state_proof::state_proof_fetcher::TreeHash;
-use serde::{Deserialize, Serialize};
 use beacon_types::{BeaconBlockBody, ExecPayload, ExecutionPayloadHeader, MainnetEthSpec};
-use crate::clients::beacon_chain::BeaconRpcClient;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 /// Index of the execution payload in the beacon block body merkle tree
 const EXECUTION_PAYLOAD_LEAF_INDEX: usize = 9;
 
@@ -39,10 +40,10 @@ impl ExecutionHeaderProof {
     /// # Returns
     /// * `Result<ExecutionHeaderProof, Error>` - The constructed proof or an error
     /// ```
-    pub(crate) async fn fetch_proof(
+    pub async fn fetch_proof(
         client: &BeaconRpcClient,
         slot: u64,
-    ) -> Result<ExecutionHeaderProof, Error> {
+    ) -> Result<ExecutionHeaderProof, ExecutionHeaderError> {
         // Fetch the beacon block body for the specified slot
         let beacon_block_body: BeaconBlockBody<MainnetEthSpec> =
             client.get_block_body(slot).await?;
@@ -81,4 +82,10 @@ impl ExecutionHeaderProof {
 
         Ok(proof)
     }
+}
+
+#[derive(Debug, Error)]
+pub enum ExecutionHeaderError {
+    #[error("Beacon error: {0}")]
+    Beacon(#[from] BeaconError),
 }

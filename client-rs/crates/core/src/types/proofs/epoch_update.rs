@@ -1,13 +1,17 @@
 use std::fs;
 
 use crate::{
-    types::proofs::execution_header::ExecutionHeaderProof,
-    types::traits::{ProofType, Provable, Submittable},
-    types::error::Error,
+    cairo_runner::python::CairoRunnerError,
+    clients::{beacon_chain::BeaconError, ClientError},
+    db::manager::DatabaseError,
+    types::{
+        proofs::execution_header::ExecutionHeaderProof,
+        traits::{ProofType, Provable, Submittable},
+    },
 };
 
-use crate::utils::{constants, hashing::get_committee_hash};
 use crate::clients::beacon_chain::BeaconRpcClient;
+use crate::utils::{constants, hashing::get_committee_hash};
 use alloy_primitives::FixedBytes;
 use alloy_rpc_types_beacon::{
     events::light_client_finality::SyncAggregate, header::HeaderResponse,
@@ -17,9 +21,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use starknet::{core::types::Felt, macros::selector};
 use starknet_crypto::poseidon_hash_many;
+use thiserror::Error;
 use tracing::info;
 use tree_hash::TreeHash;
 use tree_hash_derive::TreeHash;
+
+use super::{execution_header::ExecutionHeaderError, ProofError};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochProof {
@@ -77,7 +84,7 @@ pub struct EpochUpdate {
 }
 
 impl EpochUpdate {
-    pub(crate) async fn new(client: &BeaconRpcClient, slot: u64) -> Result<Self, Error> {
+    pub async fn new(client: &BeaconRpcClient, slot: u64) -> Result<Self, EpochUpdateError> {
         let circuit_inputs = EpochCircuitInputs::generate_epoch_proof(client, slot).await?;
         let expected_circuit_outputs = ExpectedEpochUpdateOutputs::from_inputs(&circuit_inputs);
         Ok(Self {
@@ -88,13 +95,14 @@ impl EpochUpdate {
 }
 
 impl EpochUpdate {
-    pub fn from_json<T>(slot: u64) -> Result<T, Error>
+    pub fn from_json<T>(slot: u64) -> Result<T, EpochUpdateError>
     where
         T: serde::de::DeserializeOwned,
     {
         let path = format!("batches/epoch/{}/input_{}.json", slot, slot);
-        let json = fs::read_to_string(path).map_err(Error::IoError)?;
-        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
+        let json = fs::read_to_string(path)?;
+        let epoch_update = serde_json::from_str(&json)?;
+        Ok(epoch_update)
     }
 }
 
@@ -106,15 +114,15 @@ impl Provable for EpochUpdate {
         hex::encode(hasher.finalize().as_slice())
     }
 
-    fn export(&self) -> Result<String, Error> {
+    fn export(&self) -> Result<String, ProofError> {
         let json = serde_json::to_string_pretty(&self).unwrap();
         let dir_path = format!("batches/epoch/{}", self.circuit_inputs.header.slot);
-        fs::create_dir_all(dir_path.clone()).map_err(Error::IoError)?;
+        fs::create_dir_all(dir_path.clone());
         let path = format!(
             "{}/input_{}.json",
             dir_path, self.circuit_inputs.header.slot
         );
-        fs::write(path.clone(), json).map_err(Error::IoError)?;
+        fs::write(path.clone(), json);
         Ok(path)
     }
 
@@ -222,16 +230,18 @@ impl EpochCircuitInputs {
     pub(crate) async fn generate_epoch_proof(
         client: &BeaconRpcClient,
         mut slot: u64,
-    ) -> Result<EpochCircuitInputs, Error> {
+    ) -> Result<EpochCircuitInputs, EpochUpdateError> {
         let mut attempts = 0;
 
         let header = loop {
             match client.get_header(slot).await {
                 Ok(header) => break header,
-                Err(Error::EmptySlotDetected(_)) => {
+                Err(BeaconError::EmptySlot(_)) => {
                     attempts += 1;
                     if attempts >= constants::MAX_SKIPPED_SLOTS_RETRY_ATTEMPTS {
-                        return Err(Error::EmptySlotDetected(slot));
+                        return Err(EpochUpdateError::Client(
+                            BeaconError::EmptySlot(slot).into(),
+                        ));
                     }
                     slot += 1;
                     info!(
@@ -241,12 +251,18 @@ impl EpochCircuitInputs {
                         slot
                     );
                 }
-                Err(e) => return Err(e), // Propagate other errors immediately
+                Err(e) => return Err(EpochUpdateError::Client(e.into())), // Propagate other errors immediately
             }
         };
 
-        let sync_agg = client.get_sync_aggregate(slot).await?;
-        let validator_pubs = client.get_sync_committee_validator_pubs(slot).await?;
+        let sync_agg = client
+            .get_sync_aggregate(slot)
+            .await
+            .map_err(ClientError::Beacon)?;
+        let validator_pubs = client
+            .get_sync_committee_validator_pubs(slot)
+            .await
+            .map_err(ClientError::Beacon)?;
         // Process the sync committee data
         let signature_point = Self::extract_signature_point(&sync_agg)?;
         let non_signers = Self::derive_non_signers(&sync_agg, &validator_pubs);
@@ -261,12 +277,12 @@ impl EpochCircuitInputs {
     }
 
     /// Extracts and validates the BLS signature point from the sync aggregate
-    fn extract_signature_point(sync_agg: &SyncAggregate) -> Result<G2Point, Error> {
+    fn extract_signature_point(sync_agg: &SyncAggregate) -> Result<G2Point, EpochUpdateError> {
         let mut bytes = [0u8; 96];
         bytes.copy_from_slice(&sync_agg.sync_committee_signature.0);
         match G2Affine::from_compressed(&bytes).into() {
             Some(point) => Ok(G2Point(point)),
-            None => Err(Error::InvalidBLSPoint),
+            None => Err(EpochUpdateError::InvalidBLSPoint),
         }
     }
 
@@ -511,4 +527,22 @@ impl Submittable<EpochCircuitInputs> for ExpectedEpochUpdateOutputs {
     fn get_contract_selector(&self) -> Felt {
         selector!("verify_epoch_update")
     }
+}
+
+#[derive(Debug, Error)]
+pub enum EpochUpdateError {
+    #[error("Cairo run error: {0}")]
+    CairoRun(#[from] CairoRunnerError),
+    #[error("Database error: {0}")]
+    Database(#[from] DatabaseError),
+    #[error("Io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Deserialize error: {0}")]
+    Deserialize(#[from] serde_json::Error),
+    #[error("Beacon error: {0}")]
+    Client(#[from] ClientError),
+    #[error("Execution header error: {0}")]
+    ExecutionHeader(#[from] ExecutionHeaderError),
+    #[error("Invalid BLS point")]
+    InvalidBLSPoint,
 }

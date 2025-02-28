@@ -6,6 +6,7 @@ use reqwest::{
     Body,
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::{
     fs,
     time::{sleep, Duration},
@@ -15,7 +16,6 @@ use tracing::{debug, error, info, trace};
 
 use crate::{
     types::traits::{ProofType, Provable},
-    types::error::Error,
 };
 
 #[derive(Debug)]
@@ -30,6 +30,22 @@ pub struct StarkProof {
     pub proof: serde_json::Value,
 }
 
+#[derive(Debug, Error)]
+pub enum AtlanticError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Atlantic error: {0}")]
+    Request(#[from] reqwest::Error),
+    #[error("Invalid response: {0}")]
+    InvalidResponse(String),
+    #[error("Atlantic processing error: {0}")]
+    AtlanticProcessingError(String),
+    #[error("Pooling timeout for batch: {0}")]
+    AtlanticPoolingTimeout(String),
+    #[error("Decoding Error: {0}")]
+    Decoding(#[from] serde_json::Error),
+}
+
 impl AtlanticClient {
     pub fn new(endpoint: String, api_key: String) -> Self {
         Self {
@@ -39,17 +55,13 @@ impl AtlanticClient {
         }
     }
 
-    pub async fn submit_batch(&self, batch: impl Provable) -> Result<String, Error> {
+    pub async fn submit_batch(&self, batch: impl Provable) -> Result<String, AtlanticError> {
         let pie_path: PathBuf = batch.pie_path().into();
 
-        let meta = fs::metadata(pie_path.clone())
-            .await
-            .map_err(Error::IoError)?;
+        let meta = fs::metadata(pie_path.clone()).await?;
         let total_bytes = meta.len();
 
-        let file = fs::File::open(pie_path.clone())
-            .await
-            .map_err(Error::IoError)?;
+        let file = fs::File::open(pie_path.clone()).await?;
 
         let stream = ReaderStream::new(file);
 
@@ -94,8 +106,7 @@ impl AtlanticClient {
                     .to_string_lossy()
                     .to_string(),
             )
-            .mime_str("application/zip")
-            .map_err(Error::AtlanticError)?;
+            .mime_str("application/zip")?;
 
         let external_id = format!(
             "update_{}",
@@ -120,40 +131,34 @@ impl AtlanticClient {
             .header("accept", "application/json")
             .multipart(form)
             .send()
-            .await
-            .map_err(Error::AtlanticError)?;
+            .await?;
 
         if !response.status().is_success() {
-            error!("Error status: {}", response.status());
-            let error_text = response.text().await.map_err(Error::AtlanticError)?;
-            error!("Error response: {}", error_text);
-            return Err(Error::InvalidResponse(format!(
+            let error_text = response.text().await?;
+            return Err(AtlanticError::InvalidResponse(format!(
                 "Request failed: {}",
                 error_text
             )));
         }
 
         // Parse the response
-        let response_data: serde_json::Value =
-            response.json().await.map_err(Error::AtlanticError)?;
+        let response_data: serde_json::Value = response.json().await?;
 
         Ok(response_data["atlanticQueryId"]
             .as_str()
-            .ok_or_else(|| Error::InvalidResponse("Missing atlanticQueryId".into()))?
+            .ok_or_else(|| AtlanticError::InvalidResponse("Missing atlanticQueryId".into()))?
             .to_string())
     }
 
-    pub async fn submit_wrapped_proof(&self, proof: StarkProof) -> Result<String, Error> {
+    pub async fn submit_wrapped_proof(&self, proof: StarkProof) -> Result<String, AtlanticError> {
         info!("Uploading to Atlantic...");
         // Serialize the proof to JSON string
-        let proof_json =
-            serde_json::to_string(&proof).map_err(|e| Error::DeserializeError(e.to_string()))?;
+        let proof_json = serde_json::to_string(&proof)?;
 
         // Create a Part from the JSON string
         let proof_part = Part::text(proof_json)
             .file_name("proof.json")
-            .mime_str("application/json")
-            .map_err(Error::AtlanticError)?;
+            .mime_str("application/json")?;
 
         // Build the form
         let form = Form::new()
@@ -174,28 +179,26 @@ impl AtlanticClient {
             .header("accept", "application/json")
             .multipart(form)
             .send()
-            .await
-            .map_err(Error::AtlanticError)?;
+            .await?;
 
         if !response.status().is_success() {
-            let error_text = response.text().await.map_err(Error::AtlanticError)?;
-            return Err(Error::InvalidResponse(format!(
+            let error_text = response.text().await?;
+            return Err(AtlanticError::InvalidResponse(format!(
                 "Request failed: {}",
                 error_text
             )));
         }
 
         // Parse the response
-        let response_data: serde_json::Value =
-            response.json().await.map_err(Error::AtlanticError)?;
+        let response_data: serde_json::Value = response.json().await?;
 
         Ok(response_data["atlanticQueryId"]
             .as_str()
-            .ok_or_else(|| Error::InvalidResponse("Missing atlanticQueryId".into()))?
+            .ok_or_else(|| AtlanticError::InvalidResponse("Missing atlanticQueryId".into()))?
             .to_string())
     }
 
-    pub async fn fetch_proof(&self, batch_id: &str) -> Result<StarkProof, Error> {
+    pub async fn fetch_proof(&self, batch_id: &str) -> Result<StarkProof, AtlanticError> {
         let response = self
             .client
             .get(format!(
@@ -205,33 +208,30 @@ impl AtlanticClient {
             ))
             .header("accept", "application/json")
             .send()
-            .await
-            .map_err(Error::AtlanticError)?;
+            .await?;
 
         let response_data: serde_json::Value =
-            response.json().await.map_err(Error::AtlanticError)?;
+            response.json().await?;
 
         Ok(StarkProof {
             proof: response_data,
         })
     }
 
-    pub async fn check_batch_status(&self, batch_id: &str) -> Result<String, Error> {
+    pub async fn check_batch_status(&self, batch_id: &str) -> Result<String, AtlanticError> {
         let response = self
             .client
             .get(format!("{}/v1/atlantic-query/{}", self.endpoint, batch_id))
             .query(&[("apiKey", &self.api_key)])
             .header("accept", "application/json")
             .send()
-            .await
-            .map_err(Error::AtlanticError)?;
+            .await?;
 
-        let response_data: serde_json::Value =
-            response.json().await.map_err(Error::AtlanticError)?;
+        let response_data: serde_json::Value = response.json().await?;
 
         let status = response_data["atlanticQuery"]["status"]
             .as_str()
-            .ok_or_else(|| Error::InvalidResponse("Missing status field".into()))?;
+            .ok_or_else(|| AtlanticError::InvalidResponse("Missing status field".into()))?;
 
         Ok(status.to_string())
     }
@@ -241,7 +241,7 @@ impl AtlanticClient {
         batch_id: &str,
         sleep_duration: Duration,
         max_retries: usize,
-    ) -> Result<bool, Error> {
+    ) -> Result<bool, AtlanticError> {
         for attempt in 1..=max_retries {
             debug!("Pooling Atlantic for update... {}", batch_id);
             let status = self.check_batch_status(batch_id).await?;
@@ -251,7 +251,7 @@ impl AtlanticClient {
             }
 
             if status == "FAILED" {
-                return Err(Error::AtlanticProcessingError(format!(
+                return Err(AtlanticError::AtlanticProcessingError(format!(
                     "Atlantic processing failed for query {}",
                     batch_id
                 )));
@@ -267,7 +267,7 @@ impl AtlanticClient {
             sleep(sleep_duration).await;
         }
 
-        return Err(Error::AtlanticPoolingTimeout(format!(
+        return Err(AtlanticError::AtlanticPoolingTimeout(format!(
             "Pooling timeout for batch {}",
             batch_id
         )));

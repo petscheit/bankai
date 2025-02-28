@@ -1,8 +1,7 @@
-use crate::{
-    utils::constants::{
-        EPOCHS_PER_SYNC_COMMITTEE, SLOTS_PER_EPOCH, SLOTS_PER_SYNC_COMMITTEE, TARGET_BATCH_SIZE,
-    },
-    types::error::Error,
+use std::env;
+
+use crate::utils::constants::{
+    EPOCHS_PER_SYNC_COMMITTEE, SLOTS_PER_EPOCH, SLOTS_PER_SYNC_COMMITTEE, TARGET_BATCH_SIZE,
 };
 use tracing::info;
 
@@ -38,11 +37,11 @@ pub fn calculate_slots_range_for_batch(first_slot: u64) -> (u64, u64) {
 }
 
 /// Computes the slot numbers for term of specified slot
-pub async fn calculate_batching_range_for_slot(slot: u64) -> Result<(u64, u64), Error> {
-    let next_epoch_slot = (u64::try_from(slot).unwrap() / 32) * 32 + 32;
+pub async fn calculate_batching_range_for_slot(slot: u64) -> (u64, u64) {
+    let next_epoch_slot = (slot / 32) * 32 + 32;
     let term = next_epoch_slot / 0x2000;
     let terms_last_epoch_slot = (term + 1) * 0x2000 - 32;
-    Ok((next_epoch_slot, terms_last_epoch_slot))
+    (next_epoch_slot, terms_last_epoch_slot)
 }
 
 /// Returns the first epoch signed by the specified sync committee
@@ -88,4 +87,31 @@ pub fn extract_json_from_event(event_text: &str) -> Option<String> {
         }
     }
     None
+}
+
+// Checking status of env vars
+pub fn check_env_vars() -> Result<(), String> {
+    let required_vars = [
+        "BEACON_RPC_URL",
+        "STARKNET_RPC_URL",
+        "STARKNET_ADDRESS",
+        "STARKNET_PRIVATE_KEY",
+        "ATLANTIC_API_KEY",
+        "PROOF_REGISTRY",
+        "POSTGRESQL_HOST",
+        "POSTGRESQL_USER",
+        "POSTGRESQL_PASSWORD",
+        "POSTGRESQL_DB_NAME",
+        "RPC_LISTEN_HOST",
+        "RPC_LISTEN_PORT",
+        "TRANSACTOR_API_KEY",
+    ];
+
+    for &var in &required_vars {
+        if env::var(var).is_err() {
+            return Err(format!("Environment variable `{}` is not set", var));
+        }
+    }
+
+    Ok(())
 }

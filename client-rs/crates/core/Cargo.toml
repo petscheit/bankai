@@ -30,3 +30,5 @@ futures.workspace = true
 dotenv.workspace = true
 postgres-types.workspace = true
 glob.workspace = true
+thiserror.workspace = true
+strum.workspace = true

@@ -1,24 +1,21 @@
 use std::fs;
 
 use crate::{
-    types::traits::{ProofType, Provable, Submittable},
-    types::error::Error,
-    utils::{
-        hashing::get_committee_hash,
-        merkle
+    clients::beacon_chain::{BeaconError, BeaconRpcClient},
+    types::{
+        traits::{ProofType, Provable, Submittable},
     },
-    clients::beacon_chain::BeaconRpcClient
+    utils::{hashing::get_committee_hash, merkle},
 };
 use alloy_primitives::FixedBytes;
 use beacon_state_proof::state_proof_fetcher::{StateProofFetcher, SyncCommitteeProof, TreeHash};
 use bls12_381::G1Affine;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use starknet::{
-    core::types::Felt,
-    macros::selector,
-};
+use starknet::{core::types::Felt, macros::selector};
+use thiserror::Error;
 
+use super::ProofError;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SyncCommitteeUpdate {
@@ -29,12 +26,14 @@ pub struct SyncCommitteeUpdate {
 }
 
 impl SyncCommitteeUpdate {
-    pub async fn new(client: &BeaconRpcClient, slot: u64) -> Result<SyncCommitteeUpdate, Error> {
+    pub async fn new(
+        client: &BeaconRpcClient,
+        slot: u64,
+    ) -> Result<SyncCommitteeUpdate, SyncCommitteeError> {
         let state_proof_fetcher = StateProofFetcher::new(client.rpc_url.clone());
         let proof = state_proof_fetcher
             .fetch_next_sync_committee_proof(slot)
-            .await
-            .map_err(|_| Error::FailedFetchingBeaconState)?;
+            .await?;
 
         let circuit_inputs = CommitteeCircuitInputs::from(proof);
         let expected_circuit_outputs = ExpectedCircuitOutputs::from_inputs(&circuit_inputs);
@@ -45,13 +44,14 @@ impl SyncCommitteeUpdate {
         })
     }
 
-    pub fn from_json<T>(slot: u64) -> Result<T, Error>
+    pub fn from_json<T>(slot: u64) -> Result<T, SyncCommitteeError>
     where
         T: serde::de::DeserializeOwned,
     {
         let path = format!("batches/committee/{}/input_{}.json", slot, slot);
-        let json: String = fs::read_to_string(path).map_err(Error::IoError)?;
-        serde_json::from_str(&json).map_err(|e| Error::DeserializeError(e.to_string()))
+        let json_string: String = fs::read_to_string(path)?;
+        let json = serde_json::from_str(&json_string)?;
+        Ok(json)
     }
 }
 
@@ -63,16 +63,16 @@ impl Provable for SyncCommitteeUpdate {
         hex::encode(hasher.finalize().as_slice())
     }
 
-    fn export(&self) -> Result<String, Error> {
+    fn export(&self) -> Result<String, ProofError> {
         let json = serde_json::to_string_pretty(&self).unwrap();
         let dir_path = format!("batches/committee/{}", self.circuit_inputs.beacon_slot);
-        fs::create_dir_all(&dir_path).map_err(Error::IoError)?;
+        fs::create_dir_all(&dir_path);
 
         let path = format!(
             "{}/input_{}.json",
             dir_path, self.circuit_inputs.beacon_slot
         );
-        fs::write(path.clone(), json).map_err(Error::IoError)?;
+        fs::write(path.clone(), json);
         Ok(path)
     }
 
@@ -205,5 +205,23 @@ impl From<SyncCommitteeProof> for CommitteeCircuitInputs {
             ),
             committee_keys_root: FixedBytes::from_slice(committee_keys_root.as_bytes()),
         }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum SyncCommitteeError {
+    #[error("Beacon error: {0}")]
+    Beacon(#[from] BeaconError),
+    #[error("Io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Beacon state proof error")]
+    BeaconStateProof(beacon_state_proof::error::Error),
+    #[error("Deserialize error: {0}")]
+    DeserializeError(#[from] serde_json::Error),
+}
+
+impl From<beacon_state_proof::error::Error> for SyncCommitteeError {
+    fn from(error: beacon_state_proof::error::Error) -> Self {
+        SyncCommitteeError::BeaconStateProof(error)
     }
 }

@@ -1,13 +1,10 @@
-use crate::{
-    utils::config::BankaiConfig,
-    types::traits::Submittable,
-    types::error::Error
-};
+use crate::{types::traits::Submittable, utils::config::BankaiConfig};
 use reqwest::{
     header::{AUTHORIZATION, CONTENT_TYPE},
     Client,
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::time::{sleep, Duration};
 use tracing::{debug, trace};
 
@@ -57,7 +54,7 @@ impl TransactorClient {
     pub async fn send_transaction(
         &self,
         request: TransactorRequest,
-    ) -> Result<TransactorResponse, Error> {
+    ) -> Result<TransactorResponse, TransactorError> {
         let url = format!("{}/transactor", self.endpoint);
         let response = self
             .client
@@ -66,18 +63,16 @@ impl TransactorClient {
             .header(CONTENT_TYPE, "application/json")
             .json(&request)
             .send()
-            .await
-            .map_err(Error::TransactorError)?;
+            .await?;
 
-        let response_data: TransactorResponse =
-            response.json().await.map_err(Error::TransactorError)?;
+        let response_data: TransactorResponse = response.json().await?;
         Ok(response_data)
     }
 
     pub async fn check_transaction_status(
         &self,
         transaction_id: &str,
-    ) -> Result<TransactorResponse, Error> {
+    ) -> Result<TransactorResponse, TransactorError> {
         let url = format!("{}/transactor/{}", self.endpoint, transaction_id);
         let response = self
             .client
@@ -85,11 +80,9 @@ impl TransactorClient {
             .header(AUTHORIZATION, format!("Bearer {}", self.api_key))
             .header(CONTENT_TYPE, "application/json")
             .send()
-            .await
-            .map_err(Error::TransactorError)?;
+            .await?;
 
-        let response_data: TransactorResponse =
-            response.json().await.map_err(Error::TransactorError)?;
+        let response_data: TransactorResponse = response.json().await?;
         Ok(response_data)
     }
 
@@ -98,7 +91,7 @@ impl TransactorClient {
         transaction_id: &str,
         sleep_duration: Duration,
         max_retries: usize,
-    ) -> Result<bool, Error> {
+    ) -> Result<bool, TransactorError> {
         for attempt in 1..=max_retries {
             debug!("Polling Transactor for update... {}", transaction_id);
             let status_response = self.check_transaction_status(transaction_id).await?;
@@ -109,7 +102,7 @@ impl TransactorClient {
             }
 
             if status == "KO_FAILED_TO_ESTIMATE_GAS" || status == "KO_WITH_ERRORS" {
-                return Err(Error::InvalidResponse(format!(
+                return Err(TransactorError::Response(format!(
                     "Transactor processing failed for transaction {} with status: {}",
                     transaction_id, status
                 )));
@@ -125,7 +118,7 @@ impl TransactorClient {
             sleep(sleep_duration).await;
         }
 
-        Err(Error::InvalidResponse(format!(
+        Err(TransactorError::PollingTimeout(format!(
             "Polling timeout for transaction {}",
             transaction_id
         )))
@@ -135,7 +128,7 @@ impl TransactorClient {
         &self,
         update: impl Submittable<T>,
         config: &BankaiConfig,
-    ) -> Result<String, Error> {
+    ) -> Result<String, TransactorError> {
         let request = TransactorRequest {
             chain_id: config.proof_settlement_chain_id.clone().to_hex_string(),
             contract_invocations: vec![ContractInvocation {
@@ -157,9 +150,19 @@ impl TransactorClient {
             println!("Transaction sent with tx_hash: {:?}", hash);
             Ok(hash)
         } else {
-            Err(Error::InvalidResponse(
+            Err(TransactorError::Response(
                 "Transaction hash not found".to_string(),
             ))
         }
     }
+}
+
+#[derive(Debug, Error)]
+pub enum TransactorError {
+    #[error("Transactor request error: {0}")]
+    Request(#[from] reqwest::Error),
+    #[error("Transactor response error: {0}")]
+    Response(String),
+    #[error("Polling timeout for transaction {0}")]
+    PollingTimeout(String),
 }

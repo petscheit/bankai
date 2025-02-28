@@ -1,21 +1,19 @@
-pub mod utils;
-pub mod types;
+pub mod cairo_runner;
 pub mod clients;
 pub mod db;
+pub mod types;
+pub mod utils;
 
 use crate::utils::constants;
 use crate::{
-    types::proofs::contract_init::ContractInitializationData,
-    types::proofs::epoch_update::EpochUpdate,
-    types::error::Error,
-    utils::config::BankaiConfig,
-    types::proofs::sync_committee::SyncCommitteeUpdate,
-    clients::atlantic::AtlanticClient,
-    clients::beacon_chain::BeaconRpcClient,
-    clients::starknet::StarknetClient,
-    clients::transactor::TransactorClient,
-
+    clients::atlantic::AtlanticClient, clients::beacon_chain::BeaconRpcClient,
+    clients::starknet::StarknetClient, clients::transactor::TransactorClient,
+    types::contract::contract_init::ContractInitializationData, types::error::BankaiCoreError,
+    types::proofs::epoch_update::EpochUpdate, types::proofs::sync_committee::SyncCommitteeUpdate,
+    utils::config::BankaiConfig, types::proofs::ProofError, types::contract::ContractError,
 };
+use clients::beacon_chain::BeaconError;
+use clients::ClientError;
 use dotenv::from_filename;
 use std::env;
 use tracing::info;
@@ -57,17 +55,17 @@ impl BankaiClient {
     pub async fn get_sync_committee_update(
         &self,
         mut slot: u64,
-    ) -> Result<SyncCommitteeUpdate, Error> {
+    ) -> Result<SyncCommitteeUpdate, BankaiCoreError> {
         let mut attempts = 0;
 
         // Before we start generating the proof, we ensure the slot was not missed
         let _header = loop {
             match self.client.get_header(slot).await {
                 Ok(header) => break header,
-                Err(Error::EmptySlotDetected(_)) => {
+                Err(BeaconError::EmptySlot(_)) => {
                     attempts += 1;
                     if attempts >= constants::MAX_SKIPPED_SLOTS_RETRY_ATTEMPTS {
-                        return Err(Error::EmptySlotDetected(slot));
+                        return Err(BankaiCoreError::Client(ClientError::Beacon(BeaconError::EmptySlot(slot))));
                     }
                     slot += 1;
                     info!(
@@ -77,17 +75,17 @@ impl BankaiClient {
                         slot
                     );
                 }
-                Err(e) => return Err(e), // Propagate other errors immediately
+                Err(e) => return Err(BankaiCoreError::Client(ClientError::Beacon(e))), // Propagate other errors immediately
             }
         };
 
-        let proof: SyncCommitteeUpdate = SyncCommitteeUpdate::new(&self.client, slot).await?;
+        let proof = SyncCommitteeUpdate::new(&self.client, slot).await.map_err(|e| BankaiCoreError::Proof(ProofError::SyncCommittee(e)))?;
 
         Ok(proof)
     }
 
-    pub async fn get_epoch_proof(&self, slot: u64) -> Result<EpochUpdate, Error> {
-        let epoch_proof = EpochUpdate::new(&self.client, slot).await?;
+    pub async fn get_epoch_proof(&self, slot: u64) -> Result<EpochUpdate, BankaiCoreError> {
+        let epoch_proof = EpochUpdate::new(&self.client, slot).await.map_err(|e| BankaiCoreError::Proof(ProofError::EpochUpdate(e)))?;
         Ok(epoch_proof)
     }
 
@@ -95,8 +93,8 @@ impl BankaiClient {
         &self,
         slot: u64,
         config: &BankaiConfig,
-    ) -> Result<ContractInitializationData, Error> {
-        let contract_init = ContractInitializationData::new(&self.client, slot, config).await?;
+    ) -> Result<ContractInitializationData, BankaiCoreError> {
+        let contract_init = ContractInitializationData::new(&self.client, slot, config).await.map_err(|e| BankaiCoreError::Contract(ContractError::Initialization(e)))?;
         Ok(contract_init)
     }
 }

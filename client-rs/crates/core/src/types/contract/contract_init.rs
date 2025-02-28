@@ -1,4 +1,5 @@
-use crate::{utils::rpc::BeaconRpcClient, BankaiConfig, Error};
+use crate::clients::beacon_chain::{BeaconError, BeaconRpcClient};
+use crate::utils::config::BankaiConfig;
 use alloy_primitives::FixedBytes;
 use serde::{Deserialize, Serialize};
 use starknet::core::types::Felt;
@@ -17,7 +18,7 @@ impl ContractInitializationData {
         client: &BeaconRpcClient,
         slot: u64,
         config: &BankaiConfig,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, ContractInitializationError> {
         let committee = client.get_sync_committee_validator_pubs(slot).await?;
         Ok(Self {
             committee_id: (slot / 0x2000), // since this is the current committee, we dont increment the committee id
@@ -39,4 +40,10 @@ impl ContractInitializationData {
             self.epoch_batch_program_hash,
         ]
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ContractInitializationError {
+    #[error("Beacon error: {0}")]
+    Beacon(#[from] BeaconError),
 }

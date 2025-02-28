@@ -1,7 +1,7 @@
 use serde::Serialize;
 use starknet::core::types::Felt;
 
-use crate::types::error::Error;
+use super::proofs::ProofError;
 
 /// A trait for the types that can be submitted on-chain
 pub trait Submittable<T> {
@@ -18,7 +18,7 @@ pub enum ProofType {
 
 pub trait Provable: Serialize {
     fn id(&self) -> String;
-    fn export(&self) -> Result<String, Error>;
+    fn export(&self) -> Result<String, ProofError>;
     // fn from_json<T>(slot: u64) -> Result<T, Error>
     // where
     //     T: serde::de::DeserializeOwned;

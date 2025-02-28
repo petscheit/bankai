@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use starknet::core::types::Felt;
+use thiserror::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MerklePath {
@@ -8,7 +9,7 @@ pub struct MerklePath {
 }
 
 pub(crate) mod sha256 {
-    use crate::types::error::Error;
+    use super::MerkleError;
     use alloy_primitives::FixedBytes;
     use sha2::{Digest, Sha256};
 
@@ -40,9 +41,9 @@ pub(crate) mod sha256 {
     pub fn generate_path(
         leaves: Vec<FixedBytes<32>>,
         leaf_index: usize,
-    ) -> Result<Vec<FixedBytes<32>>, Error> {
+    ) -> Result<Vec<FixedBytes<32>>, MerkleError> {
         if leaf_index >= leaves.len() {
-            return Err(Error::InvalidMerkleTree);
+            return Err(MerkleError::InvalidMerkleTree);
         }
 
         // Calculate the smallest power of 2 that can fit all leaves
@@ -214,4 +215,10 @@ pub(crate) mod poseidon {
 
         current_hash
     }
+}
+
+#[derive(Debug, Error)]
+pub enum MerkleError {
+    #[error("Invalid Merkle tree")]
+    InvalidMerkleTree,
 }
