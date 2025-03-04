@@ -1,5 +1,7 @@
 # Bankai - An Ethereum Light client, written in Cairo.
 
+![Bankai](.github/assets/Bankai.jpg)
+
 This repository contains all the code for the Bankai Ethereum Light client. It consists of 3 main components: Cairo0 circuits for verifying epoch and sync committee updates, a Rust client for generating circuit inputs, the trace and submitting them to Starknet, and a Cairo1 contract (deployed on Starknet) for decommitting and storing verified beacon chain headers.
 
 ## Table of Contents
