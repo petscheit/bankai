@@ -242,6 +242,7 @@ version = "0.1.0"
 dependencies = [
  "cairo-vm",
  "garaga-zero-hints",
+ "hex",
  "num-bigint",
  "serde",
  "serde_json",

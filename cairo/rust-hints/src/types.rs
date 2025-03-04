@@ -1,10 +1,9 @@
-pub use garaga_zero_hints::types::{CairoType};
+pub use garaga_zero_hints::types::CairoType;
 use cairo_vm::{types::relocatable::Relocatable, vm::{errors::memory_errors::MemoryError, vm_core::VirtualMachine}, Felt252};
-// use cairo_vm::vm::relocatable::Relocatable;
 use num_bigint::BigUint;
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(try_from = "String")]
 pub struct Uint256(pub BigUint);
 
@@ -76,7 +75,7 @@ impl Uint256Bits32 {
         let limb_mask = (BigUint::from(1u64) << LIMB_SIZE) - BigUint::from(1u64);
         
         let limbs = (0..8).map(|i| {
-            let shift = i * LIMB_SIZE;
+            let shift = (7 - i) * LIMB_SIZE;
             let limb = (&self.0 >> shift) & &limb_mask;
             Felt252::from_bytes_be_slice(&limb.to_bytes_be())
         }).collect::<Vec<_>>();
@@ -172,7 +171,7 @@ impl CairoType for UInt384 {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Felt(pub Felt252);
 
 impl CairoType for Felt {

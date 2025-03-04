@@ -1,19 +1,19 @@
 {
     "circuit_inputs": {
-        "beacon_slot": "0x555555",
+        "beacon_slot": "0x5800000",
         "next_sync_committee_branch": [
-            "0xba29c0d918ce63c33e6ae5610f2a35ad793f74ab94d9cbd1532c1e0217fbdfbf",
-            "0xe6f947a1c5d672350aaf2bc34e571ee3224a6c1b6f0f8aaa1f860e7fc39655c8",
-            "0xc16a6f26ca899f0f1db55285d57c11cde515ebb0a9be43fd99a2379f6a8e3326",
-            "0xb196bde4a6960d168a7447f83952fe1c7640e768e2358cd3a27892c79ce85fc3",
-            "0x6fc83b94aeb4230de5768f4803ea543b151103fc55aa5c7ead65e18ee4623cfa"
+            "0x5c0250435f7865d60a44273d1d31dc4879f56788b97c2e870cb1ad28bb410cd3",
+            "0xb8aa9475087dad6978f2ef152dd7bb55fcbe6309b04bce93f171f484ef505445",
+            "0x7ea66c3a85774a038fee76be4989a8f207d94e8a78b8d2d6c4cb4b6316da6f66",
+            "0x2c2471a5a0556b99f292e77e1c254556b3c10f75eb87653b36e0ad125cb077e9",
+            "0x491e7da6bfca87304a4fd02506492c5ca4b326a1c77bcb6cc7c4e6c49e6fc6b9"
         ],
-        "next_aggregate_sync_committee": "0x9302730d53031be9020289a2c96fcbddadf13d7588cac0ec32d5ec0f2e9bdfab75017a2a0d5940219e436e3837c4f468",
-        "committee_keys_root": "0x194ff1405484d917508c452d42f17bd1ecfb0f075999de2fce858cfd3fb6f836"
+        "next_aggregate_sync_committee": "0xa2bd66fd33ceee206928f19f316b567d06085b7f1563e41f1373bf75d99eb22d795509d5462e984a6691eafb50fb5cef",
+        "committee_keys_root": "0x514bf17725567be663d2f370ecdf8fc31f267c222517e49a2728578c1f7abf5d"
     },
     "expected_circuit_outputs": {
-        "state_root": "0xe6ee936b3ce539d7790115cd668e6aca7e2858c9fb5b7997a49d80cfe29a1429",
-        "slot": "0x555555",
-        "committee_hash": "0x5ab23ffcc70bf8c9e30afe09a0a7ee0c271bdd454a44cfbb6d5e0b770ccd3d0a"
+        "state_root": "0x22e3c1f0fbbd08b234f7082a3588491579cf623e2ac22ead59e619ebfd0e9739",
+        "slot": "0x5800000",
+        "committee_hash": "0xb205af5933a943bbcaa2fb6979a08b22329c120b83ac7622af81ae0f0e9ef917"
     }
 }

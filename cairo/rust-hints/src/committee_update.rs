@@ -37,6 +37,7 @@ pub struct CircuitOutput {
 }
 
 pub const HINT_WRITE_CIRCUIT_INPUTS: &str = r#"load_inputs()"#;
+pub const HINT_ASSERT_RESULT: &str = r#"assert_result()"#;
 
 impl CustomHintProcessor {
 
@@ -47,7 +48,6 @@ impl CustomHintProcessor {
         hint_data: &HintProcessorData,
         _constants: &HashMap<String, Felt252>,
     ) -> Result<(), HintError> {
-        println!("Writing circuit inputs");
         if let Some(committee_update) = &self.committee_input {
     
             let slot_ptr = get_relocatable_from_var_name("slot", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
@@ -75,7 +75,40 @@ impl CustomHintProcessor {
         } else {
             panic!("Committee input not found");
         }
+    }
+
     
+    pub fn assert_result(
+        &self,
+        vm: &mut VirtualMachine,
+        _exec_scopes: &mut ExecutionScopes,
+        hint_data: &HintProcessorData,
+        _constants: &HashMap<String, Felt252>,
+    ) -> Result<(), HintError> {
+        let expected_outputs = &self.committee_input.as_ref().expect("Committee input not found").expected_circuit_outputs;
+
+        let state_root_ptr = get_relocatable_from_var_name("state_root", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+        let state_root = Uint256::from_memory(vm, state_root_ptr)?;
+        let expected_state_root = &expected_outputs.state_root;
+        if &state_root != expected_state_root {
+            return Err(HintError::AssertionFailed(format!("Invalid state root: {:?} != {:?}", state_root, expected_state_root).into_boxed_str()));
+        }
+
+        let slot_ptr = get_relocatable_from_var_name("slot", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+        let slot = Felt::from_memory(vm, slot_ptr)?;
+        let expected_slot = &expected_outputs.slot;
+        if &slot != expected_slot {
+            return Err(HintError::AssertionFailed(format!("Invalid slot: {:?} != {:?}", slot, expected_slot).into_boxed_str()));
+        }
+
+        let committee_hash_ptr = get_relocatable_from_var_name("committee_hash", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+        let committee_hash = Uint256::from_memory(vm, committee_hash_ptr)?;
+        if &committee_hash != &expected_outputs.committee_hash {
+            return Err(HintError::AssertionFailed(format!("Invalid committee hash: {:?} != {:?}", committee_hash, expected_outputs.committee_hash).into_boxed_str()));
+        }
+
+        Ok(())
+
     }
 
 }

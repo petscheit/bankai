@@ -11,9 +11,7 @@ use cairo_vm::{
 };
 use garaga_zero_hints::*;
 
-use crate::committee_update::{CommitteeUpdate};
-
-use crate::committee_update::{HINT_WRITE_CIRCUIT_INPUTS};
+use crate::committee_update::{CommitteeUpdate, HINT_ASSERT_RESULT, HINT_WRITE_CIRCUIT_INPUTS};
 
 pub type HintImpl = fn(&mut VirtualMachine, &mut ExecutionScopes, &HintProcessorData, &HashMap<String, Felt252>) -> Result<(), HintError>;
 
@@ -86,13 +84,13 @@ impl HintProcessorLogic for CustomHintProcessor {
 
             let res = match hint_code {
                 HINT_WRITE_CIRCUIT_INPUTS => self.write_circuit_inputs(vm, exec_scopes, hpd, constants),
+                HINT_ASSERT_RESULT => self.assert_result(vm, exec_scopes, hpd, constants),
                 _ => Err(HintError::UnknownHint(hint_code.to_string().into_boxed_str())),
             };
 
             if !matches!(res, Err(HintError::UnknownHint(_))) {
                 return res.map(|_| HintExtension::default());
             }
-            println!("Hint code: {}", hint_code);
 
             // First try our custom hints
             if let Some(hint_impl) = self.hints.get(hint_code) {

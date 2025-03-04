@@ -23,9 +23,7 @@ fn main() -> Result<(), Error> {
     let program_file = std::fs::read("../build/committee_update.json").map_err(Error::IO)?;
 
     let update = CommitteeUpdate::from_file("committee_update_input.json").unwrap();
-
-    println!("{:?}", update);
-
+    
     // Load the Program
     let program = Program::from_bytes(&program_file, Some(cairo_run_config.entrypoint))?;
 

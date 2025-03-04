@@ -41,18 +41,6 @@ func main{
 
     %{ load_inputs() %}
 
-    // Initialize variables from program input
-    // %{
-    //     from cairo.py.utils import write_uint384, hex_to_chunks_32, print_u256
-    //     write_uint384(ids.aggregate_committee_key, int(program_input["circuit_inputs"]["next_aggregate_sync_committee"], 16))
-    //     committee_keys_root = hex_to_chunks_32(program_input["circuit_inputs"]["committee_keys_root"])
-    //     segments.write_arg(ids.committee_keys_root, committee_keys_root)
-    //     ids.slot = program_input["circuit_inputs"]["beacon_slot"]
-    //     path = [hex_to_chunks_32(node) for node in program_input["circuit_inputs"]["next_sync_committee_branch"]]
-    //     ids.path_len = len(path)
-    //     segments.write_arg(ids.path, path)
-    // %}
-
     // Compute hashes and update state
     with sha256_ptr, pow2_array {
         let leaf_hash = compute_leaf_hash(committee_keys_root, aggregate_committee_key);
@@ -62,17 +50,11 @@ func main{
         );
         let committee_hash = compute_committee_hash(aggregate_committee_key);
     }
-    // %{ print_u256("Derived committee hash", ids.committee_hash) %}
 
     // Finalize SHA256 and write output
     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
 
-    %{
-        from cairo.py.utils import uint256_to_int
-        assert uint256_to_int(ids.state_root) == int(program_input["expected_circuit_outputs"]["state_root"], 16), "State Root Mismatch"
-        assert ids.slot == program_input["expected_circuit_outputs"]["slot"], "Slot Mismatch"
-        assert uint256_to_int(ids.committee_hash) == int(program_input["expected_circuit_outputs"]["committee_hash"], 16), "Committee Hash Mismatch"
-    %}
+    %{ assert_result() %}
 
     assert [output_ptr] = state_root.low;
     assert [output_ptr + 1] = state_root.high;
@@ -89,7 +71,6 @@ func compute_leaf_hash{range_check_ptr, pow2_array: felt*, sha256_ptr: felt*}(
     committee_keys_root: felt*, aggregate_committee_key: UInt384
 ) -> felt* {
     alloc_locals;
-    print_uint384(aggregate_committee_key);
     // Step 1: Create leaf hash -> h(sync_committee_root, aggregate_committee_key)
     let (aggregate_committee_key_chunks) = HashUtils.chunk_uint384(aggregate_committee_key);
     // Pad the key to 64 bytes
