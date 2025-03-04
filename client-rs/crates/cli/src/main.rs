@@ -1,36 +1,34 @@
+use bankai_core::cairo_runner::python::{CairoRunner, CairoRunnerError};
 use bankai_core::clients::atlantic::AtlanticError;
 use bankai_core::clients::starknet::StarknetError;
+use bankai_core::types::error::BankaiCoreError;
+use bankai_core::types::proofs::epoch_batch::EpochUpdateBatch;
+use bankai_core::types::proofs::epoch_update::EpochUpdate;
+use bankai_core::types::proofs::execution_header::ExecutionHeaderProof;
+use bankai_core::types::proofs::sync_committee::SyncCommitteeUpdate;
 use bankai_core::types::proofs::ProofError;
+use bankai_core::types::traits::Provable;
+use bankai_core::BankaiClient;
 use clap::{Parser, Subcommand};
 use dotenv::from_filename;
 use starknet::core::types::Felt;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
-use tokio;
-use bankai_core::types::error::BankaiCoreError;
-use bankai_core::types::proofs::epoch_batch::EpochUpdateBatch;
-use bankai_core::types::proofs::epoch_update::EpochUpdate;
-use bankai_core::cairo_runner::python::{CairoRunner, CairoRunnerError};
-use bankai_core::BankaiClient;
-use bankai_core::types::proofs::execution_header::ExecutionHeaderProof;
-use bankai_core::types::proofs::sync_committee::SyncCommitteeUpdate;
-use serde_json;
-use bankai_core::types::traits::Provable;
 
 #[derive(Subcommand)]
 enum Commands {
     /// Generate and manage proofs for the light client state
     #[command(subcommand)]
     Prove(ProveCommands),
-    
+
     /// Generate and manage contract data
     #[command(subcommand)]
     Contract(ContractCommands),
-    
+
     /// Verify and submit proofs to the network
     #[command(subcommand)]
     Verify(VerifyCommands),
-    
+
     /// Query and check proof status
     #[command(subcommand)]
     Status(StatusCommands),
@@ -185,7 +183,9 @@ async fn main() -> Result<(), BankaiCliError> {
     match cli.command {
         Commands::Prove(cmd) => match cmd {
             ProveCommands::ExecutionHeader { block } => {
-                let proof = ExecutionHeaderProof::fetch_proof(&bankai.client, block).await.map_err(|e|BankaiCliError::ProofFetch(e.into()))?;
+                let proof = ExecutionHeaderProof::fetch_proof(&bankai.client, block)
+                    .await
+                    .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
                 let json = serde_json::to_string_pretty(&proof)?;
                 println!("{}", json);
             }
@@ -249,14 +249,18 @@ async fn main() -> Result<(), BankaiCliError> {
                 // make sure next_epoch % 32 == 0
                 let next_epoch = (u64::try_from(latest_epoch).unwrap() / 32) * 32 + 32;
                 println!("Fetching Inputs for Epoch: {}", next_epoch);
-                let epoch_update = EpochUpdate::new(&bankai.client, next_epoch).await.map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
+                let epoch_update = EpochUpdate::new(&bankai.client, next_epoch)
+                    .await
+                    .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
                 let _ = epoch_update.export().unwrap();
                 CairoRunner::generate_pie(&epoch_update, &bankai.config, None, None).await?;
                 let batch_id = bankai.atlantic_client.submit_batch(epoch_update).await?;
                 println!("Batch Submitted: {}", batch_id);
             }
             ProveCommands::NextEpochBatch => {
-                let epoch_update = EpochUpdateBatch::new(&bankai).await.map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
+                let epoch_update = EpochUpdateBatch::new(&bankai)
+                    .await
+                    .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
                 println!("Update contents: {:?}", epoch_update);
                 let _ = epoch_update.export().unwrap();
                 CairoRunner::generate_pie(&epoch_update, &bankai.config, None, None).await?;
@@ -329,7 +333,8 @@ async fn main() -> Result<(), BankaiCliError> {
                     .check_batch_status(batch_id.as_str())
                     .await?;
                 if status == "DONE" {
-                    let update = EpochUpdate::from_json::<EpochUpdate>(slot).map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
+                    let update = EpochUpdate::from_json::<EpochUpdate>(slot)
+                        .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
                     bankai
                         .starknet_client
                         .submit_update(update.expected_circuit_outputs, &bankai.config)
@@ -339,14 +344,19 @@ async fn main() -> Result<(), BankaiCliError> {
                     println!("Batch not completed yet. Status: {}", status);
                 }
             }
-            VerifyCommands::EpochBatch { batch_id, first_slot, last_slot } => {
+            VerifyCommands::EpochBatch {
+                batch_id,
+                first_slot,
+                last_slot,
+            } => {
                 let status = bankai
                     .atlantic_client
                     .check_batch_status(batch_id.as_str())
                     .await?;
                 if status == "DONE" {
                     let update =
-                        EpochUpdateBatch::from_json::<EpochUpdateBatch>(first_slot, last_slot).map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
+                        EpochUpdateBatch::from_json::<EpochUpdateBatch>(first_slot, last_slot)
+                            .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
                     bankai
                         .starknet_client
                         .submit_update(update.expected_circuit_outputs, &bankai.config)
@@ -362,7 +372,8 @@ async fn main() -> Result<(), BankaiCliError> {
                     .check_batch_status(batch_id.as_str())
                     .await?;
                 if status == "DONE" {
-                    let update = SyncCommitteeUpdate::from_json::<SyncCommitteeUpdate>(slot).map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
+                    let update = SyncCommitteeUpdate::from_json::<SyncCommitteeUpdate>(slot)
+                        .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
                     bankai
                         .starknet_client
                         .submit_update(update.expected_circuit_outputs, &bankai.config)

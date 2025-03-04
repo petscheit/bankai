@@ -14,6 +14,7 @@ from cairo.src.signer import commit_committee_key
 from cairo.src.ssz import MerkleTree
 from sha import SHA256, HashUtils
 from ec_ops import derive_g1_point_from_x
+from debug import print_felt_hex, print_uint384
 
 // Main function to update the committee
 func main{
@@ -38,17 +39,19 @@ func main{
     local aggregate_committee_key: UInt384;
     local slot: felt;
 
+    %{ load_inputs() %}
+
     // Initialize variables from program input
-    %{
-        from cairo.py.utils import write_uint384, hex_to_chunks_32, print_u256
-        write_uint384(ids.aggregate_committee_key, int(program_input["circuit_inputs"]["next_aggregate_sync_committee"], 16))
-        committee_keys_root = hex_to_chunks_32(program_input["circuit_inputs"]["committee_keys_root"])
-        segments.write_arg(ids.committee_keys_root, committee_keys_root)
-        ids.slot = program_input["circuit_inputs"]["beacon_slot"]
-        path = [hex_to_chunks_32(node) for node in program_input["circuit_inputs"]["next_sync_committee_branch"]]
-        ids.path_len = len(path)
-        segments.write_arg(ids.path, path)
-    %}
+    // %{
+    //     from cairo.py.utils import write_uint384, hex_to_chunks_32, print_u256
+    //     write_uint384(ids.aggregate_committee_key, int(program_input["circuit_inputs"]["next_aggregate_sync_committee"], 16))
+    //     committee_keys_root = hex_to_chunks_32(program_input["circuit_inputs"]["committee_keys_root"])
+    //     segments.write_arg(ids.committee_keys_root, committee_keys_root)
+    //     ids.slot = program_input["circuit_inputs"]["beacon_slot"]
+    //     path = [hex_to_chunks_32(node) for node in program_input["circuit_inputs"]["next_sync_committee_branch"]]
+    //     ids.path_len = len(path)
+    //     segments.write_arg(ids.path, path)
+    // %}
 
     // Compute hashes and update state
     with sha256_ptr, pow2_array {
@@ -86,6 +89,7 @@ func compute_leaf_hash{range_check_ptr, pow2_array: felt*, sha256_ptr: felt*}(
     committee_keys_root: felt*, aggregate_committee_key: UInt384
 ) -> felt* {
     alloc_locals;
+    print_uint384(aggregate_committee_key);
     // Step 1: Create leaf hash -> h(sync_committee_root, aggregate_committee_key)
     let (aggregate_committee_key_chunks) = HashUtils.chunk_uint384(aggregate_committee_key);
     // Pad the key to 64 bytes
@@ -113,10 +117,9 @@ func compute_committee_hash{
     let (flags, x_point) = decompress_g1(compressed_g1);
     assert flags.compression_bit = 1;
     assert flags.infinity_bit = 0;
-    let s = UInt384(d0=flags.sign_bit, d1=0, d2=0, d3=0);
 
     // Derive the full G1 point and hash it
-    let (point) = derive_g1_point_from_x(curve_id=1, x=x_point, s=s);
+    let (point) = derive_g1_point_from_x(curve_id=1, x=x_point, s=flags.sign_bit);
     let committee_hash = commit_committee_key(point=point);
 
     return committee_hash;
@@ -151,3 +154,12 @@ func decompress_g1{range_check_ptr}(compressed_g1: UInt384) -> (CompressedG1Flag
 
     return (CompressedG1Flags(compression_bit, infinity_bit, sign_bit), x_point);
 }
+
+
+struct CircuitInput {
+    beacon_slot: felt,
+    next_sync_committee_branch: Uint256*,
+    next_aggregate_sync_committee: UInt384,
+    committee_keys_root: Uint256,
+}
+
