@@ -95,47 +95,66 @@ PROOF_WRAPPER_PROGRAM_HASH=0x193641eb151b0f41674641089952e60bc3aded26e3cf4279365
 
 The Bankai client provides the following command categories:
 
-### 1. Input Generation Commands
-Generate JSON inputs for circuits and debugging:
-
-```bash
-# Initialize contract with starting slot
-cargo run -- contract-init --slot <SLOT> [--export <FILE>]
-
-# Generate epoch update inputs
-cargo run -- epoch-update --slot <SLOT> [--export <FILE>]
-
-# Generate sync committee update inputs
-cargo run -- committee-update --slot <SLOT> [--export <FILE>]
-```
-
-### 2. Proof Generation Commands
+### 1. Proof Generation Commands
 Generate and manage proofs for the light client state:
 
 ```bash
-# Generate proof for next epoch
-cargo run -- prove-next-epoch
+# Generate sync committee update proof
+cargo run --bin cli prove committee-update --slot <SLOT> [--export <FILE>]
 
-# Generate proof for next committee
-cargo run -- prove-next-committee
+# Generate epoch update proof
+cargo run --bin cli prove epoch-update --slot <SLOT> [--export <FILE>]
 
-# Wrap and resubmit proof (required for dynamic layouts)
-cargo run -- submit-wrapped-proof --batch-id <BATCH_ID>
+# Generate proof for committee at specific slot
+cargo run --bin cli prove committee-at-slot --slot <SLOT>
 
-# Check proof generation status
-cargo run -- check-batch-status --batch-id <BATCH_ID>
+# Generate execution header proof
+cargo run --bin cli prove execution-header --block <BLOCK>
+
+# Generate proof for next committee update
+cargo run --bin cli prove next-committee
+
+# Generate proof for next epoch update
+cargo run --bin cli prove next-epoch
+
+# Generate proof for next epoch batch
+cargo run --bin cli prove next-epoch-batch
+
+# Submit wrapped proof for verification
+cargo run --bin cli prove submit-wrapped --batch-id <BATCH_ID>
 ```
 
-### 3. Contract Management Commands
-Deploy and interact with the Starknet contract:
+### 2. Contract Management Commands
+Generate and deploy contract data:
 
 ```bash
-# Deploy Bankai contract
-cargo run -- deploy-contract --slot <SLOT>
+# Generate contract initialization data
+cargo run --bin cli contract init --slot <SLOT> [--export <FILE>]
 
-# Verify and decommit proofs
-cargo run -- verify-epoch --batch-id <BATCH_ID> --slot <SLOT>      # For epoch updates
-cargo run -- verify-committee --batch-id <BATCH_ID> --slot <SLOT>  # For committee updates
+# Deploy Bankai contract
+cargo run --bin cli contract deploy --slot <SLOT>
+```
+
+### 3. Proof Verification Commands
+Verify and submit proofs to the network:
+
+```bash
+# Verify and submit epoch update proof
+cargo run --bin cli verify epoch --batch-id <BATCH_ID> --slot <SLOT>
+
+# Verify and submit epoch batch proof
+cargo run --bin cli verify epoch-batch --batch-id <BATCH_ID> --first-slot <SLOT> --last-slot <SLOT>
+
+# Verify and submit committee update proof
+cargo run --bin cli verify committee --batch-id <BATCH_ID> --slot <SLOT>
+```
+
+### 4. Status Commands
+Query and check proof status:
+
+```bash
+# Check proof batch status
+cargo run --bin cli status check-batch --batch-id <BATCH_ID>
 ```
 
 > **Note**: All commands that generate proofs will automatically create input files, generate traces, and submit to Atlantic for proving. The returned batch ID can be used to track the proof status.

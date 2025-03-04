@@ -506,18 +506,37 @@ dependencies = [
 ]
 
 [[package]]
-name = "bankai-cli"
+name = "bankai-core"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives 0.8.18",
+ "alloy-rpc-types-beacon",
  "beacon-state-proof",
- "clap",
- "core",
+ "bls12_381",
+ "chrono",
  "dotenv",
+ "futures",
+ "glob",
+ "hex",
+ "itertools 0.13.0",
+ "num-traits",
+ "postgres-types",
+ "reqwest 0.12.12",
+ "serde",
  "serde_json",
+ "sha2",
  "starknet",
+ "starknet-crypto",
+ "strum",
+ "thiserror 2.0.10",
  "tokio",
+ "tokio-postgres",
+ "tokio-util",
  "tracing",
- "tracing-subscriber",
+ "tree_hash 0.8.0",
+ "tree_hash_derive 0.8.0",
+ "types",
+ "uuid 1.15.1",
 ]
 
 [[package]]
@@ -768,6 +787,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
+name = "cli"
+version = "0.1.0"
+dependencies = [
+ "bankai-core",
+ "beacon-state-proof",
+ "clap",
+ "dotenv",
+ "serde_json",
+ "starknet",
+ "thiserror 2.0.10",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "client-rs"
 version = "0.1.0"
 
@@ -818,40 +853,6 @@ name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
-
-[[package]]
-name = "core"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives 0.8.18",
- "alloy-rpc-types-beacon",
- "beacon-state-proof",
- "bls12_381",
- "chrono",
- "dotenv",
- "futures",
- "glob",
- "hex",
- "itertools 0.13.0",
- "num-traits",
- "postgres-types",
- "reqwest 0.12.12",
- "serde",
- "serde_json",
- "sha2",
- "starknet",
- "starknet-crypto",
- "strum",
- "thiserror 2.0.10",
- "tokio",
- "tokio-postgres",
- "tokio-util",
- "tracing",
- "tree_hash 0.8.0",
- "tree_hash_derive 0.8.0",
- "types",
- "uuid 1.15.1",
-]
 
 [[package]]
 name = "core-foundation"

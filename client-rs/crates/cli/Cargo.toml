@@ -1,10 +1,10 @@
 [package]
-name = "bankai-cli"
+name = "cli"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-core.workspace = true
+bankai-core.workspace = true
 beacon-state-proof.workspace = true
 starknet.workspace = true
 clap.workspace = true
@@ -13,3 +13,4 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 tokio.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true

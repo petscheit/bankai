@@ -58,5 +58,5 @@ tower-http = { version = "0.6.2", features = ["trace", "timeout"] }
 chrono = { version = "0.4.39", features = ["serde"] }
 tokio-util = "0.7.13"
 
-core = { path = "crates/core" }
-cli = { path = "crates/cli" }
+bankai-core = { path = "crates/core" }
+bankai-cli = { path = "crates/cli" }

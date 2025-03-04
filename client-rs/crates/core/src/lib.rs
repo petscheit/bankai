@@ -78,7 +78,7 @@ impl BankaiClient {
                         slot
                     );
                 }
-                Err(e) => return Err(BankaiCoreError::Client(ClientError::Beacon(e))), // Propagate other errors immediately
+                Err(e) => return Err(BankaiCoreError::Client(ClientError::Beacon(e))),
             }
         };
 
