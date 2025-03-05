@@ -2,7 +2,7 @@ pub mod hint_processor;
 pub mod error;
 pub mod committee_update;
 pub mod types;
-
+pub mod epoch_update;
 use cairo_vm::{
     cairo_run::{self, cairo_run_program},
     types::{layout_name::LayoutName, program::Program},
@@ -20,7 +20,7 @@ fn main() -> Result<(), Error> {
         ..Default::default()
     };
     println!("Loading hash_to_curve program...");
-    let program_file = std::fs::read("../build/committee_update.json").map_err(Error::IO)?;
+    let program_file = std::fs::read("../build/epoch_update.json").map_err(Error::IO)?;
 
     let update = CommitteeUpdate::from_file("committee_update_input.json").unwrap();
     

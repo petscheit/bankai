@@ -46,12 +46,12 @@ impl Default for BankaiConfig {
                 "0x5f4dad2d8549e91c25694875eb02fc2910eeead0e1a13d3061464a3eaa4bd8d",
             )
             .unwrap(),
-            contract_path: "../contract/target/release/bankai_BankaiContract.contract_class.json"
+            contract_path: "../../contract/target/release/bankai_BankaiContract.contract_class.json"
                 .to_string(),
-            epoch_circuit_path: "../cairo/build/epoch_update.json".to_string(),
-            epoch_batch_circuit_path: "../cairo/build/epoch_batch.json".to_string(),
-            committee_circuit_path: "../cairo/build/committee_update.json".to_string(),
-            atlantic_endpoint: "https://atlantic.api.herodotus.cloud".to_string(),
+            epoch_circuit_path: "../../cairo/build/epoch_update.json".to_string(),
+            epoch_batch_circuit_path: "../../cairo/build/epoch_batch.json".to_string(),
+            committee_circuit_path: "../../../cairo/build/committee_update.json".to_string(),
+            atlantic_endpoint: "https://staging.atlantic.api.herodotus.cloud".to_string(),
             transactor_endpoint: "https://staging.api.herodotus.cloud".to_string(),
             // Set how many concurrent pie generation (trace generation) tasks are allowed
             pie_generation_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_PIE_GENERATIONS)), // 3 at once

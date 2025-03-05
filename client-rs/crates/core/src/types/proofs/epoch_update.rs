@@ -104,7 +104,7 @@ fn combine_to_fixed_bytes(high: Felt, low: Felt) -> Result<FixedBytes<32>, Strin
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpochUpdate {
     /// Input data for the epoch circuit
-    pub circuit_inputs: EpochCircuitInputs,
+    pub circuit_inputs: EpochInputs,
     /// Expected outputs after processing
     pub expected_circuit_outputs: ExpectedEpochUpdateOutputs,
 }
@@ -119,7 +119,7 @@ impl EpochUpdate {
     /// # Returns
     /// * `Result<Self, EpochUpdateError>` - New epoch update or error
     pub async fn new(client: &BeaconRpcClient, slot: u64) -> Result<Self, EpochUpdateError> {
-        let circuit_inputs = EpochCircuitInputs::generate_epoch_proof(client, slot).await?;
+        let circuit_inputs = EpochInputs::generate_epoch_proof(client, slot).await?;
         let expected_circuit_outputs = ExpectedEpochUpdateOutputs::from_inputs(&circuit_inputs);
         Ok(Self {
             circuit_inputs,
@@ -181,7 +181,7 @@ impl Provable for EpochUpdate {
 
 /// Contains all necessary inputs for generating and verifying epoch proofs
 #[derive(Debug, Serialize, Deserialize)]
-pub struct EpochCircuitInputs {
+pub struct EpochInputs {
     /// The beacon chain block header
     pub header: BeaconHeader,
     /// BLS signature point in G2
@@ -263,7 +263,7 @@ impl From<Vec<String>> for SyncCommitteeValidatorPubs {
     }
 }
 
-impl EpochCircuitInputs {
+impl EpochInputs {
     /// Generates an epoch proof by fetching and processing beacon chain data
     ///
     /// # Arguments
@@ -271,11 +271,11 @@ impl EpochCircuitInputs {
     /// * `slot` - Slot number to generate proof for
     ///
     /// # Returns
-    /// * `Result<EpochCircuitInputs, EpochUpdateError>` - Generated inputs or error
+    /// * `Result<EpochInputs, EpochUpdateError>` - Generated inputs or error
     pub(crate) async fn generate_epoch_proof(
         client: &BeaconRpcClient,
         mut slot: u64,
-    ) -> Result<EpochCircuitInputs, EpochUpdateError> {
+    ) -> Result<EpochInputs, EpochUpdateError> {
         let mut attempts = 0;
 
         let header = loop {
@@ -312,7 +312,7 @@ impl EpochCircuitInputs {
         let signature_point = Self::extract_signature_point(&sync_agg)?;
         let non_signers = Self::derive_non_signers(&sync_agg, &validator_pubs);
 
-        Ok(EpochCircuitInputs {
+        Ok(EpochInputs {
             header: header.into(),
             signature_point,
             aggregate_pub: G1Point(validator_pubs.aggregate_pub),
@@ -567,7 +567,7 @@ impl ExpectedEpochUpdateOutputs {
     }
 }
 
-impl Submittable<EpochCircuitInputs> for ExpectedEpochUpdateOutputs {
+impl Submittable<EpochInputs> for ExpectedEpochUpdateOutputs {
     /// Creates expected outputs from circuit inputs
     ///
     /// # Arguments
@@ -575,7 +575,7 @@ impl Submittable<EpochCircuitInputs> for ExpectedEpochUpdateOutputs {
     ///
     /// # Returns
     /// * `Self` - Expected outputs after processing
-    fn from_inputs(circuit_inputs: &EpochCircuitInputs) -> Self {
+    fn from_inputs(circuit_inputs: &EpochInputs) -> Self {
         let block_hash: FixedBytes<32> = FixedBytes::from_slice(
             circuit_inputs
                 .execution_header_proof

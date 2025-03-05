@@ -7,15 +7,15 @@ use serde::Deserialize;
 use serde_json;
 
 #[derive(Deserialize, Debug)]
-pub struct CommitteeUpdate {
+pub struct CommitteeUpdateCircuit {
     pub circuit_inputs: CircuitInput,
     pub expected_circuit_outputs: CircuitOutput,
 }
 
-impl CommitteeUpdate {
+impl CommitteeUpdateCircuit {
     pub fn from_file(file_path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let file_content = std::fs::read_to_string(file_path)?;
-        let committee_update: CommitteeUpdate = serde_json::from_str(&file_content)?;
+        let committee_update: CommitteeUpdateCircuit = serde_json::from_str(&file_content)?;
         Ok(committee_update)
     }
     

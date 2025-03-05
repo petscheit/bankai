@@ -51,6 +51,7 @@ impl BeaconRpcClient {
     /// This is a helper method used by all other RPC calls.
     async fn get_json(&self, route: &str) -> Result<Value, BeaconError> {
         let url = format!("{}/{}", self.rpc_url, route);
+        println!("Fetching from: {}", url);
         let json = self.provider.get(url).send().await?.json().await?;
 
         Ok(json)
@@ -63,6 +64,8 @@ impl BeaconRpcClient {
         let json = self
             .get_json(&format!("eth/v1/beacon/headers/{}", slot))
             .await?;
+
+        println!("Response: {:?}", json);
 
         // Check for 404 NOT_FOUND error
         if let Some(code) = json.get("code").and_then(|c| c.as_i64()) {

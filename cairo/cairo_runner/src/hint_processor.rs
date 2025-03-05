@@ -11,7 +11,7 @@ use cairo_vm::{
 };
 use garaga_zero_hints::*;
 
-use crate::committee_update::{CommitteeUpdate, HINT_ASSERT_RESULT, HINT_WRITE_CIRCUIT_INPUTS};
+use crate::committee_update::{CommitteeUpdateCircuit, HINT_ASSERT_RESULT, HINT_WRITE_CIRCUIT_INPUTS};
 
 pub type HintImpl = fn(&mut VirtualMachine, &mut ExecutionScopes, &HintProcessorData, &HashMap<String, Felt252>) -> Result<(), HintError>;
 
@@ -19,12 +19,12 @@ pub struct CustomHintProcessor {
     hints: HashMap<String, HintImpl>,
     // Add the builtin hint processor
     builtin_hint_proc: BuiltinHintProcessor,
-    pub committee_input: Option<CommitteeUpdate>,
+    pub committee_input: Option<CommitteeUpdateCircuit>,
 }
 
 
 impl CustomHintProcessor {
-    pub fn new(committee_input: Option<CommitteeUpdate>) -> Self {
+    pub fn new(committee_input: Option<CommitteeUpdateCircuit>) -> Self {
         Self {
             hints: Self::hints(),
             builtin_hint_proc: BuiltinHintProcessor::new_empty(),

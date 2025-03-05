@@ -6,6 +6,7 @@ use crate::{
     types::{contract::ContractError, proofs::ProofError},
     utils::UtilsError,
 };
+use bankai_runner::error::Error as CairoRunnerError;
 
 #[derive(Debug, Error)]
 pub enum BankaiCoreError {
@@ -19,4 +20,6 @@ pub enum BankaiCoreError {
     Contract(#[from] ContractError),
     #[error("Utils error: {0}")]
     Utils(#[from] UtilsError),
+    #[error("Cairo runner error: {0}")]
+    CairoRunner(#[from] CairoRunnerError),
 }

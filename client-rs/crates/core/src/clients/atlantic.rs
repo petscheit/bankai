@@ -6,6 +6,7 @@
 
 use std::{env, path::PathBuf};
 
+use cairo_vm::vm::runners::cairo_pie::CairoPie;
 use futures::StreamExt;
 use reqwest::{
     multipart::{Form, Part},
@@ -82,17 +83,19 @@ impl AtlanticClient {
     /// Displays progress during file upload.
     /// 
     /// # Arguments
-    /// * `batch` - The batch implementing the Provable trait
+    /// * `pie` - The generate Pie
     /// 
     /// # Returns
     /// * `Result<String, AtlanticError>` - The Atlantic query ID on success
-    pub async fn submit_batch(&self, batch: impl Provable) -> Result<String, AtlanticError> {
-        let pie_path: PathBuf = batch.pie_path().into();
-
-        let meta = fs::metadata(pie_path.clone()).await?;
-        let total_bytes = meta.len();
-
+    pub async fn submit_batch(&self, pie: CairoPie, proof_type: ProofType) -> Result<String, AtlanticError> {
+        let pie_path = std::env::temp_dir().join("pie.zip");
+        pie.write_zip_file(&pie_path)?;
+        println!("{}", pie_path.display());
         let file = fs::File::open(pie_path.clone()).await?;
+        
+        // Get file metadata to determine total size
+        let metadata = fs::metadata(&pie_path).await?;
+        let total_bytes = metadata.len();
 
         let stream = ReaderStream::new(file);
 
@@ -135,23 +138,27 @@ impl AtlanticClient {
 
         let external_id = format!(
             "update_{}",
-            match batch.proof_type() {
+            match proof_type {
                 ProofType::Epoch => "epoch",
                 ProofType::SyncCommittee => "sync_committee",
                 ProofType::EpochBatch => "epoch_batch",
             }
         );
-        // Build the form
+        
+        // Build the form with updated API parameters
         let form = Form::new()
             .part("pieFile", file_part)
+            .text("declaredJobSize", "S")
             .text("layout", "auto")
-            .text("prover", "starkware_sharp")
+            .text("cairoVm", "rust")
+            .text("cairoVersion", "cairo0")
+            .text("result", "PROOF_GENERATION")
             .text("externalId", external_id);
 
-        // Send the request
+        // Send the request to the updated endpoint
         let response = self
             .client
-            .post(format!("{}/v1/proof-generation", self.endpoint))
+            .post(format!("{}/atlantic-query", self.endpoint))
             .query(&[("apiKey", &self.api_key)])
             .header("accept", "application/json")
             .multipart(form)
@@ -192,21 +199,21 @@ impl AtlanticClient {
             .file_name("proof.json")
             .mime_str("application/json")?;
 
-        // Build the form
+        // Build the form with updated API parameters
         let form = Form::new()
-            .text(
-                "programHash",
-                env::var("PROOF_WRAPPER_PROGRAM_HASH").unwrap(),
-            )
+            .text("programHash", env::var("PROOF_WRAPPER_PROGRAM_HASH").unwrap())
             .part("inputFile", proof_part)
-            .text("cairoVersion", "0")
+            .text("declaredJobSize", "L")  // Using large job size as default
+            .text("cairoVersion", "cairo0")
+            .text("cairoVm", "rust")
+            .text("result", "PROOF_GENERATION")
             .text("mockFactHash", "false")
             .text("externalId", "proof_wrapper");
 
-        // Send the request
+        // Send the request to the updated endpoint
         let response = self
             .client
-            .post(format!("{}/v1/l2/atlantic-query", self.endpoint))
+            .post(format!("{}/atlantic-query", self.endpoint))
             .query(&[("apiKey", &self.api_key)])
             .header("accept", "application/json")
             .multipart(form)
@@ -266,7 +273,7 @@ impl AtlanticClient {
     pub async fn check_batch_status(&self, batch_id: &str) -> Result<String, AtlanticError> {
         let response = self
             .client
-            .get(format!("{}/v1/atlantic-query/{}", self.endpoint, batch_id))
+            .get(format!("{}/atlantic-query/{}", self.endpoint, batch_id))
             .query(&[("apiKey", &self.api_key)])
             .header("accept", "application/json")
             .send()

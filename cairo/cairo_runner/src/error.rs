@@ -1,9 +1,5 @@
 use cairo_vm::{
-    Felt252,
-    air_public_input::PublicInputError,
-    cairo_run::EncodeTraceError,
-    types::errors::program_errors::ProgramError,
-    vm::errors::{cairo_run_errors::CairoRunError, memory_errors::MemoryError, trace_errors::TraceError, vm_errors::VirtualMachineError},
+    air_public_input::PublicInputError, cairo_run::EncodeTraceError, types::errors::program_errors::ProgramError, vm::errors::{cairo_run_errors::CairoRunError, memory_errors::MemoryError, runner_errors::RunnerError, trace_errors::TraceError, vm_errors::VirtualMachineError}, Felt252
 };
 use thiserror::Error;
 
@@ -43,4 +39,6 @@ pub enum Error {
         "Only programs with `Array<Felt252>` as an input can be currently proven. Try inputing the serialized version of the input and deserializing it on main"
     )]
     IlegalInputValue,
+    #[error("Runner Error: {0}")]
+    Runner(#[from] RunnerError),
 }
