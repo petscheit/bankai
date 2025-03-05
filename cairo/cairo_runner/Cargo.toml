@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-garaga-zero-hints = { git = "https://github.com/petscheit/garaga-zero", branch = "chore/change_requests" }
+garaga-zero-hints = { git = "https://github.com/petscheit/garaga-zero", branch = "feat/rust-vm" }
 cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", tag = "v2.0.0-rc4", features = ["extensive_hints", "clap", "cairo-1-hints", "mod_builtin"] }
 thiserror = "2.0.12"
 serde = { version = "1.0.215", features = ["derive"] }

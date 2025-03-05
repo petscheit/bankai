@@ -385,11 +385,11 @@ impl From<HeaderResponse> for BeaconHeader {
 }
 
 /// Point on the G1 curve used for public keys
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct G1Point(pub G1Affine);
 
 /// Point on the G2 curve used for signatures
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct G2Point(pub G2Affine);
 
 impl Serialize for G1Point {

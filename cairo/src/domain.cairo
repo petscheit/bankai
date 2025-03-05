@@ -3,12 +3,79 @@ from starkware.cairo.common.uint256 import Uint256
 from cairo.src.ssz import SSZ
 from cairo.src.utils import felt_divmod
 
-namespace ForkSepolia {
-    func genesis_validator_root() -> Uint256 {
-        return (
-            Uint256(low=0xcf3f9209c00e4efbaaddac09ed9b8078, high=0xd8ea171f3c94aea21ebc42a1ed61052a)
-        );
-    }
+// namespace ForkSepolia {
+//     func genesis_validator_root() -> Uint256 {
+//         return (
+//             Uint256(low=0xcf3f9209c00e4efbaaddac09ed9b8078, high=0xd8ea171f3c94aea21ebc42a1ed61052a)
+//         );
+//     }
+
+//     const GENESIS_ACTIVATION_SLOT = 0;  // 0 * SLOTS_PER_EPOCH;
+//     const ALTAIR_ACTIVATION_SLOT = 1600;  // 50 * SLOTS_PER_EPOCH;
+//     const BELLATRIX_ACTIVATION_SLOT = 3200;  // 100 * SLOTS_PER_EPOCH;
+//     const CAPPELLA_ACTIVATION_SLOT = 1818624;  // 56832 * SLOTS_PER_EPOCH;
+//     const DENEB_ACTIVATION_SLOT = 4243456;  // 132608 * SLOTS_PER_EPOCH;
+
+//     func get_fork_version{range_check_ptr}(slot: felt) -> felt {
+//         alloc_locals;
+
+//         local fork: felt;
+//         // %{
+//         //     if ids.slot < ids.ALTAIR_ACTIVATION_SLOT:
+//         //         ids.fork = 0
+//         //     elif ids.slot < ids.BELLATRIX_ACTIVATION_SLOT:
+//         //         ids.fork = 1
+//         //     elif ids.slot < ids.CAPPELLA_ACTIVATION_SLOT:
+//         //         ids.fork = 2
+//         //     elif ids.slot < ids.DENEB_ACTIVATION_SLOT:
+//         //         ids.fork = 3
+//         //     else:
+//         //         ids.fork = 4
+//         // %}
+//         %{ check_fork_version() %}
+
+//         if (fork == 0) {
+//             assert [range_check_ptr] = ALTAIR_ACTIVATION_SLOT - slot;
+//             tempvar range_check_ptr = range_check_ptr + 1;
+//             return 0x90000069000000000000000000000000;
+//         }
+
+//         if (fork == 1) {
+//             assert [range_check_ptr] = BELLATRIX_ACTIVATION_SLOT - slot;
+//             assert [range_check_ptr + 1] = slot - ALTAIR_ACTIVATION_SLOT;
+//             tempvar range_check_ptr = range_check_ptr + 2;
+//             return 0x90000070000000000000000000000000;
+//         }
+
+//         if (fork == 2) {
+//             assert [range_check_ptr] = CAPPELLA_ACTIVATION_SLOT - slot;
+//             assert [range_check_ptr + 1] = slot - BELLATRIX_ACTIVATION_SLOT;
+//             tempvar range_check_ptr = range_check_ptr + 2;
+//             return 0x90000071000000000000000000000000;
+//         }
+
+//         if (fork == 3) {
+//             assert [range_check_ptr] = DENEB_ACTIVATION_SLOT - slot;
+//             assert [range_check_ptr + 1] = slot - CAPPELLA_ACTIVATION_SLOT;
+//             tempvar range_check_ptr = range_check_ptr + 2;
+//             return 0x90000072000000000000000000000000;
+//         }
+//         return 0x90000073000000000000000000000000;
+//     }
+
+//     func get_fork_root{
+//         range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*, sha256_ptr: felt*
+//     }(slot: felt) -> Uint256 {
+//         let fork = get_fork_version(slot);
+//         let genesis_validator_root = ForkSepolia.genesis_validator_root();
+//         let root = SSZ.hash_pair_container(Uint256(low=0, high=fork), genesis_validator_root);
+//         return root;
+//     }
+// }
+
+namespace Domain {
+    // 0x07000000 is the real sync committee domain, but we can asign the shifted value already
+    const DOMAIN_SYNC_COMMITTEE = 0x07000000000000000000000000000000;
 
     const GENESIS_ACTIVATION_SLOT = 0;  // 0 * SLOTS_PER_EPOCH;
     const ALTAIR_ACTIVATION_SLOT = 1600;  // 50 * SLOTS_PER_EPOCH;
@@ -16,99 +83,29 @@ namespace ForkSepolia {
     const CAPPELLA_ACTIVATION_SLOT = 1818624;  // 56832 * SLOTS_PER_EPOCH;
     const DENEB_ACTIVATION_SLOT = 4243456;  // 132608 * SLOTS_PER_EPOCH;
 
-    func get_fork_version{range_check_ptr}(slot: felt) -> felt {
-        alloc_locals;
+    // func compute_domain{range_check_ptr}(slot: felt) -> Uint256 {
+    //     let fork_root = ForkSepolia.get_fork_root(slot);
 
-        local fork: felt;
-        %{
-            if ids.slot < ids.ALTAIR_ACTIVATION_SLOT:
-                ids.fork = 0
-            elif ids.slot < ids.BELLATRIX_ACTIVATION_SLOT:
-                ids.fork = 1
-            elif ids.slot < ids.CAPPELLA_ACTIVATION_SLOT:
-                ids.fork = 2
-            elif ids.slot < ids.DENEB_ACTIVATION_SLOT:
-                ids.fork = 3
-            else:
-                ids.fork = 4
-        %}
+    //     // We now need to right right-shift the fork root 4 bytes, and prepend the domain
+    //     let (q_high, r_high) = felt_divmod(fork_root.high, 0x100000000);
+    //     let (q_low, _r_low) = felt_divmod(fork_root.low, 0x100000000);
 
-        if (fork == 0) {
-            assert [range_check_ptr] = ALTAIR_ACTIVATION_SLOT - slot;
-            tempvar range_check_ptr = range_check_ptr + 1;
-            return 0x90000069000000000000000000000000;
-        }
+    //     let high = DOMAIN_SYNC_COMMITTEE + q_high;
+    //     let low = r_high * 0x1000000000000000000000000 + q_low;
 
-        if (fork == 1) {
-            assert [range_check_ptr] = BELLATRIX_ACTIVATION_SLOT - slot;
-            assert [range_check_ptr + 1] = slot - ALTAIR_ACTIVATION_SLOT;
-            tempvar range_check_ptr = range_check_ptr + 2;
-            return 0x90000070000000000000000000000000;
-        }
-
-        if (fork == 2) {
-            assert [range_check_ptr] = CAPPELLA_ACTIVATION_SLOT - slot;
-            assert [range_check_ptr + 1] = slot - BELLATRIX_ACTIVATION_SLOT;
-            tempvar range_check_ptr = range_check_ptr + 2;
-            return 0x90000071000000000000000000000000;
-        }
-
-        if (fork == 3) {
-            assert [range_check_ptr] = DENEB_ACTIVATION_SLOT - slot;
-            assert [range_check_ptr + 1] = slot - CAPPELLA_ACTIVATION_SLOT;
-            tempvar range_check_ptr = range_check_ptr + 2;
-            return 0x90000072000000000000000000000000;
-        }
-        return 0x90000073000000000000000000000000;
-    }
-
-    func get_fork_root{
-        range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*, sha256_ptr: felt*
-    }(slot: felt) -> Uint256 {
-        let fork = get_fork_version(slot);
-        let genesis_validator_root = ForkSepolia.genesis_validator_root();
-        let root = SSZ.hash_pair_container(Uint256(low=0, high=fork), genesis_validator_root);
-        return root;
-    }
-}
-
-namespace Domain {
-    // 0x07000000 is the real sync committee domain, but we can asign the shifted value already
-    const DOMAIN_SYNC_COMMITTEE = 0x07000000000000000000000000000000;
-
-    func compute_domain{range_check_ptr}(slot: felt) -> Uint256 {
-        let fork_root = ForkSepolia.get_fork_root(slot);
-
-        // We now need to right right-shift the fork root 4 bytes, and prepend the domain
-        let (q_high, r_high) = felt_divmod(fork_root.high, 0x100000000);
-        let (q_low, _r_low) = felt_divmod(fork_root.low, 0x100000000);
-
-        let high = DOMAIN_SYNC_COMMITTEE + q_high;
-        let low = r_high * 0x1000000000000000000000000 + q_low;
-
-        return (Uint256(low=low, high=high));
-    }
+    //     return (Uint256(low=low, high=high));
+    // }
 
     // This function uses precomuted domain values
     func get_domain{range_check_ptr}(slot: felt) -> Uint256 {
         alloc_locals;
 
         local fork: felt;
-        %{
-            if ids.slot < ids.ForkSepolia.ALTAIR_ACTIVATION_SLOT:
-                ids.fork = 0
-            elif ids.slot < ids.ForkSepolia.BELLATRIX_ACTIVATION_SLOT:
-                ids.fork = 1
-            elif ids.slot < ids.ForkSepolia.CAPPELLA_ACTIVATION_SLOT:
-                ids.fork = 2
-            elif ids.slot < ids.ForkSepolia.DENEB_ACTIVATION_SLOT:
-                ids.fork = 3
-            else:
-                ids.fork = 4
-        %}
+        %{ check_fork_version() %}
+
 
         if (fork == 0) {
-            assert [range_check_ptr] = ForkSepolia.ALTAIR_ACTIVATION_SLOT - slot;
+            assert [range_check_ptr] = ALTAIR_ACTIVATION_SLOT - slot;
             tempvar range_check_ptr = range_check_ptr + 1;
             return (
                 Uint256(
@@ -118,8 +115,8 @@ namespace Domain {
         }
 
         if (fork == 1) {
-            assert [range_check_ptr] = ForkSepolia.BELLATRIX_ACTIVATION_SLOT - slot;
-            assert [range_check_ptr + 1] = slot - ForkSepolia.ALTAIR_ACTIVATION_SLOT;
+            assert [range_check_ptr] = BELLATRIX_ACTIVATION_SLOT - slot;
+            assert [range_check_ptr + 1] = slot - ALTAIR_ACTIVATION_SLOT;
             tempvar range_check_ptr = range_check_ptr + 2;
             return (
                 Uint256(
@@ -129,8 +126,8 @@ namespace Domain {
         }
 
         if (fork == 2) {
-            assert [range_check_ptr] = ForkSepolia.CAPPELLA_ACTIVATION_SLOT - slot;
-            assert [range_check_ptr + 1] = slot - ForkSepolia.BELLATRIX_ACTIVATION_SLOT;
+            assert [range_check_ptr] = CAPPELLA_ACTIVATION_SLOT - slot;
+            assert [range_check_ptr + 1] = slot - BELLATRIX_ACTIVATION_SLOT;
             tempvar range_check_ptr = range_check_ptr + 2;
             return (
                 Uint256(
@@ -140,8 +137,8 @@ namespace Domain {
         }
 
         if (fork == 3) {
-            assert [range_check_ptr] = ForkSepolia.DENEB_ACTIVATION_SLOT - slot;
-            assert [range_check_ptr + 1] = slot - ForkSepolia.CAPPELLA_ACTIVATION_SLOT;
+            assert [range_check_ptr] = DENEB_ACTIVATION_SLOT - slot;
+            assert [range_check_ptr + 1] = slot - CAPPELLA_ACTIVATION_SLOT;
             tempvar range_check_ptr = range_check_ptr + 2;
             return (
                 Uint256(

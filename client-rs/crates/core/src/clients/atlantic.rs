@@ -149,7 +149,7 @@ impl AtlanticClient {
         let form = Form::new()
             .part("pieFile", file_part)
             .text("declaredJobSize", "S")
-            .text("layout", "auto")
+            .text("layout", "dynamic")
             .text("cairoVm", "rust")
             .text("cairoVersion", "cairo0")
             .text("result", "PROOF_GENERATION")
@@ -189,10 +189,15 @@ impl AtlanticClient {
     /// 
     /// # Returns
     /// * `Result<String, AtlanticError>` - The Atlantic query ID on success
-    pub async fn submit_wrapped_proof(&self, proof: StarkProof) -> Result<String, AtlanticError> {
+    pub async fn submit_wrapped_proof(&self, proof: StarkProof, program_path: String) -> Result<String, AtlanticError> {
         info!("Uploading to Atlantic...");
         // Serialize the proof to JSON string
         let proof_json = serde_json::to_string(&proof)?;
+        
+        let program = fs::read(program_path).await?;
+        let program_part = Part::bytes(program)
+            .file_name("program.json") // Provide a filename
+            .mime_str("application/json")?;
 
         // Create a Part from the JSON string
         let proof_part = Part::text(proof_json)
@@ -201,12 +206,13 @@ impl AtlanticClient {
 
         // Build the form with updated API parameters
         let form = Form::new()
-            .text("programHash", env::var("PROOF_WRAPPER_PROGRAM_HASH").unwrap())
+            .part("programFile", program_part)
             .part("inputFile", proof_part)
-            .text("declaredJobSize", "L")  // Using large job size as default
+            .text("declaredJobSize", "M")
             .text("cairoVersion", "cairo0")
-            .text("cairoVm", "rust")
-            .text("result", "PROOF_GENERATION")
+            .text("cairoVm", "python")
+            .text("layout", "recursive_with_poseidon")
+            .text("result", "PROOF_VERIFICATION_ON_L2")
             .text("mockFactHash", "false")
             .text("externalId", "proof_wrapper");
 
@@ -248,7 +254,7 @@ impl AtlanticClient {
         let response = self
             .client
             .get(format!(
-                "{}/query_{}/proof.json",
+                "{}/{}/proof.json",
                 env::var("PROOF_REGISTRY").unwrap(),
                 batch_id
             ))

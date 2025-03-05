@@ -15,6 +15,7 @@ use starknet::core::types::Felt;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 use bankai_core::cairo_runner::rust::generate_pie;
+use bankai_core::cairo_runner::rust::generate_epoch_update_pie;
 #[derive(Subcommand)]
 enum Commands {
     /// Generate and manage proofs for the light client state
@@ -217,18 +218,21 @@ async fn main() -> Result<(), BankaiCliError> {
                 println!("Batch Submitted: {}", batch_id);
             }
             ProveCommands::NextEpoch => {
-                let latest_epoch = bankai
-                    .starknet_client
-                    .get_latest_epoch_slot(&bankai.config)
-                    .await?;
-                println!("Latest Epoch: {}", latest_epoch);
-                // make sure next_epoch % 32 == 0
-                let next_epoch = (u64::try_from(latest_epoch).unwrap() / 32) * 32 + 32;
-                println!("Fetching Inputs for Epoch: {}", next_epoch);
-                let epoch_update = EpochUpdate::new(&bankai.client, next_epoch)
+                // let latest_epoch = bankai
+                //     .starknet_client
+                //     .get_latest_epoch_slot(&bankai.config)
+                //     .await?;
+                // println!("Latest Epoch: {}", latest_epoch);
+                // // make sure next_epoch % 32 == 0
+                // let next_epoch = (u64::try_from(latest_epoch).unwrap() / 32) * 32 + 32;
+                // println!("Fetching Inputs for Epoch: {}", next_epoch);
+                let epoch_update = EpochUpdate::new(&bankai.client, 5555555)
                     .await
                     .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
                 let _ = epoch_update.export().unwrap();
+                let pie = generate_epoch_update_pie(epoch_update, &bankai.config, None, None).await?;
+                // let batch_id = bankai.atlantic_client.submit_batch(pie, ProofType::Epoch).await?;
+                // println!("Batch Submitted: {}", batch_id);
                 // CairoRunner::generate_pie(&epoch_update, &bankai.config, None, None).await?;
                 // let batch_id = bankai.atlantic_client.submit_batch(epoch_update).await?;
                 // println!("Batch Submitted: {}", batch_id);
@@ -268,7 +272,7 @@ async fn main() -> Result<(), BankaiCliError> {
                         .atlantic_client
                         .fetch_proof(batch_id.as_str())
                         .await?;
-                    let batch_id = bankai.atlantic_client.submit_wrapped_proof(proof).await?;
+                    let batch_id = bankai.atlantic_client.submit_wrapped_proof(proof, bankai.config.cairo_verifier_path).await?;
                     println!("Batch Submitted: {}", batch_id);
                 } else {
                     println!("Batch not completed yet. Status: {}", status);

@@ -11,7 +11,7 @@ use cairo_vm::{
 };
 use garaga_zero_hints::*;
 
-use crate::committee_update::{CommitteeUpdateCircuit, HINT_ASSERT_RESULT, HINT_WRITE_CIRCUIT_INPUTS};
+use crate::{committee_update::{CommitteeUpdateCircuit, HINT_ASSERT_RESULT, HINT_WRITE_CIRCUIT_INPUTS}, epoch_update::{self, EpochUpdateCircuit, HINT_WRITE_EPOCH_INPUTS}};
 
 pub type HintImpl = fn(&mut VirtualMachine, &mut ExecutionScopes, &HintProcessorData, &HashMap<String, Felt252>) -> Result<(), HintError>;
 
@@ -20,15 +20,17 @@ pub struct CustomHintProcessor {
     // Add the builtin hint processor
     builtin_hint_proc: BuiltinHintProcessor,
     pub committee_input: Option<CommitteeUpdateCircuit>,
+    pub epoch_input: Option<EpochUpdateCircuit>,
 }
 
 
 impl CustomHintProcessor {
-    pub fn new(committee_input: Option<CommitteeUpdateCircuit>) -> Self {
+    pub fn new(committee_input: Option<CommitteeUpdateCircuit>, epoch_input: Option<EpochUpdateCircuit>) -> Self {
         Self {
             hints: Self::hints(),
             builtin_hint_proc: BuiltinHintProcessor::new_empty(),
             committee_input,
+            epoch_input,
         }
     }
 
@@ -44,6 +46,7 @@ impl CustomHintProcessor {
             basic_field_ops::HINT_ASSERT_NEQ_MOD_P.into(),
             basic_field_ops::hint_assert_neq_mod_p,
         );
+        hints.insert(basic_field_ops::HINT_IS_EQ_MOD_P.into(), basic_field_ops::hint_is_eq_mod_p);
         hints.insert(
             basic_field_ops::HINT_IS_OPPOSITE_MOD_P.into(),
             basic_field_ops::hint_is_opposite_mod_p,
@@ -54,6 +57,8 @@ impl CustomHintProcessor {
         hints.insert(debug::PRINT_FELT.into(), debug::print_felt);
         hints.insert(debug::PRINT_STRING.into(), debug::print_string);
         hints.insert(debug::PRINT_UINT384.into(), debug::print_uint384);
+
+        hints.insert(epoch_update::HINT_CHECK_FORK_VERSION.into(), epoch_update::hint_check_fork_version);
 
         
         hints
@@ -85,12 +90,15 @@ impl HintProcessorLogic for CustomHintProcessor {
             let res = match hint_code {
                 HINT_WRITE_CIRCUIT_INPUTS => self.write_circuit_inputs(vm, exec_scopes, hpd, constants),
                 HINT_ASSERT_RESULT => self.assert_result(vm, exec_scopes, hpd, constants),
+                HINT_WRITE_EPOCH_INPUTS => self.write_epoch_inputs(vm, exec_scopes, hpd, constants),
                 _ => Err(HintError::UnknownHint(hint_code.to_string().into_boxed_str())),
             };
 
             if !matches!(res, Err(HintError::UnknownHint(_))) {
                 return res.map(|_| HintExtension::default());
             }
+
+            println!("hint_code: {}", hint_code);
 
             // First try our custom hints
             if let Some(hint_impl) = self.hints.get(hint_code) {

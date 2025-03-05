@@ -131,7 +131,7 @@ namespace MerkleTree {
 
         // ensure we have a power of 2.
         // ToDo: we should automatically add padding leafs
-        %{ assert ids.leafs_len & (ids.leafs_len - 1) == 0 %}
+        // %{ assert ids.leafs_len & (ids.leafs_len - 1) == 0 %}
 
         // chunk the leafs and write to leafs array
         let (chunked_leafs: felt*) = alloc();

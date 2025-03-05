@@ -189,3 +189,58 @@ impl CairoType for Felt {
         Ok(1)
     }
 }
+
+#[derive(Debug, Deserialize)]
+pub struct G1CircuitPoint{
+    x: UInt384,
+    y: UInt384,
+}
+
+impl CairoType for G1CircuitPoint {
+    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, MemoryError> {
+        let x = UInt384::from_memory(vm, address)?;
+        let y = UInt384::from_memory(vm, (address + 4)?)?;
+        Ok(Self{x, y})
+    }
+
+    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, MemoryError> {
+        self.x.to_memory(vm, address)?;
+        self.y.to_memory(vm, (address + 4)?)?;
+        Ok((address + 8)?)
+    }
+
+    fn n_fields(_vm: &VirtualMachine, _address: Relocatable) -> Result<usize, MemoryError> {
+        Ok(8)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct G2CircuitPoint{
+    x0: UInt384,
+    x1: UInt384,
+    y0: UInt384,
+    y1: UInt384,
+}
+
+impl CairoType for G2CircuitPoint {
+    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, MemoryError> {
+        let x0 = UInt384::from_memory(vm, address)?;
+        let x1 = UInt384::from_memory(vm, (address + 4)?)?;
+        let y0 = UInt384::from_memory(vm, (address + 8)?)?;
+        let y1 = UInt384::from_memory(vm, (address + 12)?)?;
+        Ok(Self{x0, x1, y0, y1})
+    }
+
+    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, MemoryError> {
+        self.x0.to_memory(vm, address)?;
+        self.x1.to_memory(vm, (address + 4)?)?;
+        self.y0.to_memory(vm, (address + 8)?)?;
+        self.y1.to_memory(vm, (address + 12)?)?;
+        Ok((address + 16)?)
+
+    }
+
+    fn n_fields(_vm: &VirtualMachine, _address: Relocatable) -> Result<usize, MemoryError> {
+        Ok(16)
+    }
+}
