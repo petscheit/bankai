@@ -34,23 +34,6 @@ pub struct ExecutionHeaderCircuitProof {
 }
 
 
-
-// pub struct ExecutionHeaderProof {
-//     /// Root hash of the beacon block body merkle tree
-//     pub root: FixedBytes<32>,
-//     /// Merkle proof path containing the intermediate hashes
-//     pub path: Vec<FixedBytes<32>>,
-//     /// Hash of the execution payload header (leaf node)
-//     pub leaf: FixedBytes<32>,
-//     /// Position of the execution payload in the merkle tree. Should be 9.
-//     pub index: usize,
-//     /// The actual execution payload header data
-//     pub execution_payload_header: ExecutionPayloadHeader<MainnetEthSpec>,
-//     /// Slot number of the beacon block containing this payload
-//     pub slot: u64,
-// }
-
-
 #[derive(Debug, Deserialize)]
 pub struct BeaconHeaderCircuit {
     pub slot: Uint256,
@@ -89,15 +72,19 @@ impl ExecutionPayloadHeaderCircuit {
         let roots = match &self.0 {
             ExecutionPayloadHeader::Bellatrix(h) => extract_common_fields!(h),
             ExecutionPayloadHeader::Capella(h) => {
+                println!("Capella");
                 let mut roots = extract_common_fields!(h);
                 roots.push(Uint256(BigUint::from_bytes_be(&h.withdrawals_root.as_bytes())));
                 roots
             },
             ExecutionPayloadHeader::Deneb(h) => {
+                println!("Deneb");
                 let mut roots = extract_common_fields!(h);
                 roots.push(Uint256(BigUint::from_bytes_be(&h.withdrawals_root.as_bytes())));
                 roots.push(Uint256(BigUint::from(h.blob_gas_used)));
                 roots.push(Uint256(BigUint::from(h.excess_blob_gas)));
+                println!("Deneb roots: {:?}", roots);
+                println!("length: {:?}", roots.len());
                 roots
             },
             ExecutionPayloadHeader::Electra(h) => {
@@ -105,8 +92,8 @@ impl ExecutionPayloadHeaderCircuit {
                 roots.push(Uint256(BigUint::from_bytes_be(&h.withdrawals_root.as_bytes())));
                 roots.push(Uint256(BigUint::from(h.blob_gas_used)));
                 roots.push(Uint256(BigUint::from(h.excess_blob_gas)));
-                roots.push(Uint256(BigUint::from_bytes_be(&h.deposit_requests_root.as_bytes())));
-                roots.push(Uint256(BigUint::from_bytes_be(&h.withdrawal_requests_root.as_bytes())));
+                // roots.push(Uint256(BigUint::from_bytes_be(&h.deposit_requests_root.as_bytes())));
+                // roots.push(Uint256(BigUint::from_bytes_be(&h.withdrawal_requests_root.as_bytes())));
                 roots
             },
         };
@@ -153,7 +140,31 @@ impl CustomHintProcessor {
             vm.insert_value((signer_data_ptr + 1)?, &Felt252::from(epoch_update.circuit_inputs.non_signers.len()))?;
 
             println!("ADDED SIGNER DATA: {:?}", signer_data_ptr);
-        
+
+            let mut execution_header_proof_ptr = get_relocatable_from_var_name("execution_header_proof", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+            execution_header_proof_ptr = epoch_update.circuit_inputs.execution_header_proof.root.to_memory(vm, execution_header_proof_ptr)?;
+            println!("wrote root");
+            let path_segment = vm.add_memory_segment();
+            vm.insert_value(execution_header_proof_ptr, &path_segment)?;
+            execution_header_proof_ptr = (execution_header_proof_ptr + 1)?;
+            println!("wrote path segment");
+            let mut path_ptr = path_segment;
+            for i in 0..epoch_update.circuit_inputs.execution_header_proof.path.len() {
+                path_ptr = epoch_update.circuit_inputs.execution_header_proof.path[i].to_memory(vm, path_ptr)?;
+            }
+            println!("wrote path");
+            execution_header_proof_ptr = epoch_update.circuit_inputs.execution_header_proof.leaf.to_memory(vm, execution_header_proof_ptr)?;
+            println!("wrote leaf");
+            execution_header_proof_ptr = epoch_update.circuit_inputs.execution_header_proof.index.to_memory(vm, execution_header_proof_ptr)?;
+            println!("wrote index");
+            let payload_fields_segment = vm.add_memory_segment();
+            vm.insert_value(execution_header_proof_ptr, &payload_fields_segment)?;
+            println!("wrote payload fields segment");
+            let mut payload_fields_ptr = payload_fields_segment;
+            for i in 0..epoch_update.circuit_inputs.execution_header_proof.execution_payload_header.len() {
+                payload_fields_ptr = epoch_update.circuit_inputs.execution_header_proof.execution_payload_header[i].to_memory(vm, payload_fields_ptr)?;
+            }
+            println!("wrote payload fields");
             Ok(())
         } else {
             panic!("Committee input not found");
@@ -170,7 +181,6 @@ pub fn hint_check_fork_version(
     hint_data: &HintProcessorData,
     constants: &HashMap<String, Felt252>,
  ) -> Result<(), HintError> {
-    println!("{:?}", constants);
 
     let altair_activation_slot = constants.get("cairo.src.domain.Domain.ALTAIR_ACTIVATION_SLOT").unwrap();
     let bellatrix_activation_slot = constants.get("cairo.src.domain.Domain.BELLATRIX_ACTIVATION_SLOT").unwrap();

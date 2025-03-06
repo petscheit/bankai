@@ -13,8 +13,9 @@ from cairo.src.signer import (
 )
 from cairo.src.utils import pow2alloc128
 from sha import SHA256
-from debug import print_string
-from cairo.src.types import SignerData
+from debug import print_string, print_felt_hex, print_felt
+from cairo.src.types import SignerData, ExecutionHeaderProof
+
 struct BeaconHeader {
     slot: Uint256,
     proposer_index: Uint256,
@@ -39,8 +40,7 @@ func run_epoch_update{
     local sig_point: G2Point;
     local header: BeaconHeader;
     local signer_data: SignerData;
-    let (execution_path: felt**) = alloc();
-    local execution_path_len: felt;
+    local execution_header_proof: ExecutionHeaderProof;
 
 
     // %{
@@ -100,13 +100,14 @@ func run_epoch_update{
     print_string('Verified Signature');
 
     // Verify Execution Header
-    let (execution_root, execution_hash, execution_height) = SSZ.hash_execution_payload_header_root();
+    let (execution_root, execution_hash, execution_height) = SSZ.hash_execution_payload_header_root(execution_header_proof.payload_fields);
+    print_felt(execution_height);
 
     print_string('Computed Execution Root');
 
     let root_felts = MerkleUtils.chunk_uint256(execution_root);
     let computed_body_root = MerkleTree.hash_merkle_path(
-        path=execution_path, path_len=4, leaf=root_felts, index=9
+        path=execution_header_proof.path, path_len=4, leaf=root_felts, index=9
     );
 
     // %{

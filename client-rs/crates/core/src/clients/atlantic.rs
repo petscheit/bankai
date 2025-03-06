@@ -89,7 +89,7 @@ impl AtlanticClient {
     /// * `Result<String, AtlanticError>` - The Atlantic query ID on success
     pub async fn submit_batch(&self, pie: CairoPie, proof_type: ProofType) -> Result<String, AtlanticError> {
         let pie_path = std::env::temp_dir().join("pie.zip");
-        pie.write_zip_file(&pie_path)?;
+        pie.write_zip_file(&pie_path, true)?;
         println!("{}", pie_path.display());
         let file = fs::File::open(pie_path.clone()).await?;
         

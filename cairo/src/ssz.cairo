@@ -13,8 +13,9 @@ from starkware.cairo.common.builtin_poseidon.poseidon import (
     poseidon_hash_many,
 )
 from sha import SHA256
+from debug import print_string, print_felt, print_felt_hex
 from cairo.src.utils import pow2alloc128, felt_divmod
-
+from cairo.src.types import ExecutionHeaderProof
 namespace SSZ {
     func hash_pair_container{
         range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*, sha256_ptr: felt*
@@ -61,63 +62,33 @@ namespace SSZ {
 
     func hash_execution_payload_header_root{
         range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*, sha256_ptr: felt*
-    }() -> (header_root: Uint256, header_hash: Uint256, header_height: felt) {
-        alloc_locals;
-
-        let (logs_bloom_segments: felt*) = alloc();
-        %{
-            header = program_input["circuit_inputs"]["execution_header_proof"]["execution_payload_header"]
-        %}
-
-        let (leaf_segments: felt*) = alloc();
-        %{
-            from cairo.py.ssz import hash_tree_root_of_execution_payload_header
-            from cairo.py.utils import hex_to_bytes
-
-            # Build a dict in the format that hash_tree_root_of_execution_payload_header expects:
-            fields = {
-                "parent_hash":       hex_to_bytes(header["parent_hash"]),
-                "fee_recipient":     hex_to_bytes(header["fee_recipient"]),
-                "state_root":        hex_to_bytes(header["state_root"]),
-                "receipts_root":     hex_to_bytes(header["receipts_root"]),
-                "logs_bloom":        hex_to_bytes(header["logs_bloom"]),
-                "prev_randao":       hex_to_bytes(header["prev_randao"]),
-                "block_number":      int(header["block_number"]),
-                "gas_limit":         int(header["gas_limit"]),
-                "gas_used":          int(header["gas_used"]),
-                "timestamp":         int(header["timestamp"]),
-                "extra_data":        hex_to_bytes(header["extra_data"]),
-                "base_fee_per_gas":  int(header["base_fee_per_gas"]),
-                "block_hash":        hex_to_bytes(header["block_hash"]),
-                "transactions_root": hex_to_bytes(header["transactions_root"]),
-                "withdrawals_root":  hex_to_bytes(header["withdrawals_root"]),
-                "blob_gas_used":     int(header["blob_gas_used"]),
-                "excess_blob_gas":   int(header["excess_blob_gas"]),
-            }
-
-            # Compute the container Merkle root
-            root, fields = hash_tree_root_of_execution_payload_header(fields)
-
-            leaf_segments = []
-            for field in fields:
-
-                high_segment = int.from_bytes(field[:16], 'big')
-                low_segment = int.from_bytes(field[16:], 'big')
-                leaf_segments.extend([low_segment, high_segment])
-
-            # Write segments to memory
-            segments.write_arg(ids.leaf_segments, leaf_segments)
-
-        %}
-
+    }(payload_fields: Uint256*) -> (header_root: Uint256, header_hash: Uint256, header_height: felt) {
+        print_string('payload_fields');
+        let leaf_segments = cast(payload_fields, felt*);
+        print_string('leaf_segments');
         memset(dst=leaf_segments + 34, value=0, n=30);
+        print_string('leaf_segments');
 
         let leafs = cast(leaf_segments, Uint256*);
+        print_string('leafs');
         let root = MerkleTree.compute_root(leafs=leafs, leafs_len=32);
+        print_string('root');
 
-        let (header_height) = uint256_reverse_endian(leafs[6]);
+        let header_height = leafs[6];
+        print_string('header_height');
+        print_felt(header_height.low);
+        print_felt(header_height.high);
 
-        return (root, leafs[12], header_height.low);
+        let header_hash = leafs[12];
+        print_string('header_hash');
+        print_felt_hex(header_hash.low);
+        print_felt_hex(header_hash.high);
+
+        print_string('root');
+        print_felt_hex(root.low);
+        print_felt_hex(root.high);
+
+        return (root, header_hash, header_height.low);
     }
 }
 

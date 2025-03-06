@@ -115,7 +115,7 @@ impl Into<EpochUpdateCircuit> for EpochUpdate {
             state_root: Uint256(BigUint::from_bytes_be(self.circuit_inputs.header.state_root.as_slice())),
             body_root: Uint256(BigUint::from_bytes_be(self.circuit_inputs.header.body_root.as_slice())),
         };
-        let execution_header_proof = ExecutionHeaderCircuitProof {
+        let execution_header_proof: ExecutionHeaderCircuitProof = ExecutionHeaderCircuitProof {
             root: Uint256(BigUint::from_bytes_be(self.circuit_inputs.execution_header_proof.root.as_slice())),
             path: self.circuit_inputs.execution_header_proof.path.iter().map(|p| Uint256Bits32(BigUint::from_bytes_be(p.as_slice()))).collect::<Vec<Uint256Bits32>>(),
             leaf: Uint256(BigUint::from_bytes_be(self.circuit_inputs.execution_header_proof.leaf.as_slice())),

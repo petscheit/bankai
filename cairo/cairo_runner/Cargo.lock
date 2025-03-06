@@ -1020,8 +1020,8 @@ dependencies = [
 
 [[package]]
 name = "cairo-vm"
-version = "2.0.0-rc4"
-source = "git+https://github.com/lambdaclass/cairo-vm?tag=v2.0.0-rc4#5af592484d2bc50c8a47151ba24ea14d2c1fe85f"
+version = "2.0.0"
+source = "git+https://github.com/lambdaclass/cairo-vm?tag=v2.0.0#3de653ddb6a81de497a381374f2dcf63e72736e2"
 dependencies = [
  "anyhow",
  "ark-ff 0.4.2",
@@ -1035,6 +1035,7 @@ dependencies = [
  "generic-array",
  "hashbrown 0.15.2",
  "hex",
+ "indoc",
  "keccak",
  "lazy_static",
  "nom",
@@ -1663,7 +1664,6 @@ checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 [[package]]
 name = "garaga-zero-hints"
 version = "0.1.0"
-source = "git+https://github.com/petscheit/garaga-zero?branch=feat%2Frust-vm#b92a211c32a44ee289ee0224c10b4762d34e14c2"
 dependencies = [
  "ark-bls12-381",
  "ark-ff 0.4.2",

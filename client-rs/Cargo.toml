@@ -18,7 +18,7 @@ serde_derive = "1.0.215"
 serde_json = "1.0.133"
 tokio = { version = "1.0", features = ["full"] }
 beacon-state-proof = { git = "https://github.com/petscheit/beacon-state-proof" }
-cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", tag = "v2.0.0-rc4", features = ["extensive_hints", "clap", "cairo-1-hints", "mod_builtin"] }
+cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", tag = "v2.0.0", features = ["extensive_hints", "clap", "cairo-1-hints", "mod_builtin"] }
 beacon_types = { git = "https://github.com/petscheit/lighthouse.git", package = "types" }
 sha2 = "0.10.8"
 reqwest = { version = "0.12.9", features = ["json", "multipart", "stream"] }
