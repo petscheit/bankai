@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{hint_processor::CustomHintProcessor, types::{Bytes32, Felt, G1CircuitPoint, G2CircuitPoint, UInt384, Uint256, Uint256Bits32}};
-use cairo_vm::{hint_processor::builtin_hint_processor::{builtin_hint_processor_definition::HintProcessorData, hint_utils::{get_integer_from_var_name, get_ptr_from_var_name, get_relocatable_from_var_name}}, types::exec_scope::ExecutionScopes, vm::{errors::hint_errors::HintError, vm_core::VirtualMachine}, Felt252};
+use cairo_vm::{hint_processor::builtin_hint_processor::{builtin_hint_processor_definition::HintProcessorData, hint_utils::{get_integer_from_var_name, get_ptr_from_var_name, get_relocatable_from_var_name}}, types::{exec_scope::ExecutionScopes, relocatable::Relocatable}, vm::{errors::hint_errors::HintError, vm_core::VirtualMachine}, Felt252};
 use garaga_zero_hints::types::CairoType;
 use num_bigint::BigUint;
 use serde::Deserialize;
@@ -86,22 +86,15 @@ impl ExecutionPayloadHeaderCircuit {
         let roots = match &self.0 {
             ExecutionPayloadHeader::Bellatrix(h) => extract_common_fields!(h),
             ExecutionPayloadHeader::Capella(h) => {
-                println!("Capella");
                 let mut roots = extract_common_fields!(h);
                 roots.push(to_uint256(h.withdrawals_root.as_bytes()));
                 roots
             },
             ExecutionPayloadHeader::Deneb(h) => {
-                println!("Deneb");
                 let mut roots = extract_common_fields!(h);
                 roots.push(to_uint256(h.withdrawals_root.as_bytes()));
                 roots.push(u64_to_uint256(h.blob_gas_used));
                 roots.push(u64_to_uint256(h.excess_blob_gas));
-                println!("Deneb roots: {:?}", roots);
-                for root in roots.iter() {
-                    println!("root: {:?}", hex::encode(root.as_bytes()));
-                }
-                println!("length: {:?}", roots.len());
                 roots
             },
             ExecutionPayloadHeader::Electra(h) => {
@@ -134,7 +127,6 @@ impl CustomHintProcessor {
         println!("Writing epoch inputs");
         if let Some(epoch_update) = &self.epoch_input {
             let sig_point_ptr = get_relocatable_from_var_name("sig_point", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
-            println!("Sig point ptr: {:?}", sig_point_ptr);
             epoch_update.circuit_inputs.signature_point.to_memory(vm, sig_point_ptr)?;
 
             let mut header_ptr = get_relocatable_from_var_name("header", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
@@ -156,20 +148,22 @@ impl CustomHintProcessor {
             }
             vm.insert_value((signer_data_ptr + 1)?, &Felt252::from(epoch_update.circuit_inputs.non_signers.len()))?;
 
-            println!("ADDED SIGNER DATA: {:?}", signer_data_ptr);
 
             let mut execution_header_proof_ptr = get_relocatable_from_var_name("execution_header_proof", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
             execution_header_proof_ptr = epoch_update.circuit_inputs.execution_header_proof.root.to_memory(vm, execution_header_proof_ptr)?;
-            println!("wrote root");
             let path_segment = vm.add_memory_segment();
             vm.insert_value(execution_header_proof_ptr, &path_segment)?;
             execution_header_proof_ptr = (execution_header_proof_ptr + 1)?;
-            println!("wrote path segment");
             let mut path_ptr = path_segment;
             for i in 0..epoch_update.circuit_inputs.execution_header_proof.path.len() {
-                path_ptr = epoch_update.circuit_inputs.execution_header_proof.path[i].to_memory(vm, path_ptr)?;
+                let element_segment = vm.add_memory_segment();
+                vm.insert_value(path_ptr, &element_segment)?;
+                path_ptr = (path_ptr + 1)?;
+                
+                epoch_update.circuit_inputs.execution_header_proof.path[i].to_memory(vm, element_segment)?;
             }
             println!("wrote path");
+            print_address_range(vm, path_ptr, 10, None);
             execution_header_proof_ptr = epoch_update.circuit_inputs.execution_header_proof.leaf.to_memory(vm, execution_header_proof_ptr)?;
             println!("wrote leaf");
             execution_header_proof_ptr = epoch_update.circuit_inputs.execution_header_proof.index.to_memory(vm, execution_header_proof_ptr)?;
@@ -223,4 +217,25 @@ pub fn hint_check_fork_version(
     vm.insert_value(fork, &fork_value)?;
     
     Ok(())
+}
+
+
+pub fn print_address_range(vm: &VirtualMachine, address: Relocatable, depth: usize, padding: Option<usize>) {
+    let padding = padding.unwrap_or(0); // Default to 20 if not specified
+    let start_offset = if address.offset >= padding { address.offset - padding } else { 0 };
+    let end_offset = address.offset + depth + padding;
+
+    println!("\nFull memory segment range for segment {}:", address.segment_index);
+    println!("----------------------------------------");
+    for i in start_offset..end_offset {
+        let addr = Relocatable {
+            segment_index: address.segment_index,
+            offset: i,
+        };
+        match vm.get_maybe(&addr) {
+            Some(value) => println!("Offset {}: {:?}", i, value),
+            None => println!("Offset {}: <empty>", i),
+        }
+    }
+    println!("----------------------------------------\n");
 }

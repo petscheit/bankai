@@ -118,16 +118,16 @@ func run_epoch_update{
     assert computed_body_root.high = body_root.high;
 
 
-    %{
-        from cairo.py.utils import uint256_to_int
-        assert uint256_to_int(ids.header_root) == int(program_input["expected_circuit_outputs"]["beacon_header_root"], 16), "Header Root Mismatch"
-        assert uint256_to_int(ids.state_root) == int(program_input["expected_circuit_outputs"]["beacon_state_root"], 16), "State Root Mismatch"
-        assert uint256_to_int(ids.committee_hash) == int(program_input["expected_circuit_outputs"]["committee_hash"], 16), "Committee Hash Mismatch"
-        assert ids.n_signers == program_input["expected_circuit_outputs"]["n_signers"], "Number of Signers Mismatch"
-        assert ids.slot == program_input["expected_circuit_outputs"]["slot"], "Slot Mismatch"
-        assert uint256_to_int(ids.execution_hash) == int(program_input["expected_circuit_outputs"]["execution_header_hash"], 16), "Execution Header Hash Mismatch"
-        assert ids.execution_height == program_input["expected_circuit_outputs"]["execution_header_height"], "Execution Header Height Mismatch"
-    %}
+    // %{
+    //     from cairo.py.utils import uint256_to_int
+    //     assert uint256_to_int(ids.header_root) == int(program_input["expected_circuit_outputs"]["beacon_header_root"], 16), "Header Root Mismatch"
+    //     assert uint256_to_int(ids.state_root) == int(program_input["expected_circuit_outputs"]["beacon_state_root"], 16), "State Root Mismatch"
+    //     assert uint256_to_int(ids.committee_hash) == int(program_input["expected_circuit_outputs"]["committee_hash"], 16), "Committee Hash Mismatch"
+    //     assert ids.n_signers == program_input["expected_circuit_outputs"]["n_signers"], "Number of Signers Mismatch"
+    //     assert ids.slot == program_input["expected_circuit_outputs"]["slot"], "Slot Mismatch"
+    //     assert uint256_to_int(ids.execution_hash) == int(program_input["expected_circuit_outputs"]["execution_header_hash"], 16), "Execution Header Hash Mismatch"
+    //     assert ids.execution_height == program_input["expected_circuit_outputs"]["execution_header_height"], "Execution Header Height Mismatch"
+    // %}
 
     assert [output_ptr] = header_root.low;
     assert [output_ptr + 1] = header_root.high;

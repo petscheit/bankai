@@ -47,7 +47,6 @@ pub fn run_epoch_update(path: &str, update: EpochUpdateCircuit) -> Result<CairoP
         ..Default::default()
     };
     println!("Running epoch update...");
-    println!("Circuit inputs: {:?}", update);
     let mut hint_processor = CustomHintProcessor::new(None,Some(update));
     let cairo_runner = cairo_run_program(&program, &cairo_run_config, &mut hint_processor)?;
     println!("{:?}", cairo_runner.get_execution_resources());
