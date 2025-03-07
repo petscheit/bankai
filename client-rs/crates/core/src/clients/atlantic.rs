@@ -148,7 +148,7 @@ impl AtlanticClient {
         // Build the form with updated API parameters
         let form = Form::new()
             .part("pieFile", file_part)
-            .text("declaredJobSize", "S")
+            .text("declaredJobSize", "XS")
             .text("layout", "dynamic")
             .text("cairoVm", "rust")
             .text("cairoVersion", "cairo0")

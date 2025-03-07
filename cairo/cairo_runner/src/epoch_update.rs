@@ -48,23 +48,37 @@ pub struct ExecutionPayloadHeaderCircuit(pub ExecutionPayloadHeader<MainnetEthSp
 
 impl ExecutionPayloadHeaderCircuit {
     pub fn to_field_roots(&self) -> Vec<Uint256> {
+        // Helper function to convert any value to a padded 32-byte Uint256
+        fn to_uint256<T: AsRef<[u8]>>(bytes: T) -> Uint256 {
+            let mut padded = vec![0; 32];
+            let bytes = bytes.as_ref();
+            let start = if bytes.len() >= 32 { 0 } else { 32 - bytes.len() };
+            padded[start..].copy_from_slice(bytes);
+            Uint256(BigUint::from_bytes_be(&padded))
+        }
+
+        // Convert u64 to padded bytes
+        fn u64_to_uint256(value: u64) -> Uint256 {
+            to_uint256(value.to_be_bytes())
+        }
+
         macro_rules! extract_common_fields {
             ($h:expr) => {
                 vec![
-                    Uint256(BigUint::from_bytes_be(&$h.parent_hash.0.as_bytes())),
-                    Uint256(BigUint::from_bytes_be(&$h.fee_recipient.0.to_vec())),
-                    Uint256(BigUint::from_bytes_be(&$h.state_root.0.to_vec())),
-                    Uint256(BigUint::from_bytes_be(&$h.receipts_root.0.to_vec())),
-                    Uint256(BigUint::from_bytes_be(&$h.logs_bloom.tree_hash_root().as_bytes())),
-                    Uint256(BigUint::from_bytes_be(&$h.prev_randao.0.to_vec())),
-                    Uint256(BigUint::from($h.block_number)),
-                    Uint256(BigUint::from($h.gas_limit)),
-                    Uint256(BigUint::from($h.gas_used)),
-                    Uint256(BigUint::from($h.timestamp)),
-                    Uint256(BigUint::from_bytes_be(&$h.extra_data.tree_hash_root().as_bytes())),
-                    Uint256(BigUint::from_bytes_be(&$h.base_fee_per_gas.tree_hash_root().as_bytes())),
-                    Uint256(BigUint::from_bytes_be(&$h.block_hash.0.as_bytes())),
-                    Uint256(BigUint::from_bytes_be(&$h.transactions_root.as_bytes())),
+                    to_uint256($h.parent_hash.0.as_bytes()),
+                    to_uint256($h.fee_recipient.0.to_vec()),
+                    to_uint256($h.state_root.0.to_vec()),
+                    to_uint256($h.receipts_root.0.to_vec()),
+                    to_uint256($h.logs_bloom.tree_hash_root().as_bytes()),
+                    to_uint256($h.prev_randao.0.to_vec()),
+                    u64_to_uint256($h.block_number),
+                    u64_to_uint256($h.gas_limit),
+                    u64_to_uint256($h.gas_used),
+                    u64_to_uint256($h.timestamp),
+                    to_uint256($h.extra_data.tree_hash_root().as_bytes()),
+                    to_uint256($h.base_fee_per_gas.tree_hash_root().as_bytes()),
+                    to_uint256($h.block_hash.0.as_bytes()),
+                    to_uint256($h.transactions_root.as_bytes()),
                 ]
             };
         }
@@ -74,26 +88,26 @@ impl ExecutionPayloadHeaderCircuit {
             ExecutionPayloadHeader::Capella(h) => {
                 println!("Capella");
                 let mut roots = extract_common_fields!(h);
-                roots.push(Uint256(BigUint::from_bytes_be(&h.withdrawals_root.as_bytes())));
+                roots.push(to_uint256(h.withdrawals_root.as_bytes()));
                 roots
             },
             ExecutionPayloadHeader::Deneb(h) => {
                 println!("Deneb");
                 let mut roots = extract_common_fields!(h);
-                roots.push(Uint256(BigUint::from_bytes_be(&h.withdrawals_root.as_bytes())));
-                roots.push(Uint256(BigUint::from(h.blob_gas_used)));
-                roots.push(Uint256(BigUint::from(h.excess_blob_gas)));
+                roots.push(to_uint256(h.withdrawals_root.as_bytes()));
+                roots.push(u64_to_uint256(h.blob_gas_used));
+                roots.push(u64_to_uint256(h.excess_blob_gas));
                 println!("Deneb roots: {:?}", roots);
                 println!("length: {:?}", roots.len());
                 roots
             },
             ExecutionPayloadHeader::Electra(h) => {
                 let mut roots = extract_common_fields!(h);
-                roots.push(Uint256(BigUint::from_bytes_be(&h.withdrawals_root.as_bytes())));
-                roots.push(Uint256(BigUint::from(h.blob_gas_used)));
-                roots.push(Uint256(BigUint::from(h.excess_blob_gas)));
-                // roots.push(Uint256(BigUint::from_bytes_be(&h.deposit_requests_root.as_bytes())));
-                // roots.push(Uint256(BigUint::from_bytes_be(&h.withdrawal_requests_root.as_bytes())));
+                roots.push(to_uint256(h.withdrawals_root.as_bytes()));
+                roots.push(u64_to_uint256(h.blob_gas_used));
+                roots.push(u64_to_uint256(h.excess_blob_gas));
+                // roots.push(to_uint256(h.deposit_requests_root.as_bytes()));
+                // roots.push(to_uint256(h.withdrawal_requests_root.as_bytes()));
                 roots
             },
         };

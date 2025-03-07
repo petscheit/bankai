@@ -226,7 +226,7 @@ async fn main() -> Result<(), BankaiCliError> {
                 // // make sure next_epoch % 32 == 0
                 // let next_epoch = (u64::try_from(latest_epoch).unwrap() / 32) * 32 + 32;
                 // println!("Fetching Inputs for Epoch: {}", next_epoch);
-                let epoch_update = EpochUpdate::new(&bankai.client, 5555555)
+                let epoch_update = EpochUpdate::new(&bankai.client, 6981632)
                     .await
                     .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
                 let _ = epoch_update.export().unwrap();
