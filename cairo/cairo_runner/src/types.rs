@@ -2,6 +2,7 @@ pub use garaga_zero_hints::types::CairoType;
 use cairo_vm::{types::relocatable::Relocatable, vm::{errors::memory_errors::MemoryError, vm_core::VirtualMachine}, Felt252};
 use num_bigint::BigUint;
 use serde::Deserialize;
+use hex;
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(try_from = "String")]
@@ -52,7 +53,6 @@ impl CairoType for Uint256 {
         Ok(2)
     }
 }
-
 
 #[derive(Debug, Deserialize)]
 #[serde(try_from = "String")]
@@ -242,5 +242,110 @@ impl CairoType for G2CircuitPoint {
 
     fn n_fields(_vm: &VirtualMachine, _address: Relocatable) -> Result<usize, MemoryError> {
         Ok(16)
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
+#[serde(try_from = "String")]
+pub struct Bytes32([u8; 32]);
+
+impl TryFrom<String> for Bytes32 {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let hex_str = value.strip_prefix("0x").unwrap_or(&value);
+        let bytes = hex::decode(hex_str)
+            .map_err(|e| format!("Invalid hex string: {}, error: {}", value, e))?;
+        
+        let mut padded = [0u8; 32];
+        let start = if bytes.len() >= 32 { 0 } else { 32 - bytes.len() };
+        padded[start..].copy_from_slice(&bytes[..std::cmp::min(bytes.len(), 32)]);
+        
+        Ok(Bytes32(padded))
+    }
+}
+
+impl Bytes32 {
+    pub fn new<T: AsRef<[u8]>>(bytes: T) -> Self {
+        let bytes = bytes.as_ref();
+        let mut padded = [0u8; 32];
+        let start = if bytes.len() >= 32 { 0 } else { 32 - bytes.len() };
+        padded[start..].copy_from_slice(&bytes[..std::cmp::min(bytes.len(), 32)]);
+        Bytes32(padded)
+    }
+    
+    pub fn from_u64(value: u64) -> Self {
+        let mut bytes = [0u8; 32];
+        // Place u64 value in the first 8 bytes (little-endian)
+        bytes[0..8].copy_from_slice(&value.to_le_bytes());
+        Bytes32(bytes)
+    }
+    
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+    
+    // Helper to get the high and low limbs for Cairo memory representation
+    fn to_limbs(&self) -> [Felt252; 2] {        
+        let mut low_limb = [0u8; 16];
+        let mut high_limb = [0u8; 16];
+        
+        low_limb.copy_from_slice(&self.0[16..32]);
+        high_limb.copy_from_slice(&self.0[0..16]);
+        
+        [
+            Felt252::from_bytes_be_slice(&low_limb),
+            Felt252::from_bytes_be_slice(&high_limb)
+        ]
+    }
+}
+
+impl CairoType for Bytes32 {
+    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, MemoryError> {
+        // Read the two limbs directly
+        let low_felt = vm.get_integer((address + 0)?)?;
+        let high_felt = vm.get_integer((address + 1)?)?;
+        
+        // Convert to bytes with proper padding
+        let low_bytes = low_felt.to_bytes_be();
+        let high_bytes = high_felt.to_bytes_be();
+        
+        let mut result = [0u8; 32];
+        
+        // Copy high limb bytes to the first 16 bytes (with padding)
+        let high_start = if high_bytes.len() >= 16 { 0 } else { 16 - high_bytes.len() };
+        result[high_start..16].copy_from_slice(&high_bytes[..std::cmp::min(high_bytes.len(), 16)]);
+        
+        // Copy low limb bytes to the last 16 bytes (with padding)
+        let low_start = if low_bytes.len() >= 16 { 0 } else { 16 + (16 - low_bytes.len()) };
+        result[low_start..32].copy_from_slice(&low_bytes[..std::cmp::min(low_bytes.len(), 16)]);
+        
+        Ok(Self(result))
+    }
+
+    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, MemoryError> {
+        let limbs = self.to_limbs();
+        
+        vm.insert_value((address + 0)?, &limbs[0])?;
+        vm.insert_value((address + 1)?, &limbs[1])?;
+        
+        Ok((address + 2)?)
+    }
+
+    fn n_fields(_vm: &VirtualMachine, _address: Relocatable) -> Result<usize, MemoryError> {
+        Ok(2)
+    }
+}
+
+// Add From/Into implementations for common conversions
+impl From<[u8; 32]> for Bytes32 {
+    fn from(bytes: [u8; 32]) -> Self {
+        Bytes32(bytes)
+    }
+}
+
+impl From<Bytes32> for [u8; 32] {
+    fn from(bytes32: Bytes32) -> Self {
+        bytes32.0
     }
 }

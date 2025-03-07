@@ -63,32 +63,15 @@ namespace SSZ {
     func hash_execution_payload_header_root{
         range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*, sha256_ptr: felt*
     }(payload_fields: Uint256*) -> (header_root: Uint256, header_hash: Uint256, header_height: felt) {
-        print_string('payload_fields');
         let leaf_segments = cast(payload_fields, felt*);
-        print_string('leaf_segments');
         memset(dst=leaf_segments + 34, value=0, n=30);
-        print_string('leaf_segments');
 
         let leafs = cast(leaf_segments, Uint256*);
-        print_string('leafs');
         let root = MerkleTree.compute_root(leafs=leafs, leafs_len=32);
-        print_string('root');
 
-        let header_height = leafs[6];
-        print_string('header_height');
-        print_felt(header_height.low);
-        print_felt(header_height.high);
+        let (header_height) = uint256_reverse_endian(num=leafs[6]);
 
-        let header_hash = leafs[12];
-        print_string('header_hash');
-        print_felt_hex(header_hash.low);
-        print_felt_hex(header_hash.high);
-
-        print_string('root');
-        print_felt_hex(root.low);
-        print_felt_hex(root.high);
-
-        return (root, header_hash, header_height.low);
+        return (root, leafs[12], header_height.low);
     }
 }
 

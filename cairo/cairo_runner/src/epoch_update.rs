@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{hint_processor::CustomHintProcessor, types::{Felt, UInt384, Uint256, Uint256Bits32, G1CircuitPoint, G2CircuitPoint}};
+use crate::{hint_processor::CustomHintProcessor, types::{Bytes32, Felt, G1CircuitPoint, G2CircuitPoint, UInt384, Uint256, Uint256Bits32}};
 use cairo_vm::{hint_processor::builtin_hint_processor::{builtin_hint_processor_definition::HintProcessorData, hint_utils::{get_integer_from_var_name, get_ptr_from_var_name, get_relocatable_from_var_name}}, types::exec_scope::ExecutionScopes, vm::{errors::hint_errors::HintError, vm_core::VirtualMachine}, Felt252};
 use garaga_zero_hints::types::CairoType;
 use num_bigint::BigUint;
@@ -30,7 +30,7 @@ pub struct ExecutionHeaderCircuitProof {
     pub path: Vec<Uint256Bits32>,
     pub leaf: Uint256,
     pub index: Felt,
-    pub execution_payload_header: Vec<Uint256>,
+    pub execution_payload_header: Vec<Bytes32>,
 }
 
 
@@ -47,19 +47,19 @@ pub struct BeaconHeaderCircuit {
 pub struct ExecutionPayloadHeaderCircuit(pub ExecutionPayloadHeader<MainnetEthSpec>);
 
 impl ExecutionPayloadHeaderCircuit {
-    pub fn to_field_roots(&self) -> Vec<Uint256> {
+    pub fn to_field_roots(&self) -> Vec<Bytes32> {
         // Helper function to convert any value to a padded 32-byte Uint256
-        fn to_uint256<T: AsRef<[u8]>>(bytes: T) -> Uint256 {
+        fn to_uint256<T: AsRef<[u8]>>(bytes: T) -> Bytes32 {
             let mut padded = vec![0; 32];
             let bytes = bytes.as_ref();
-            let start = if bytes.len() >= 32 { 0 } else { 32 - bytes.len() };
-            padded[start..].copy_from_slice(bytes);
-            Uint256(BigUint::from_bytes_be(&padded))
+            // Copy bytes to the beginning of the padded array (right padding with zeros)
+            padded[..bytes.len()].copy_from_slice(bytes);
+            Bytes32::new(padded)
         }
 
         // Convert u64 to padded bytes
-        fn u64_to_uint256(value: u64) -> Uint256 {
-            to_uint256(value.to_be_bytes())
+        fn u64_to_uint256(value: u64) -> Bytes32 {
+            Bytes32::from_u64(value)
         }
 
         macro_rules! extract_common_fields {
@@ -98,6 +98,9 @@ impl ExecutionPayloadHeaderCircuit {
                 roots.push(u64_to_uint256(h.blob_gas_used));
                 roots.push(u64_to_uint256(h.excess_blob_gas));
                 println!("Deneb roots: {:?}", roots);
+                for root in roots.iter() {
+                    println!("root: {:?}", hex::encode(root.as_bytes()));
+                }
                 println!("length: {:?}", roots.len());
                 roots
             },
