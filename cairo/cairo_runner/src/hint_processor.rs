@@ -11,7 +11,7 @@ use cairo_vm::{
 };
 use garaga_zero_hints::*;
 
-use crate::{committee_update::{CommitteeUpdateCircuit, HINT_ASSERT_RESULT, HINT_WRITE_CIRCUIT_INPUTS}, epoch_update::{self, EpochUpdateCircuit, HINT_WRITE_EPOCH_INPUTS}};
+use crate::{committee_update::{CommitteeUpdateCircuit, HINT_ASSERT_COMMITTEE_UPDATE_RESULT, HINT_WRITE_COMMITTEE_UPDATE_INPUTS}, epoch_update::{self, EpochUpdateCircuit, HINT_ASSERT_EPOCH_UPDATE_RESULT, HINT_WRITE_EPOCH_UPDATE_INPUTS}};
 
 pub type HintImpl = fn(&mut VirtualMachine, &mut ExecutionScopes, &HintProcessorData, &HashMap<String, Felt252>) -> Result<(), HintError>;
 
@@ -95,9 +95,10 @@ impl HintProcessorLogic for CustomHintProcessor {
             let hint_code = hpd.code.as_str();
 
             let res = match hint_code {
-                HINT_WRITE_CIRCUIT_INPUTS => self.write_circuit_inputs(vm, exec_scopes, hpd, constants),
-                HINT_ASSERT_RESULT => self.assert_result(vm, exec_scopes, hpd, constants),
-                HINT_WRITE_EPOCH_INPUTS => self.write_epoch_inputs(vm, exec_scopes, hpd, constants),
+                HINT_WRITE_COMMITTEE_UPDATE_INPUTS => self.write_committee_update_inputs(vm, exec_scopes, hpd, constants),
+                HINT_ASSERT_COMMITTEE_UPDATE_RESULT => self.assert_committee_update_result(vm, exec_scopes, hpd, constants),
+                HINT_WRITE_EPOCH_UPDATE_INPUTS => self.write_epoch_update_inputs(vm, exec_scopes, hpd, constants),
+                HINT_ASSERT_EPOCH_UPDATE_RESULT => self.assert_epoch_update_result(vm, exec_scopes, hpd, constants),
                 _ => Err(HintError::UnknownHint(hint_code.to_string().into_boxed_str())),
             };
 

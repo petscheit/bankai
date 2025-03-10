@@ -36,12 +36,12 @@ pub struct CircuitOutput {
     pub committee_hash: Uint256,
 }
 
-pub const HINT_WRITE_CIRCUIT_INPUTS: &str = r#"load_inputs()"#;
-pub const HINT_ASSERT_RESULT: &str = r#"assert_result()"#;
+pub const HINT_WRITE_COMMITTEE_UPDATE_INPUTS: &str = r#"write_committee_update_inputs()"#;
+pub const HINT_ASSERT_COMMITTEE_UPDATE_RESULT: &str = r#"assert_committee_update_result()"#;
 
 impl CustomHintProcessor {
 
-    pub fn write_circuit_inputs(
+    pub fn write_committee_update_inputs(
         &self,
         vm: &mut VirtualMachine,
         _exec_scopes: &mut ExecutionScopes,
@@ -78,7 +78,7 @@ impl CustomHintProcessor {
     }
 
     
-    pub fn assert_result(
+    pub fn assert_committee_update_result(
         &self,
         vm: &mut VirtualMachine,
         _exec_scopes: &mut ExecutionScopes,

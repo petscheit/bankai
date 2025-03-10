@@ -39,7 +39,7 @@ func main{
     local aggregate_committee_key: UInt384;
     local slot: felt;
 
-    %{ load_inputs() %}
+    %{ write_committee_update_inputs() %}
 
     // Compute hashes and update state
     with sha256_ptr, pow2_array {
@@ -54,7 +54,7 @@ func main{
     // Finalize SHA256 and write output
     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
 
-    %{ assert_result() %}
+    %{ assert_committee_update_result() %}
 
     assert [output_ptr] = state_root.low;
     assert [output_ptr + 1] = state_root.high;

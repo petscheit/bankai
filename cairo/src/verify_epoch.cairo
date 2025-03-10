@@ -42,92 +42,28 @@ func run_epoch_update{
     local signer_data: SignerData;
     local execution_header_proof: ExecutionHeaderProof;
 
-
-    // %{
-    //     from cairo.py.utils import generate_signers_array
-    //     non_signers = generate_signers_array(program_input["circuit_inputs"]["non_signers"])
-    //     write_g1(ids.committee_pub, program_input["circuit_inputs"]["committee_pub"])
-
-    //     for i, non_signer in enumerate(non_signers):
-    //         memory[ids.non_signers._reference_value + i * 8] = non_signer[0][0]
-    //         memory[ids.non_signers._reference_value + i * 8 + 1] = non_signer[0][1]
-    //         memory[ids.non_signers._reference_value + i * 8 + 2] = non_signer[0][2]
-    //         memory[ids.non_signers._reference_value + i * 8 + 3] = non_signer[0][3]
-    //         memory[ids.non_signers._reference_value + i * 8 + 4] = non_signer[1][0]
-    //         memory[ids.non_signers._reference_value + i * 8 + 5] = non_signer[1][1]
-    //         memory[ids.non_signers._reference_value + i * 8 + 6] = non_signer[1][2]
-    //         memory[ids.non_signers._reference_value + i * 8 + 7] = non_signer[1][3]
-
-    //     ids.n_non_signers = len(non_signers)
-    // %}
-    // %{
-    //     from cairo.py.utils import write_g2, write_g1g2, write_g1, print_g2, int_to_uint256, hex_to_chunks_32
-    //     write_g2(ids.sig_point, program_input["circuit_inputs"]["signature_point"])
-    //     ids.slot = program_input["circuit_inputs"]["header"]["slot"]
-
-    //     execution_path = [hex_to_chunks_32(node) for node in program_input["circuit_inputs"]["execution_header_proof"]["path"]]
-    //     ids.execution_path_len = len(execution_path)
-    //     segments.write_arg(ids.execution_path, execution_path)
-    // %}
-    %{ write_epoch_inputs() %}
-    // %{ print("Running Verification for Slot: ", ids.slot) %}
+    %{ write_epoch_update_inputs() %}
 
     let (header_root, body_root, state_root) = hash_header(header);
-
-    print_string('Computed Header Root');
-    
-    // %{ print('HeaderRoot: ', hex(ids.header_root.high * 2**128 + ids.header_root.low)) %}
-
     let signing_root = Domain.compute_signing_root(header_root, header.slot.low);
-
-    print_string('Computed Signing Root');
-
-    // %{ print('SigningRoot: ', hex(ids.signing_root.high * 2**128 + ids.signing_root.low)) %}
-
     let (msg_point) = hash_to_curve(1, signing_root);
-
-    print_string('Computed Msg Point');
-
-    // %{ print_g2('MsgPoint', ids.msg_point) %}
-
     let (committee_hash, agg_key, n_non_signers) = faster_fast_aggregate_signer_pubs(signer_data);
-
-    print_string('Computed Agg Key');
-    
     let n_signers = 512 - n_non_signers;
     verify_signature(agg_key, msg_point, sig_point);
-
-    print_string('Verified Signature');
 
     // Verify Execution Header
     let (execution_root, execution_hash, execution_height) = SSZ.hash_execution_payload_header_root(execution_header_proof.payload_fields);
     print_felt(execution_height);
-
-    print_string('Computed Execution Root');
 
     let root_felts = MerkleUtils.chunk_uint256(execution_root);
     let computed_body_root = MerkleTree.hash_merkle_path(
         path=execution_header_proof.path, path_len=4, leaf=root_felts, index=9
     );
 
-    // %{
-    //     print('execution header hash', hex(ids.execution_hash.low), hex(ids.execution_hash.high))
-    // %}
-
     assert computed_body_root.low = body_root.low;
     assert computed_body_root.high = body_root.high;
 
-
-    // %{
-    //     from cairo.py.utils import uint256_to_int
-    //     assert uint256_to_int(ids.header_root) == int(program_input["expected_circuit_outputs"]["beacon_header_root"], 16), "Header Root Mismatch"
-    //     assert uint256_to_int(ids.state_root) == int(program_input["expected_circuit_outputs"]["beacon_state_root"], 16), "State Root Mismatch"
-    //     assert uint256_to_int(ids.committee_hash) == int(program_input["expected_circuit_outputs"]["committee_hash"], 16), "Committee Hash Mismatch"
-    //     assert ids.n_signers == program_input["expected_circuit_outputs"]["n_signers"], "Number of Signers Mismatch"
-    //     assert ids.slot == program_input["expected_circuit_outputs"]["slot"], "Slot Mismatch"
-    //     assert uint256_to_int(ids.execution_hash) == int(program_input["expected_circuit_outputs"]["execution_header_hash"], 16), "Execution Header Hash Mismatch"
-    //     assert ids.execution_height == program_input["expected_circuit_outputs"]["execution_header_height"], "Execution Header Height Mismatch"
-    // %}
+    %{ verify_epoch_update_outputs() %}
 
     assert [output_ptr] = header_root.low;
     assert [output_ptr + 1] = header_root.high;

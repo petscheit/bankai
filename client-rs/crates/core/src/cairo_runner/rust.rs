@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bankai_runner::committee_update::{CommitteeUpdateCircuit, CircuitInput, CircuitOutput};
-use bankai_runner::epoch_update::{BeaconHeaderCircuit, EpochCircuitInputs, EpochUpdateCircuit, ExecutionHeaderCircuitProof, ExecutionPayloadHeaderCircuit};
+use bankai_runner::epoch_update::{BeaconHeaderCircuit, EpochCircuitInputs, EpochUpdateCircuit, ExecutionHeaderCircuitProof, ExecutionPayloadHeaderCircuit, ExpectedEpochUpdateCircuitOutputs};
 use bankai_runner::types::{Uint256, UInt384, Uint256Bits32, Felt, G1CircuitPoint, G2CircuitPoint};
 pub use bankai_runner::run_committee_update;
 use cairo_vm::Felt252;
@@ -129,8 +129,18 @@ impl Into<EpochUpdateCircuit> for EpochUpdate {
             non_signers: self.circuit_inputs.non_signers.iter().map(|n| n.clone().into()).collect::<Vec<G1CircuitPoint>>(),
             execution_header_proof: execution_header_proof,
         };
+        let expected_outputs = ExpectedEpochUpdateCircuitOutputs {
+            beacon_header_root: Uint256(BigUint::from_bytes_be(self.expected_circuit_outputs.beacon_header_root.as_slice())),
+            beacon_state_root: Uint256(BigUint::from_bytes_be(self.expected_circuit_outputs.beacon_state_root.as_slice())),
+            committee_hash: Uint256(BigUint::from_bytes_be(self.expected_circuit_outputs.committee_hash.as_slice())),
+            n_signers: Felt(Felt252::from(self.expected_circuit_outputs.n_signers)),
+            slot: Felt(Felt252::from(self.expected_circuit_outputs.slot)),
+            execution_header_hash: Uint256(BigUint::from_bytes_be(self.expected_circuit_outputs.execution_header_hash.as_slice())),
+            execution_header_height: Felt(Felt252::from(self.expected_circuit_outputs.execution_header_height)),
+        };
         EpochUpdateCircuit {
             circuit_inputs: inputs,
+            expected_circuit_outputs: expected_outputs,
         }
     }
 }

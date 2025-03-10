@@ -12,7 +12,7 @@ use beacon_types::TreeHash;
 #[derive(Debug, Deserialize)]
 pub struct EpochUpdateCircuit {
     pub circuit_inputs: EpochCircuitInputs,
-    // pub expected_circuit_outputs: ExpectedEpochUpdateOutputs,
+    pub expected_circuit_outputs: ExpectedEpochUpdateCircuitOutputs,
 }
 
 #[derive(Debug, Deserialize)]
@@ -112,76 +112,177 @@ impl ExecutionPayloadHeaderCircuit {
     }
 }
 
-pub const HINT_WRITE_EPOCH_INPUTS: &str = r#"write_epoch_inputs()"#;
-// pub const HINT_ASSERT_RESULT: &str = r#"assert_result()"#;
+pub const HINT_WRITE_EPOCH_UPDATE_INPUTS: &str = r#"write_epoch_update_inputs()"#;
+pub const HINT_ASSERT_EPOCH_UPDATE_RESULT: &str = r#"verify_epoch_update_outputs()"#;
 
 impl CustomHintProcessor {
 
-    pub fn write_epoch_inputs(
+    pub fn write_epoch_update_inputs(
         &self,
         vm: &mut VirtualMachine,
         _exec_scopes: &mut ExecutionScopes,
         hint_data: &HintProcessorData,
         _constants: &HashMap<String, Felt252>,
     ) -> Result<(), HintError> {
-        println!("Writing epoch inputs");
         if let Some(epoch_update) = &self.epoch_input {
+            // Write signature point
             let sig_point_ptr = get_relocatable_from_var_name("sig_point", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
             epoch_update.circuit_inputs.signature_point.to_memory(vm, sig_point_ptr)?;
 
-            let mut header_ptr = get_relocatable_from_var_name("header", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
-            header_ptr = epoch_update.circuit_inputs.header.slot.to_memory(vm, header_ptr)?;
-            header_ptr = epoch_update.circuit_inputs.header.proposer_index.to_memory(vm, header_ptr)?;
-            header_ptr = epoch_update.circuit_inputs.header.parent_root.to_memory(vm, header_ptr)?;
-            header_ptr = epoch_update.circuit_inputs.header.state_root.to_memory(vm, header_ptr)?;
-            epoch_update.circuit_inputs.header.body_root.to_memory(vm, header_ptr)?;
-
-            let mut signer_data_ptr = get_relocatable_from_var_name("signer_data", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+            // Write header fields
+            self.write_header_fields(vm, hint_data, &epoch_update.circuit_inputs.header)?;
             
-            signer_data_ptr = epoch_update.circuit_inputs.aggregate_pub.to_memory(vm, signer_data_ptr)?;
-            let non_signers_segment = vm.add_memory_segment();
-            vm.insert_value(signer_data_ptr, &non_signers_segment)?;
+            // Write signer data (aggregate pub key and non-signers)
+            self.write_signer_data(vm, hint_data, &epoch_update.circuit_inputs)?;
 
-            let mut segment_ptr = non_signers_segment;
-            for i in 0..epoch_update.circuit_inputs.non_signers.len() {
-                segment_ptr = epoch_update.circuit_inputs.non_signers[i].to_memory(vm, segment_ptr)?;
-            }
-            vm.insert_value((signer_data_ptr + 1)?, &Felt252::from(epoch_update.circuit_inputs.non_signers.len()))?;
-
-
-            let mut execution_header_proof_ptr = get_relocatable_from_var_name("execution_header_proof", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
-            execution_header_proof_ptr = epoch_update.circuit_inputs.execution_header_proof.root.to_memory(vm, execution_header_proof_ptr)?;
-            let path_segment = vm.add_memory_segment();
-            vm.insert_value(execution_header_proof_ptr, &path_segment)?;
-            execution_header_proof_ptr = (execution_header_proof_ptr + 1)?;
-            let mut path_ptr = path_segment;
-            for i in 0..epoch_update.circuit_inputs.execution_header_proof.path.len() {
-                let element_segment = vm.add_memory_segment();
-                vm.insert_value(path_ptr, &element_segment)?;
-                path_ptr = (path_ptr + 1)?;
-                
-                epoch_update.circuit_inputs.execution_header_proof.path[i].to_memory(vm, element_segment)?;
-            }
-            println!("wrote path");
-            print_address_range(vm, path_ptr, 10, None);
-            execution_header_proof_ptr = epoch_update.circuit_inputs.execution_header_proof.leaf.to_memory(vm, execution_header_proof_ptr)?;
-            println!("wrote leaf");
-            execution_header_proof_ptr = epoch_update.circuit_inputs.execution_header_proof.index.to_memory(vm, execution_header_proof_ptr)?;
-            println!("wrote index");
-            let payload_fields_segment = vm.add_memory_segment();
-            vm.insert_value(execution_header_proof_ptr, &payload_fields_segment)?;
-            println!("wrote payload fields segment");
-            let mut payload_fields_ptr = payload_fields_segment;
-            for i in 0..epoch_update.circuit_inputs.execution_header_proof.execution_payload_header.len() {
-                payload_fields_ptr = epoch_update.circuit_inputs.execution_header_proof.execution_payload_header[i].to_memory(vm, payload_fields_ptr)?;
-            }
-            println!("wrote payload fields");
+            // Write execution header proof
+            self.write_execution_header_proof(vm, hint_data, &epoch_update.circuit_inputs.execution_header_proof)?;
+            
             Ok(())
         } else {
-            panic!("Committee input not found");
+            panic!("EpochUpdate input not found");
         }
     }
 
+    pub fn assert_epoch_update_result(
+        &self,
+        vm: &mut VirtualMachine,
+        _exec_scopes: &mut ExecutionScopes,
+        hint_data: &HintProcessorData,
+        _constants: &HashMap<String, Felt252>,
+    ) -> Result<(), HintError> {
+        let expected_outputs = &self.epoch_input.as_ref().expect("EpochUpdate input not found").expected_circuit_outputs;
+
+        let header_root_ptr = get_relocatable_from_var_name("header_root", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+        let header_root = Uint256::from_memory(vm, header_root_ptr)?;
+        if &header_root != &expected_outputs.beacon_header_root {
+            return Err(HintError::AssertionFailed(format!("Header Root Mismatch: {:?} != {:?}", header_root, expected_outputs.beacon_header_root).into_boxed_str()));
+        }
+
+        let state_root_ptr = get_relocatable_from_var_name("state_root", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+        let state_root = Uint256::from_memory(vm, state_root_ptr)?;
+        if &state_root != &expected_outputs.beacon_state_root {
+            return Err(HintError::AssertionFailed(format!("State Root Mismatch: {:?} != {:?}", state_root, expected_outputs.beacon_state_root).into_boxed_str()));
+        }
+
+        let committee_hash_ptr = get_relocatable_from_var_name("committee_hash", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+        let committee_hash = Uint256::from_memory(vm, committee_hash_ptr)?;
+        if &committee_hash != &expected_outputs.committee_hash {
+            return Err(HintError::AssertionFailed(format!("Committee Hash Mismatch: {:?} != {:?}", committee_hash, expected_outputs.committee_hash).into_boxed_str()));
+        }
+
+        let n_signers_ptr = get_relocatable_from_var_name("n_signers", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+        let n_signers = Felt::from_memory(vm, n_signers_ptr)?;
+        if &n_signers != &expected_outputs.n_signers {
+            return Err(HintError::AssertionFailed(format!("Number of Signers Mismatch: {:?} != {:?}", n_signers, expected_outputs.n_signers).into_boxed_str()));
+        }
+
+        // first word of header is slot.low
+        let slot_ptr = get_relocatable_from_var_name("header", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+        let slot = Felt::from_memory(vm, slot_ptr)?;
+        if &slot != &expected_outputs.slot {
+            return Err(HintError::AssertionFailed(format!("Slot Mismatch: {:?} != {:?}", slot, expected_outputs.slot).into_boxed_str()));
+        }
+
+        let execution_hash_ptr = get_relocatable_from_var_name("execution_hash", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+        let execution_hash = Uint256::from_memory(vm, execution_hash_ptr)?;
+        if &execution_hash != &expected_outputs.execution_header_hash {
+            return Err(HintError::AssertionFailed(format!("Execution Header Hash Mismatch: {:?} != {:?}", execution_hash, expected_outputs.execution_header_hash).into_boxed_str()));
+        }
+
+        let execution_height_ptr = get_relocatable_from_var_name("execution_height", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+        let execution_height = Felt::from_memory(vm, execution_height_ptr)?;
+        if &execution_height != &expected_outputs.execution_header_height {
+            return Err(HintError::AssertionFailed(format!("Execution Header Height Mismatch: {:?} != {:?}", execution_height, expected_outputs.execution_header_height).into_boxed_str()));
+        }
+
+        Ok(())
+    }
+
+    fn write_header_fields(
+        &self,
+        vm: &mut VirtualMachine,
+        hint_data: &HintProcessorData,
+        header: &BeaconHeaderCircuit,
+    ) -> Result<(), HintError> {
+        let mut header_ptr = get_relocatable_from_var_name("header", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+        header_ptr = header.slot.to_memory(vm, header_ptr)?;
+        header_ptr = header.proposer_index.to_memory(vm, header_ptr)?;
+        header_ptr = header.parent_root.to_memory(vm, header_ptr)?;
+        header_ptr = header.state_root.to_memory(vm, header_ptr)?;
+        header.body_root.to_memory(vm, header_ptr)?;
+        Ok(())
+    }
+
+    fn write_signer_data(
+        &self,
+        vm: &mut VirtualMachine,
+        hint_data: &HintProcessorData,
+        circuit_inputs: &EpochCircuitInputs,
+    ) -> Result<(), HintError> {
+        let mut signer_data_ptr = get_relocatable_from_var_name("signer_data", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+        
+        // Write aggregate public key
+        signer_data_ptr = circuit_inputs.aggregate_pub.to_memory(vm, signer_data_ptr)?;
+        
+        // Create segment for non-signers and store its pointer
+        let non_signers_segment = vm.add_memory_segment();
+        vm.insert_value(signer_data_ptr, &non_signers_segment)?;
+
+        // Write all non-signers to the segment
+        let mut segment_ptr = non_signers_segment;
+        for non_signer in &circuit_inputs.non_signers {
+            segment_ptr = non_signer.to_memory(vm, segment_ptr)?;
+        }
+        
+        // Store the length of non-signers
+        vm.insert_value((signer_data_ptr + 1)?, &Felt252::from(circuit_inputs.non_signers.len()))?;
+        
+        Ok(())
+    }
+
+    fn write_execution_header_proof(
+        &self,
+        vm: &mut VirtualMachine,
+        hint_data: &HintProcessorData,
+        proof: &ExecutionHeaderCircuitProof,
+    ) -> Result<(), HintError> {
+        let mut exec_header_ptr = get_relocatable_from_var_name("execution_header_proof", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+        
+        // Write root
+        exec_header_ptr = proof.root.to_memory(vm, exec_header_ptr)?;
+        
+        // Create and write path segment
+        let path_segment = vm.add_memory_segment();
+        vm.insert_value(exec_header_ptr, &path_segment)?;
+        exec_header_ptr = (exec_header_ptr + 1)?;
+        
+        // Write each path element
+        let mut path_ptr = path_segment;
+        for path_element in &proof.path {
+            let element_segment = vm.add_memory_segment();
+            vm.insert_value(path_ptr, &element_segment)?;
+            path_ptr = (path_ptr + 1)?;
+            
+            path_element.to_memory(vm, element_segment)?;
+        }
+        
+        // Write leaf and index
+        exec_header_ptr = proof.leaf.to_memory(vm, exec_header_ptr)?;
+        exec_header_ptr = proof.index.to_memory(vm, exec_header_ptr)?;
+        
+        // Create and write payload fields segment
+        let payload_fields_segment = vm.add_memory_segment();
+        vm.insert_value(exec_header_ptr, &payload_fields_segment)?;
+        
+        // Write each payload field
+        let mut payload_fields_ptr = payload_fields_segment;
+        for field in &proof.execution_payload_header {
+            payload_fields_ptr = field.to_memory(vm, payload_fields_ptr)?;
+        }
+        
+        Ok(())
+    }
 }
 
 pub const HINT_CHECK_FORK_VERSION: &str = r#"check_fork_version()"#;
@@ -238,4 +339,15 @@ pub fn print_address_range(vm: &VirtualMachine, address: Relocatable, depth: usi
         }
     }
     println!("----------------------------------------\n");
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ExpectedEpochUpdateCircuitOutputs {
+    pub beacon_header_root: Uint256,
+    pub beacon_state_root: Uint256,
+    pub committee_hash: Uint256,
+    pub n_signers: Felt,
+    pub slot: Felt,
+    pub execution_header_hash: Uint256,
+    pub execution_header_height: Felt,
 }
