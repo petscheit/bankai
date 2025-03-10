@@ -29,3 +29,8 @@ struct EpochUpdate {
     signer_data: SignerData,
     execution_header_proof: ExecutionHeaderProof,
 }
+
+struct EpochUpdateBatch {
+    committee_hash: Uint256,
+    epochs: EpochUpdate*,
+}

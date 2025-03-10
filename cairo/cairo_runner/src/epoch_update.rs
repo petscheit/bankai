@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 
-use crate::{hint_processor::CustomHintProcessor, types::{Bytes32, Felt, G1CircuitPoint, G2CircuitPoint, UInt384, Uint256, Uint256Bits32}};
+use crate::{hint_processor::CustomHintProcessor, types::{Bytes32, Felt, G1CircuitPoint, G2CircuitPoint, Uint256, Uint256Bits32}};
 use cairo_vm::{hint_processor::builtin_hint_processor::{builtin_hint_processor_definition::HintProcessorData, hint_utils::{get_integer_from_var_name, get_ptr_from_var_name, get_relocatable_from_var_name}}, types::{exec_scope::ExecutionScopes, relocatable::Relocatable}, vm::{errors::hint_errors::HintError, vm_core::VirtualMachine}, Felt252};
 use garaga_zero_hints::types::CairoType;
-use num_bigint::BigUint;
 use serde::Deserialize;
-use beacon_types::{BeaconBlockBody, ExecPayload, ExecutionPayloadHeader, ExecutionPayloadHeaderBellatrix, ExecutionPayloadHeaderCapella, ExecutionPayloadHeaderDeneb, ExecutionPayloadHeaderElectra, MainnetEthSpec};
-use serde_json;
+use beacon_types::{ExecutionPayloadHeader, MainnetEthSpec};
+
 use beacon_types::TreeHash;
 
 #[derive(Debug, Deserialize)]
@@ -126,7 +125,8 @@ impl CustomHintProcessor {
     ) -> Result<(), HintError> {
         if let Some(epoch_update) = &self.epoch_input {
             let epoch_update_ptr = get_relocatable_from_var_name("epoch_update", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
-            write_epoch_update(epoch_update_ptr, &epoch_update.circuit_inputs, vm)
+            write_epoch_update(epoch_update_ptr, &epoch_update.circuit_inputs, vm)?;
+            Ok(())
         } else {
             panic!("EpochUpdate input not found");
         }
@@ -141,50 +141,10 @@ impl CustomHintProcessor {
     ) -> Result<(), HintError> {
         let expected_outputs = &self.epoch_input.as_ref().expect("EpochUpdate input not found").expected_circuit_outputs;
 
-        let header_root_ptr = get_relocatable_from_var_name("header_root", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
-        let header_root = Uint256::from_memory(vm, header_root_ptr)?;
-        if &header_root != &expected_outputs.beacon_header_root {
-            return Err(HintError::AssertionFailed(format!("Header Root Mismatch: {:?} != {:?}", header_root, expected_outputs.beacon_header_root).into_boxed_str()));
-        }
-
-        let state_root_ptr = get_relocatable_from_var_name("state_root", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
-        let state_root = Uint256::from_memory(vm, state_root_ptr)?;
-        if &state_root != &expected_outputs.beacon_state_root {
-            return Err(HintError::AssertionFailed(format!("State Root Mismatch: {:?} != {:?}", state_root, expected_outputs.beacon_state_root).into_boxed_str()));
-        }
-
-        let committee_hash_ptr = get_relocatable_from_var_name("committee_hash", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
-        let committee_hash = Uint256::from_memory(vm, committee_hash_ptr)?;
-        if &committee_hash != &expected_outputs.committee_hash {
-            return Err(HintError::AssertionFailed(format!("Committee Hash Mismatch: {:?} != {:?}", committee_hash, expected_outputs.committee_hash).into_boxed_str()));
-        }
-
-        let n_signers_ptr = get_relocatable_from_var_name("n_signers", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
-        let n_signers = Felt::from_memory(vm, n_signers_ptr)?;
-        if &n_signers != &expected_outputs.n_signers {
-            return Err(HintError::AssertionFailed(format!("Number of Signers Mismatch: {:?} != {:?}", n_signers, expected_outputs.n_signers).into_boxed_str()));
-        }
-
-        // first word of header is slot.low
-        let slot_ptr = (get_relocatable_from_var_name("epoch_update", vm, &hint_data.ids_data, &hint_data.ap_tracking)? + G2CircuitPoint::n_fields())?;
-        let slot = Felt::from_memory(vm, slot_ptr)?;
-        if &slot != &expected_outputs.slot {
-            return Err(HintError::AssertionFailed(format!("Slot Mismatch: {:?} != {:?}", slot, expected_outputs.slot).into_boxed_str()));
-        }
-
-        let execution_hash_ptr = get_relocatable_from_var_name("execution_hash", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
-        let execution_hash = Uint256::from_memory(vm, execution_hash_ptr)?;
-        if &execution_hash != &expected_outputs.execution_header_hash {
-            return Err(HintError::AssertionFailed(format!("Execution Header Hash Mismatch: {:?} != {:?}", execution_hash, expected_outputs.execution_header_hash).into_boxed_str()));
-        }
-
-        let execution_height_ptr = get_relocatable_from_var_name("execution_height", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
-        let execution_height = Felt::from_memory(vm, execution_height_ptr)?;
-        if &execution_height != &expected_outputs.execution_header_height {
-            return Err(HintError::AssertionFailed(format!("Execution Header Height Mismatch: {:?} != {:?}", execution_height, expected_outputs.execution_header_height).into_boxed_str()));
-        }
-
-        Ok(())
+        // Get the output pointer
+        let output_ptr = (get_ptr_from_var_name("output_ptr", vm, &hint_data.ids_data, &hint_data.ap_tracking)? - 11)?;
+        
+        assert_epoch_update_result(vm, output_ptr, expected_outputs)
     }
 }
 
@@ -259,7 +219,7 @@ pub fn write_epoch_update(
     epoch_update_ptr: Relocatable,
     circuit_inputs: &EpochCircuitInputs,
     vm: &mut VirtualMachine,
-) -> Result<(), HintError> {    
+) -> Result<Relocatable, HintError> {    
     let mut current_ptr = epoch_update_ptr;
     
     // Write signature point
@@ -272,9 +232,9 @@ pub fn write_epoch_update(
     current_ptr = write_signer_data(vm, current_ptr, circuit_inputs)?;
 
     // Write execution header proof
-    write_execution_header_proof(vm, current_ptr, &circuit_inputs.execution_header_proof)?;
+    current_ptr = write_execution_header_proof(vm, current_ptr, &circuit_inputs.execution_header_proof)?;
     
-    Ok(())
+    Ok(current_ptr)
 }
 
 fn write_header_fields(
@@ -353,4 +313,75 @@ fn write_execution_header_proof(
     }
     
     Ok((ptr + 1)?)
+}
+
+pub fn assert_epoch_update_result(
+    vm: &mut VirtualMachine,
+    output_ptr: Relocatable,
+    expected_outputs: &ExpectedEpochUpdateCircuitOutputs,
+) -> Result<(), HintError> {
+
+    // Check header root (output_ptr + 0, output_ptr + 1)
+        let header_root = Uint256::from_memory(vm, output_ptr)?;
+        if header_root != expected_outputs.beacon_header_root {
+            return Err(HintError::AssertionFailed(format!(
+                "Beacon Header Root Mismatch: {:?} != {:?}", 
+                header_root, expected_outputs.beacon_header_root
+            ).into_boxed_str()));
+        }
+        
+        // Check state root (output_ptr + 2, output_ptr + 3)
+        let state_root = Uint256::from_memory(vm, (output_ptr + 2)?)?;
+        if state_root != expected_outputs.beacon_state_root {
+            return Err(HintError::AssertionFailed(format!(
+                "Beacon State Root Mismatch: {:?} != {:?}", 
+                state_root, expected_outputs.beacon_state_root
+            ).into_boxed_str()));
+        }
+        
+        // Check slot (output_ptr + 4)
+        let slot = Felt::from_memory(vm, (output_ptr + 4)?)?;
+        if slot != expected_outputs.slot {
+            return Err(HintError::AssertionFailed(format!(
+                "Slot Mismatch: {:?} != {:?}", 
+                slot, expected_outputs.slot
+            ).into_boxed_str()));
+        }
+        
+        // Check committee hash (output_ptr + 5, output_ptr + 6)
+        let committee_hash = Uint256::from_memory(vm, (output_ptr + 5)?)?;
+        if committee_hash != expected_outputs.committee_hash {
+            return Err(HintError::AssertionFailed(format!(
+                "Committee Hash Mismatch: {:?} != {:?}", 
+                committee_hash, expected_outputs.committee_hash
+            ).into_boxed_str()));
+        }
+        
+        // Check n_signers (output_ptr + 7)
+        let n_signers = Felt::from_memory(vm, (output_ptr + 7)?)?;
+        if n_signers != expected_outputs.n_signers {
+            return Err(HintError::AssertionFailed(format!(
+                "Number of Signers Mismatch: {:?} != {:?}", 
+                n_signers, expected_outputs.n_signers
+            ).into_boxed_str()));
+        }
+        
+        // Check execution hash (output_ptr + 8, output_ptr + 9)
+        let execution_hash = Uint256::from_memory(vm, (output_ptr + 8)?)?;
+        if execution_hash != expected_outputs.execution_header_hash {
+            return Err(HintError::AssertionFailed(format!(
+                "Execution Header Hash Mismatch: {:?} != {:?}", 
+                execution_hash, expected_outputs.execution_header_hash
+            ).into_boxed_str()));
+        }
+        
+        // Check execution height (output_ptr + 10)
+        let execution_height = Felt::from_memory(vm, (output_ptr + 10)?)?;
+        if execution_height != expected_outputs.execution_header_height {
+            return Err(HintError::AssertionFailed(format!(
+                "Execution Header Height Mismatch: {:?} != {:?}", 
+                execution_height, expected_outputs.execution_header_height
+            ).into_boxed_str()));
+        }
+    Ok(())
 }

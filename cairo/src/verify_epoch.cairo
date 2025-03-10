@@ -58,7 +58,7 @@ func run_epoch_update{
     assert computed_body_root.low = body_root.low;
     assert computed_body_root.high = body_root.high;
 
-    %{ verify_epoch_update_outputs() %}
+    // %{ verify_epoch_update_outputs() %}
 
     assert [output_ptr] = header_root.low;
     assert [output_ptr + 1] = header_root.high;

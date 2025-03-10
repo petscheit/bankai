@@ -32,6 +32,8 @@ func main{
         run_epoch_update(epoch_update); 
     }
 
+    %{ verify_epoch_update_outputs() %}
+
     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
 
     return ();
