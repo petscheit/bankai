@@ -14,15 +14,7 @@ from cairo.src.signer import (
 from cairo.src.utils import pow2alloc128
 from sha import SHA256
 from debug import print_string, print_felt_hex, print_felt
-from cairo.src.types import SignerData, ExecutionHeaderProof
-
-struct BeaconHeader {
-    slot: Uint256,
-    proposer_index: Uint256,
-    parent_root: Uint256,
-    state_root: Uint256,
-    body_root: Uint256,
-}
+from cairo.src.types import SignerData, ExecutionHeaderProof, BeaconHeader, EpochUpdate
 
 func run_epoch_update{
     output_ptr: felt*,
@@ -34,32 +26,35 @@ func run_epoch_update{
     mul_mod_ptr: ModBuiltin*,
     pow2_array: felt*,
     sha256_ptr: felt*,
-}() {
+}(epoch_update: EpochUpdate) {
     alloc_locals;
 
-    local sig_point: G2Point;
-    local header: BeaconHeader;
-    local signer_data: SignerData;
-    local execution_header_proof: ExecutionHeaderProof;
+    // 1. Hash beacon header
+    let (header_root, body_root, state_root) = hash_header(epoch_update.header);
 
-    %{ write_epoch_update_inputs() %}
+    // 2. Compute signing root (this is what validators sign)
+    let signing_root = Domain.compute_signing_root(header_root, epoch_update.header.slot.low);
 
-    let (header_root, body_root, state_root) = hash_header(header);
-    let signing_root = Domain.compute_signing_root(header_root, header.slot.low);
+    // 3. Hash to curve to get message point
     let (msg_point) = hash_to_curve(1, signing_root);
-    let (committee_hash, agg_key, n_non_signers) = faster_fast_aggregate_signer_pubs(signer_data);
+
+    // 4. Aggregate signer to get aggregate key that was used to sign the message
+    let (committee_hash, agg_key, n_non_signers) = faster_fast_aggregate_signer_pubs(epoch_update.signer_data);
     let n_signers = 512 - n_non_signers;
-    verify_signature(agg_key, msg_point, sig_point);
 
-    // Verify Execution Header
-    let (execution_root, execution_hash, execution_height) = SSZ.hash_execution_payload_header_root(execution_header_proof.payload_fields);
-    print_felt(execution_height);
+    // 5. Verify signature
+    verify_signature(agg_key, msg_point, epoch_update.sig_point);
 
+    // 6. Hash execution payload root (SSZ encoded execution payload) which is stored in the beacon state
+    let (execution_root, execution_hash, execution_height) = SSZ.hash_execution_payload_header_root(epoch_update.execution_header_proof.payload_fields);
+
+    // 7. Verify ssz inclusion proof
     let root_felts = MerkleUtils.chunk_uint256(execution_root);
     let computed_body_root = MerkleTree.hash_merkle_path(
-        path=execution_header_proof.path, path_len=4, leaf=root_felts, index=9
+        path=epoch_update.execution_header_proof.path, path_len=4, leaf=root_felts, index=9
     );
 
+    // 8. Assert that the computed body root matches the body root of the verified header
     assert computed_body_root.low = body_root.low;
     assert computed_body_root.high = body_root.high;
 
@@ -69,7 +64,7 @@ func run_epoch_update{
     assert [output_ptr + 1] = header_root.high;
     assert [output_ptr + 2] = state_root.low;
     assert [output_ptr + 3] = state_root.high;
-    assert [output_ptr + 4] = header.slot.low;
+    assert [output_ptr + 4] = epoch_update.header.slot.low;
     assert [output_ptr + 5] = committee_hash.low;
     assert [output_ptr + 6] = committee_hash.high;
     assert [output_ptr + 7] = n_signers;

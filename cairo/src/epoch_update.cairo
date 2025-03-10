@@ -2,9 +2,12 @@
 
 from starkware.cairo.common.cairo_builtins import PoseidonBuiltin, ModBuiltin, BitwiseBuiltin
 from starkware.cairo.common.registers import get_fp_and_pc
+from definitions import G2Point
 
 from cairo.src.utils import pow2alloc128
 from sha import SHA256
+from cairo.src.types import EpochUpdate
+
 
 from cairo.src.verify_epoch import run_epoch_update
 
@@ -22,8 +25,11 @@ func main{
     let (pow2_array) = pow2alloc128();
     let (sha256_ptr, sha256_ptr_start) = SHA256.init();
 
+    local epoch_update: EpochUpdate;
+    %{ write_epoch_update_inputs() %}
+
     with pow2_array, sha256_ptr {
-        run_epoch_update(); 
+        run_epoch_update(epoch_update); 
     }
 
     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);

@@ -49,8 +49,8 @@ impl CairoType for Uint256 {
         Ok((address + 2)?)
     }
 
-    fn n_fields(_vm: &VirtualMachine, _address: Relocatable) -> Result<usize, MemoryError> {
-        Ok(2)
+    fn n_fields() -> usize {
+        2
     }
 }
 
@@ -106,8 +106,8 @@ impl CairoType for Uint256Bits32 {
         Ok((address + 8)?)
     }
 
-    fn n_fields(_vm: &VirtualMachine, _address: Relocatable) -> Result<usize, MemoryError> {
-        Ok(8)
+    fn n_fields() -> usize {
+        8
     }
 }
 
@@ -166,8 +166,8 @@ impl CairoType for UInt384 {
         Ok((address + 4)?)
     }
 
-    fn n_fields(_vm: &VirtualMachine, _address: Relocatable) -> Result<usize, MemoryError> {
-        Ok(4)
+    fn n_fields() -> usize {
+        4
     }
 }
 
@@ -185,8 +185,8 @@ impl CairoType for Felt {
         Ok((address + 1)?)
     }
 
-    fn n_fields(_vm: &VirtualMachine, _address: Relocatable) -> Result<usize, MemoryError> {
-        Ok(1)
+    fn n_fields() -> usize {
+        1
     }
 }
 
@@ -209,8 +209,8 @@ impl CairoType for G1CircuitPoint {
         Ok((address + 8)?)
     }
 
-    fn n_fields(_vm: &VirtualMachine, _address: Relocatable) -> Result<usize, MemoryError> {
-        Ok(8)
+    fn n_fields() -> usize {
+        8
     }
 }
 
@@ -240,8 +240,8 @@ impl CairoType for G2CircuitPoint {
 
     }
 
-    fn n_fields(_vm: &VirtualMachine, _address: Relocatable) -> Result<usize, MemoryError> {
-        Ok(16)
+    fn n_fields() -> usize {
+        16
     }
 }
 
@@ -332,8 +332,8 @@ impl CairoType for Bytes32 {
         Ok((address + 2)?)
     }
 
-    fn n_fields(_vm: &VirtualMachine, _address: Relocatable) -> Result<usize, MemoryError> {
-        Ok(2)
+    fn n_fields() -> usize {
+        2
     }
 }
 
