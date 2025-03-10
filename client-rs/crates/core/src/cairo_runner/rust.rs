@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use bankai_runner::committee_update::{CommitteeUpdateCircuit, CircuitInput, CircuitOutput};
+use bankai_runner::epoch_batch::{EpochUpdateBatchCircuit, EpochUpdateBatchCircuitInputs};
 use bankai_runner::epoch_update::{BeaconHeaderCircuit, EpochCircuitInputs, EpochUpdateCircuit, ExecutionHeaderCircuitProof, ExecutionPayloadHeaderCircuit, ExpectedEpochUpdateCircuitOutputs};
 use bankai_runner::types::{Uint256, UInt384, Uint256Bits32, Felt, G1CircuitPoint, G2CircuitPoint};
 pub use bankai_runner::run_committee_update;
@@ -11,12 +12,47 @@ use uuid::Uuid;
 use crate::db::manager::DatabaseManager;
 use crate::types::error::BankaiCoreError;
 use crate::types::job::JobStatus;
+use crate::types::proofs::epoch_batch::EpochUpdateBatch;
 use crate::types::proofs::epoch_update::{EpochUpdate, G1Point, G2Point};
 use crate::types::proofs::sync_committee::SyncCommitteeUpdate;
 use crate::utils::config::BankaiConfig;
 use cairo_vm::vm::runners::cairo_pie::CairoPie;
 // use bankai_runner::epoch_update::EpochUpdateCircuit;
 use bankai_runner::run_epoch_update;
+use bankai_runner::run_epoch_batch;
+
+pub async fn generate_epoch_batch_pie(
+    input: EpochUpdateBatch,
+    config: &BankaiConfig,
+    db_manager: Option<Arc<DatabaseManager>>,
+    job_id: Option<Uuid>,
+) -> Result<CairoPie, BankaiCoreError> {
+
+    let _permit = config
+        .pie_generation_semaphore
+        .clone()
+        .acquire_owned()
+        .await.unwrap();
+
+    match db_manager {
+        None => {}
+        Some(db) => {
+            let _ = db
+            .update_job_status(job_id.unwrap(), JobStatus::StartedTraceGeneration)
+            .await;
+        }
+    }
+
+    info!("Generating trace...");
+    let start_time = std::time::Instant::now();
+
+    let pie = run_epoch_batch(config.epoch_batch_circuit_path.as_str(), input.into())?;
+    let duration = start_time.elapsed();
+
+    info!("Trace generated successfully in {:.2?}!", duration);
+
+    Ok(pie)
+}
 
 pub async fn generate_epoch_update_pie(
     input: EpochUpdate,
@@ -158,5 +194,18 @@ impl Into<G2CircuitPoint> for G2Point {
         let json = serde_json::to_string(&self).unwrap();
         let parsed: G2CircuitPoint = serde_json::from_str(&json).unwrap();
         parsed
+    }
+}
+
+impl Into<EpochUpdateBatchCircuit> for EpochUpdateBatch {
+    fn into(self) -> EpochUpdateBatchCircuit {
+        let circuit_input = EpochUpdateBatchCircuitInputs {
+            committee_hash: Uint256(BigUint::from_bytes_be(self.circuit_inputs.committee_hash.as_slice())),
+            epochs: self.circuit_inputs.epochs.into_iter().map(|e| e.into()).collect::<Vec<EpochUpdateCircuit>>(),
+        };
+        EpochUpdateBatchCircuit {
+            circuit_inputs: circuit_input,
+            // expected_circuit_outputs: self.expected_circuit_outputs,
+        }
     }
 }

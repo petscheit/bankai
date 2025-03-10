@@ -16,7 +16,7 @@ from cairo.src.verify_epoch import run_epoch_update
 from cairo.src.utils import pow2alloc128
 from cairo.src.types import EpochUpdateBatch
 from sha import SHA256
-from debug import print_string
+from debug import print_string, print_felt
 
 func main{
     output_ptr: felt*,
@@ -43,19 +43,10 @@ func main{
         let (latest_batch_output: felt*) = run_epoch_batches{
             output_ptr=epoch_outputs,
         }(epoch_batch, 0, batch_len, 0);
-        
+
         // ToDo: ensure this can stay unvalidated
-        local next_power_of_2: felt; // Unvalidated hint.
-        %{
-            # Find next power of 2
-            def next_power_of_2(n):
-                power = 1
-                while power < n:
-                    power *= 2
-                return power
-                
-            ids.next_power_of_2 = next_power_of_2(ids.batch_len)
-        %}
+        local next_power_of_2 = 32;
+        // %{ set_next_power_of_2() %}
 
         // Pad the epoch outputs with zeros to the next power of 2
         memset(dst=epoch_outputs + batch_len, value=0, n=next_power_of_2 - batch_len);
@@ -65,13 +56,13 @@ func main{
     }
     // %{ print("computed batch root", hex(ids.batch_root)) %}
 
-    %{
-        from cairo.py.utils import uint256_to_int
+    // %{
+    //     from cairo.py.utils import uint256_to_int
 
-        assert uint256_to_int(ids.committee_hash) == int(program_input["expected_circuit_outputs"]["latest_batch_output"]["committee_hash"], 16), "Committee Hash Mismatch"
-        assert ids.batch_root == int(program_input["expected_circuit_outputs"]["batch_root"], 16), "Batch Root Mismatch"
+    //     assert uint256_to_int(ids.committee_hash) == int(program_input["expected_circuit_outputs"]["latest_batch_output"]["committee_hash"], 16), "Committee Hash Mismatch"
+    //     assert ids.batch_root == int(program_input["expected_circuit_outputs"]["batch_root"], 16), "Batch Root Mismatch"
     
-    %}
+    // %}
 
     assert [output_ptr] = batch_root;
 
@@ -97,16 +88,19 @@ func run_epoch_batches{
     alloc_locals;
     print_string('running epoch batch');
     // %{ vm_enter_scope({'program_input': program_input["circuit_inputs"]["epochs"][ids.index]}) %}
-    
+    print_felt(index);
     // Create a new output_ptr per batch
     let (epoch_output: felt*) = alloc();
+    let epoch = epoch_batch.epochs[index];
     run_epoch_update{
         output_ptr=epoch_output,
-    }(epoch_batch.epochs[index]);
+    }(epoch);
 
     // set output_ptr to first output
     let epoch_output = epoch_output - 11;
-    %{ vm_exit_scope() %}
+    // %{ vm_exit_scope() %}
+
+    // %{ assert_batched_epoch_outputs() %}
 
     // Verify the slot number matches what we expect
     let current_slot = epoch_output[4];

@@ -50,7 +50,7 @@ impl Default for BankaiConfig {
             contract_path: "../../contract/target/release/bankai_BankaiContract.contract_class.json"
                 .to_string(),
             epoch_circuit_path: "../../../cairo/build/epoch_update.json".to_string(),
-            epoch_batch_circuit_path: "../../cairo/build/epoch_batch.json".to_string(),
+            epoch_batch_circuit_path: "../../../cairo/build/epoch_batch.json".to_string(),
             committee_circuit_path: "../../cairo/cairo_runner/committee_update.json".to_string(),
             cairo_verifier_path: "../cairo/cairo_runner/cairo_verifier.json".to_string(),
             atlantic_endpoint: "https://staging.atlantic.api.herodotus.cloud".to_string(),

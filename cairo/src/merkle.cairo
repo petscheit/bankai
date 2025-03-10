@@ -13,11 +13,11 @@ namespace PoseidonMerkleTree {
         alloc_locals;
 
         // ensure we have a power of 2.
-        local sqrt: felt;
-        %{ 
-            import math
-            ids.sqrt = int(math.sqrt(ids.leafs_len))
-        %}
+        // local sqrt: felt;
+        // %{ 
+        //     import math
+        //     ids.sqrt = int(math.sqrt(ids.leafs_len))
+        // %}
         // ToDo: this doesnt work obviously. Propose a fix!
         // assert pow2_array[sqrt] = leafs_len;
 

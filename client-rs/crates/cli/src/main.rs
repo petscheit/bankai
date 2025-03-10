@@ -1,4 +1,6 @@
 use bankai_core::cairo_runner::python::{CairoRunner, CairoRunnerError};
+use bankai_core::cairo_runner::rust::{generate_epoch_batch_pie, generate_epoch_update_pie};
+use bankai_core::cairo_runner::rust::generate_pie;
 use bankai_core::clients::atlantic::AtlanticError;
 use bankai_core::clients::starknet::StarknetError;
 use bankai_core::types::error::BankaiCoreError;
@@ -14,8 +16,6 @@ use dotenv::from_filename;
 use starknet::core::types::Felt;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
-use bankai_core::cairo_runner::rust::generate_pie;
-use bankai_core::cairo_runner::rust::generate_epoch_update_pie;
 #[derive(Subcommand)]
 enum Commands {
     /// Generate and manage proofs for the light client state
@@ -209,12 +209,13 @@ async fn main() -> Result<(), BankaiCliError> {
                 // if latest_epoch_slot < lowest_committee_update_slot {
                 //     return Err(BankaiCliError::RequiresNewerEpoch(latest_epoch_slot));
                 // }
-                let update: SyncCommitteeUpdate = bankai
-                    .get_sync_committee_update(5555555)
-                    .await?;
+                let update: SyncCommitteeUpdate = bankai.get_sync_committee_update(5555555).await?;
                 let _ = update.export()?;
                 let pie = generate_pie(update, &bankai.config, None, None).await?;
-                let batch_id = bankai.atlantic_client.submit_batch(pie, ProofType::SyncCommittee).await?;
+                let batch_id = bankai
+                    .atlantic_client
+                    .submit_batch(pie, ProofType::SyncCommittee)
+                    .await?;
                 println!("Batch Submitted: {}", batch_id);
             }
             ProveCommands::NextEpoch => {
@@ -230,7 +231,8 @@ async fn main() -> Result<(), BankaiCliError> {
                     .await
                     .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
                 let _ = epoch_update.export().unwrap();
-                let pie = generate_epoch_update_pie(epoch_update, &bankai.config, None, None).await?;
+                let pie =
+                    generate_epoch_update_pie(epoch_update, &bankai.config, None, None).await?;
                 // let batch_id = bankai.atlantic_client.submit_batch(pie, ProofType::Epoch).await?;
                 // println!("Batch Submitted: {}", batch_id);
                 // CairoRunner::generate_pie(&epoch_update, &bankai.config, None, None).await?;
@@ -241,8 +243,9 @@ async fn main() -> Result<(), BankaiCliError> {
                 let epoch_update = EpochUpdateBatch::new(&bankai)
                     .await
                     .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
-                println!("Update contents: {:?}", epoch_update);
-                let _ = epoch_update.export().unwrap();
+                // println!("Update contents: {:?}", epoch_update);
+                // let _ = epoch_update.export().unwrap();
+                let pie = generate_epoch_batch_pie(epoch_update, &bankai.config, None, None).await?;
                 // CairoRunner::generate_pie(&epoch_update, &bankai.config, None, None).await?;
                 // let batch_id = bankai.atlantic_client.submit_batch(epoch_update).await?;
                 // println!("Batch Submitted: {}", batch_id);
@@ -272,7 +275,10 @@ async fn main() -> Result<(), BankaiCliError> {
                         .atlantic_client
                         .fetch_proof(batch_id.as_str())
                         .await?;
-                    let batch_id = bankai.atlantic_client.submit_wrapped_proof(proof, bankai.config.cairo_verifier_path).await?;
+                    let batch_id = bankai
+                        .atlantic_client
+                        .submit_wrapped_proof(proof, bankai.config.cairo_verifier_path)
+                        .await?;
                     println!("Batch Submitted: {}", batch_id);
                 } else {
                     println!("Batch not completed yet. Status: {}", status);
@@ -285,7 +291,7 @@ async fn main() -> Result<(), BankaiCliError> {
                     .await
                     .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
                 let json = serde_json::to_string_pretty(&proof)?;
-                
+
                 if let Some(path) = export {
                     match std::fs::write(path.clone(), json) {
                         Ok(_) => println!("Proof exported to {}", path),

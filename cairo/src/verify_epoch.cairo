@@ -29,6 +29,8 @@ func run_epoch_update{
 }(epoch_update: EpochUpdate) {
     alloc_locals;
 
+    print_string('run epoch update');
+
     // 1. Hash beacon header
     let (header_root, body_root, state_root) = hash_header(epoch_update.header);
 

@@ -11,7 +11,7 @@ use cairo_vm::{
 };
 use garaga_zero_hints::*;
 
-use crate::{committee_update::{CommitteeUpdateCircuit, HINT_ASSERT_COMMITTEE_UPDATE_RESULT, HINT_WRITE_COMMITTEE_UPDATE_INPUTS}, epoch_update::{self, EpochUpdateCircuit, HINT_ASSERT_EPOCH_UPDATE_RESULT, HINT_WRITE_EPOCH_UPDATE_INPUTS}};
+use crate::{committee_update::{CommitteeUpdateCircuit, HINT_ASSERT_COMMITTEE_UPDATE_RESULT, HINT_WRITE_COMMITTEE_UPDATE_INPUTS}, epoch_update::{self, EpochUpdateCircuit, HINT_ASSERT_EPOCH_UPDATE_RESULT, HINT_WRITE_EPOCH_UPDATE_INPUTS}, epoch_batch::{EpochUpdateBatchCircuit, HINT_WRITE_EPOCH_UPDATE_BATCH_INPUTS, HINT_ASSERT_BATCHED_EPOCH_OUTPUTS}};
 
 pub type HintImpl = fn(&mut VirtualMachine, &mut ExecutionScopes, &HintProcessorData, &HashMap<String, Felt252>) -> Result<(), HintError>;
 
@@ -21,16 +21,18 @@ pub struct CustomHintProcessor {
     builtin_hint_proc: BuiltinHintProcessor,
     pub committee_input: Option<CommitteeUpdateCircuit>,
     pub epoch_input: Option<EpochUpdateCircuit>,
+    pub epoch_batch_input: Option<EpochUpdateBatchCircuit>,
 }
 
 
 impl CustomHintProcessor {
-    pub fn new(committee_input: Option<CommitteeUpdateCircuit>, epoch_input: Option<EpochUpdateCircuit>) -> Self {
+    pub fn new(committee_input: Option<CommitteeUpdateCircuit>, epoch_input: Option<EpochUpdateCircuit>, epoch_batch_input: Option<EpochUpdateBatchCircuit>) -> Self {
         Self {
             hints: Self::hints(),
             builtin_hint_proc: BuiltinHintProcessor::new_empty(),
             committee_input,
             epoch_input,
+            epoch_batch_input,
         }
     }
 
@@ -99,6 +101,8 @@ impl HintProcessorLogic for CustomHintProcessor {
                 HINT_ASSERT_COMMITTEE_UPDATE_RESULT => self.assert_committee_update_result(vm, exec_scopes, hpd, constants),
                 HINT_WRITE_EPOCH_UPDATE_INPUTS => self.write_epoch_update_inputs(vm, exec_scopes, hpd, constants),
                 HINT_ASSERT_EPOCH_UPDATE_RESULT => self.assert_epoch_update_result(vm, exec_scopes, hpd, constants),
+                HINT_WRITE_EPOCH_UPDATE_BATCH_INPUTS => self.write_epoch_update_batch_inputs(vm, exec_scopes, hpd, constants),
+                HINT_ASSERT_BATCHED_EPOCH_OUTPUTS => self.assert_batched_epoch_outputs(vm, exec_scopes, hpd, constants),
                 _ => Err(HintError::UnknownHint(hint_code.to_string().into_boxed_str())),
             };
 
