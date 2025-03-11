@@ -35,7 +35,7 @@ pub fn run_committee_update(path: &str, update: CommitteeUpdateCircuit) -> Resul
     };
     let mut hint_processor = CustomHintProcessor::new(Some(update), None, None);
     let cairo_runner = cairo_run_program(&program, &cairo_run_config, &mut hint_processor)?;
-    println!("{:?}", cairo_runner.get_execution_resources());
+    tracing::debug!("{:?}", cairo_runner.get_execution_resources());
 
     let pie = cairo_runner.get_cairo_pie()?;
     Ok(pie)
@@ -48,11 +48,10 @@ pub fn run_epoch_update(path: &str, update: EpochUpdateCircuit) -> Result<CairoP
         layout: LayoutName::all_cairo,
         ..Default::default()
     };
-    println!("Running epoch update...");
     let mut hint_processor = CustomHintProcessor::new(None, Some(update), None);
     let cairo_runner = cairo_run_program(&program, &cairo_run_config, &mut hint_processor)?;
-    println!("{:?}", cairo_runner.get_execution_resources());
-
+    tracing::debug!("{:?}", cairo_runner.get_execution_resources());
+    
     let pie = cairo_runner.get_cairo_pie()?;
     Ok(pie)
 }
@@ -64,34 +63,10 @@ pub fn run_epoch_batch(path: &str, update: EpochUpdateBatchCircuit) -> Result<Ca
         layout: LayoutName::all_cairo,
         ..Default::default()
     };
-    println!("Running epoch batch...");
     let mut hint_processor = CustomHintProcessor::new(None, None, Some(update));
     let cairo_runner = cairo_run_program(&program, &cairo_run_config, &mut hint_processor)?;
-    println!("{:?}", cairo_runner.get_execution_resources());
+    tracing::debug!("{:?}", cairo_runner.get_execution_resources());
 
     let pie = cairo_runner.get_cairo_pie()?;
     Ok(pie)
 }
-
-// fn main() -> Result<(), Error> {
-//     // Init CairoRunConfig
-//     let cairo_run_config = cairo_run::CairoRunConfig {
-//         allow_missing_builtins: Some(true),
-//         layout: LayoutName::all_cairo,
-//         ..Default::default()
-//     };
-//     println!("Loading hash_to_curve program...");
-//     let program_file = std::fs::read("../build/epoch_update.json").map_err(Error::IO)?;
-
-//     let update = CommitteeUpdate::from_file("committee_update_input.json").unwrap();
-    
-//     // Load the Program
-//     let program = Program::from_bytes(&program_file, Some(cairo_run_config.entrypoint))?;
-
-//     let mut hint_processor = CustomHintProcessor::new(Some(update));
-//     let cairo_runner = cairo_run_program(&program, &cairo_run_config, &mut hint_processor).unwrap();
-
-//     println!("{:?}", cairo_runner.get_execution_resources());
-
-//     Ok(())
-// }

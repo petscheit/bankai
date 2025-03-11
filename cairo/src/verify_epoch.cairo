@@ -29,8 +29,6 @@ func run_epoch_update{
 }(epoch_update: EpochUpdate) {
     alloc_locals;
 
-    print_string('run epoch update');
-
     // 1. Hash beacon header
     let (header_root, body_root, state_root) = hash_header(epoch_update.header);
 
@@ -59,8 +57,6 @@ func run_epoch_update{
     // 8. Assert that the computed body root matches the body root of the verified header
     assert computed_body_root.low = body_root.low;
     assert computed_body_root.high = body_root.high;
-
-    // %{ verify_epoch_update_outputs() %}
 
     assert [output_ptr] = header_root.low;
     assert [output_ptr + 1] = header_root.high;

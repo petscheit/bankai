@@ -98,6 +98,8 @@ func run_epoch_batches{
     // set output_ptr to first output
     let epoch_output = epoch_output - 11;
 
+    %{ assert_batched_epoch_outputs() %}
+
     // Verify the slot number matches what we expect
     let current_slot = epoch_output[4];
     local current_epoch: felt;

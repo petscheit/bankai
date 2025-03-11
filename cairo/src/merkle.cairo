@@ -3,23 +3,13 @@ from starkware.cairo.common.cairo_builtins import PoseidonBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.memcpy import memcpy
 
-// First I tried to combine this with the SHA256 merkle tree, but its hard to generalize.
-// Main hurdle is the Uint256 type + the 32 bit chunks sha requires.
-// For now best solution is to have a separate implementation for the poseidon merkle tree.
 namespace PoseidonMerkleTree {
     func compute_root{
         range_check_ptr, poseidon_ptr: PoseidonBuiltin*, pow2_array: felt*
     }(leafs: felt*, leafs_len: felt) -> felt {
         alloc_locals;
 
-        // ensure we have a power of 2.
-        // local sqrt: felt;
-        // %{ 
-        //     import math
-        //     ids.sqrt = int(math.sqrt(ids.leafs_len))
-        // %}
-        // ToDo: this doesnt work obviously. Propose a fix!
-        // assert pow2_array[sqrt] = leafs_len;
+        // It needs to be ensured that the leafs_len is a power of 2.
 
         let (tree: felt*) = alloc();
         let tree_len = 2 * leafs_len - 1;  // total nodes in the tree
@@ -29,10 +19,6 @@ namespace PoseidonMerkleTree {
 
         // Calculate number of internal nodes to process
         let internal_nodes = leafs_len - 1;
-
-        // I am experimenting with using two pointers for the same segment here. 
-        // This reduces the arithmicals operations per pair hash quie a bit.
-        // Will port this to the sha256 merkle tree if it makes sense.
 
         // Set up initial pointers:
         // tree_ptr starts at the last pair of leaves

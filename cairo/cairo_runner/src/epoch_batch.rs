@@ -70,7 +70,7 @@ impl CustomHintProcessor {
     ) -> Result<(), HintError> {
 
         let index: usize = get_integer_from_var_name("index", vm, &hint_data.ids_data, &hint_data.ap_tracking)?.try_into().unwrap();
-        let epoch_output_ptr = get_relocatable_from_var_name("epoch_output", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+        let epoch_output_ptr = get_ptr_from_var_name("epoch_output", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
 
         if let Some(epoch_batch) = &self.epoch_batch_input {
             let expected_outputs = &epoch_batch.circuit_inputs.epochs[index].expected_circuit_outputs;
@@ -87,7 +87,6 @@ impl CustomHintProcessor {
         hint_data: &HintProcessorData,
         _constants: &HashMap<String, Felt252>,
     ) -> Result<(), HintError> {
-
         let output_ptr = (get_ptr_from_var_name("output_ptr", vm, &hint_data.ids_data, &hint_data.ap_tracking)? - 12)?;
         let expected_outputs = &self.epoch_batch_input.as_ref().unwrap().expected_circuit_outputs;
         let batch_root = Felt::from_memory(vm, output_ptr)?;

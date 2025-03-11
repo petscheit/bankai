@@ -115,7 +115,6 @@ impl HintProcessorLogic for CustomHintProcessor {
                 return res.map(|_| HintExtension::default());
             }
 
-            // println!("hint_code: {}", hint_code);
 
             // First try our custom hints
             if let Some(hint_impl) = self.hints.get(hint_code) {

@@ -12,3 +12,4 @@ serde_json = "1.0.105"
 num-bigint = "0.4.1"
 hex = "0.4.3"
 beacon_types = { git = "https://github.com/petscheit/lighthouse.git", package = "types" }
+tracing = "0.1.41"

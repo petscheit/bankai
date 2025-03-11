@@ -1,0 +1,19 @@
+{
+  "circuit_inputs": {
+    "beacon_slot": 7073760,
+    "next_sync_committee_branch": [
+      "0xf453aa1191c4e4ab6f256d205180ab195ee42f73ff15b2c6b78aa391b886c19f",
+      "0x7bf07cbbae895fa4a61b68787370f0b3550a74b021cb357256c4af66cf9c4cd7",
+      "0x77125b57b707af589a2e9f3fa04ba541307328ddfb96c956062ec7a5f9be7504",
+      "0x4d70f9af6db95262b865e082261cd6b9f8ff500dfc0d026fb6439875edc1fc42",
+      "0x525e04c00221b8d45957de8ecccb7885741f96e3384ba33c212f5ed0d220c214"
+    ],
+    "next_aggregate_sync_committee": "0xa511669db115ae7b98d6d69c3c2c8d155d304d21de4cbc8ddcbb05eb383de00d13ae49332306d5310695da5ab664917a",
+    "committee_keys_root": "0xa62f55fba931ca858938d6655b7399c11aba034febcf2768ab375c0d11c51f4b"
+  },
+  "expected_circuit_outputs": {
+    "state_root": "0x0193abfebb3cfbbaff2d46e2c58db6306c60e52303c2cd575a79f33455fd7b01",
+    "slot": 7073760,
+    "committee_hash": "0x0e8668a41f462a3f885bcba64230f8ff1a78b0112f5abc5acc15cccdd7560546"
+  }
+}
