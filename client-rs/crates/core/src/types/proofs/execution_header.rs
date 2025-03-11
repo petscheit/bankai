@@ -59,7 +59,7 @@ impl ExecutionHeaderProof {
         let leafs: Vec<FixedBytes<32>> = body_ref
             .body_merkle_leaves()
             .into_iter()
-            .map(|leaf| FixedBytes::from_slice(leaf.as_bytes()))
+            .map(|leaf| FixedBytes::from_slice(leaf.as_slice()))
             .collect();
 
         let path = generate_path(leafs.clone(), EXECUTION_PAYLOAD_LEAF_INDEX).unwrap();
@@ -67,11 +67,11 @@ impl ExecutionHeaderProof {
 
         // Verify the merkle proof
         let computed_root = hash_path(path.clone(), leaf, EXECUTION_PAYLOAD_LEAF_INDEX as u64);
-        assert_eq!(computed_root.as_slice(), root.as_bytes());
+        assert_eq!(computed_root.as_slice(), root.as_slice());
 
         // Construct and return the proof
         let proof = ExecutionHeaderProof {
-            root: FixedBytes::from_slice(root.as_bytes()),
+            root: FixedBytes::from_slice(root.as_slice()),
             path,
             leaf,
             index: EXECUTION_PAYLOAD_LEAF_INDEX,

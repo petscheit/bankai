@@ -582,7 +582,7 @@ impl Submittable<EpochInputs> for ExpectedEpochUpdateOutputs {
                 .execution_payload_header
                 .block_hash()
                 .into_root()
-                .as_bytes(),
+                .as_slice(),
         );
         Self {
             beacon_header_root: circuit_inputs.header.tree_hash_root(),

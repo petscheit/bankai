@@ -17,9 +17,9 @@ serde = "1.0.215"
 serde_derive = "1.0.215"
 serde_json = "1.0.133"
 tokio = { version = "1.0", features = ["full"] }
-beacon-state-proof = { git = "https://github.com/petscheit/beacon-state-proof" }
+beacon-state-proof = { git = "https://github.com/petscheit/beacon-state-proof", rev = "a0194f766e19bbb193360b4156c23400f7932a42" }
 cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", tag = "v2.0.0", features = ["extensive_hints", "clap", "cairo-1-hints", "mod_builtin"] }
-beacon_types = { git = "https://github.com/petscheit/lighthouse.git", package = "types" }
+beacon_types = { git = "https://github.com/petscheit/lighthouse.git", package = "types", rev = "577954111ac8526859534977960addeb5827e30b"}
 sha2 = "0.10.8"
 reqwest = { version = "0.12.9", features = ["json", "multipart", "stream"] }
 rand = "0.8.5"
@@ -29,8 +29,8 @@ itertools = "0.13.0"
 bls12_381 = "0.8.0"
 clap = { version = "4.5.22", features = ["derive"] }
 starknet = "0.12.0"
-tree_hash_derive = "0.8.0"
-tree_hash = "0.8.0"
+tree_hash_derive = "0.8"
+tree_hash = "0.8"
 dotenv = "0.15"
 tokio-postgres = { version = "0.7.12", features = [
     "with-uuid-1",
@@ -59,6 +59,14 @@ tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["trace", "timeout"] }
 chrono = { version = "0.4.39", features = ["serde"] }
 tokio-util = "0.7.13"
+
+# These need to be pinned to make the lighthouse fork work
+rust_eth_kzg = "=0.5.1"
+crate_crypto_internal_eth_kzg_bls12_381 = "=0.5.1"
+crate_crypto_internal_eth_kzg_erasure_codes = "=0.5.1"
+crate_crypto_internal_eth_kzg_maybe_rayon = "=0.5.1"
+crate_crypto_internal_eth_kzg_polynomial = "=0.5.1"
+crate_crypto_kzg_multi_open_fk20 = "=0.5.1"
 
 garaga-zero-hints = { path = "../cairo/packages/garaga-zero/hints/rust-vm" }
 bankai-core = { path = "crates/core" }

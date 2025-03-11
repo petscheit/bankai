@@ -246,7 +246,7 @@ impl From<SyncCommitteeProof> for CommitteeCircuitInputs {
             next_sync_committee_branch: committee_proof
                 .proof
                 .into_iter()
-                .map(|bytes| FixedBytes::from_slice(bytes.as_bytes()))
+                .map(|bytes| FixedBytes::from_slice(bytes.as_slice()))
                 .collect(),
             next_aggregate_sync_committee: FixedBytes::from_slice(
                 committee_proof
@@ -254,7 +254,7 @@ impl From<SyncCommitteeProof> for CommitteeCircuitInputs {
                     .aggregate_pubkey
                     .as_serialized(),
             ),
-            committee_keys_root: FixedBytes::from_slice(committee_keys_root.as_bytes()),
+            committee_keys_root: FixedBytes::from_slice(committee_keys_root.as_slice()),
         }
     }
 }

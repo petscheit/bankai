@@ -64,20 +64,20 @@ impl ExecutionPayloadHeaderCircuit {
         macro_rules! extract_common_fields {
             ($h:expr) => {
                 vec![
-                    to_uint256($h.parent_hash.0.as_bytes()),
+                    to_uint256($h.parent_hash.0.as_slice()),
                     to_uint256($h.fee_recipient.0.to_vec()),
                     to_uint256($h.state_root.0.to_vec()),
                     to_uint256($h.receipts_root.0.to_vec()),
-                    to_uint256($h.logs_bloom.tree_hash_root().as_bytes()),
+                    to_uint256($h.logs_bloom.tree_hash_root().as_slice()),
                     to_uint256($h.prev_randao.0.to_vec()),
                     u64_to_uint256($h.block_number),
                     u64_to_uint256($h.gas_limit),
                     u64_to_uint256($h.gas_used),
                     u64_to_uint256($h.timestamp),
-                    to_uint256($h.extra_data.tree_hash_root().as_bytes()),
-                    to_uint256($h.base_fee_per_gas.tree_hash_root().as_bytes()),
-                    to_uint256($h.block_hash.0.as_bytes()),
-                    to_uint256($h.transactions_root.as_bytes()),
+                    to_uint256($h.extra_data.tree_hash_root().as_slice()),
+                    to_uint256($h.base_fee_per_gas.tree_hash_root().as_slice()),
+                    to_uint256($h.block_hash.0.as_slice()),
+                    to_uint256($h.transactions_root.as_slice()),
                 ]
             };
         }
@@ -86,23 +86,23 @@ impl ExecutionPayloadHeaderCircuit {
             ExecutionPayloadHeader::Bellatrix(h) => extract_common_fields!(h),
             ExecutionPayloadHeader::Capella(h) => {
                 let mut roots = extract_common_fields!(h);
-                roots.push(to_uint256(h.withdrawals_root.as_bytes()));
+                roots.push(to_uint256(h.withdrawals_root.as_slice()));
                 roots
             },
             ExecutionPayloadHeader::Deneb(h) => {
                 let mut roots = extract_common_fields!(h);
-                roots.push(to_uint256(h.withdrawals_root.as_bytes()));
+                roots.push(to_uint256(h.withdrawals_root.as_slice()));
                 roots.push(u64_to_uint256(h.blob_gas_used));
                 roots.push(u64_to_uint256(h.excess_blob_gas));
                 roots
             },
             ExecutionPayloadHeader::Electra(h) => {
                 let mut roots = extract_common_fields!(h);
-                roots.push(to_uint256(h.withdrawals_root.as_bytes()));
+                roots.push(to_uint256(h.withdrawals_root.as_slice()));
                 roots.push(u64_to_uint256(h.blob_gas_used));
                 roots.push(u64_to_uint256(h.excess_blob_gas));
-                // roots.push(to_uint256(h.deposit_requests_root.as_bytes()));
-                // roots.push(to_uint256(h.withdrawal_requests_root.as_bytes()));
+                // roots.push(to_uint256(h.deposit_requests_root.as_slice()));
+                // roots.push(to_uint256(h.withdrawal_requests_root.as_slice()));
                 roots
             },
         };

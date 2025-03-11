@@ -81,15 +81,12 @@ impl EpochUpdateBatch {
     /// # Returns
     /// * `Result<EpochUpdateBatch, EpochBatchError>` - New batch or error
     pub async fn new(bankai: &BankaiClient) -> Result<EpochUpdateBatch, EpochBatchError> {
-        // let (start_slot, mut end_slot) = bankai
-        //     .starknet_client
-        //     .get_batching_range(&bankai.config)
-        //     .await
-        //     .map_err(|e| EpochBatchError::Client(ClientError::Starknet(e)))?;
-        let start_slot = 6916096;
-        let mut end_slot = 6917120;
-        // let mut end_slot = 6916224;
-        
+        let (start_slot, mut end_slot) = bankai
+            .starknet_client
+            .get_batching_range(&bankai.config)
+            .await
+            .map_err(|e| EpochBatchError::Client(ClientError::Starknet(e)))?;
+
         info!("Slots in Term: Start {}, End {}", start_slot, end_slot);
         let epoch_gap = (end_slot - start_slot) / SLOTS_PER_EPOCH;
         info!(
