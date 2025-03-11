@@ -4,7 +4,7 @@ use num_bigint::BigUint;
 use serde::Deserialize;
 use hex;
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 #[serde(try_from = "String")]
 pub struct Uint256(pub BigUint);
 
@@ -54,7 +54,7 @@ impl CairoType for Uint256 {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(try_from = "String")]
 pub struct Uint256Bits32(pub BigUint);
 

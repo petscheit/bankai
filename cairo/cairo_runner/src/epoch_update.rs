@@ -204,7 +204,7 @@ pub fn print_address_range(vm: &VirtualMachine, address: Relocatable, depth: usi
     println!("----------------------------------------\n");
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ExpectedEpochUpdateCircuitOutputs {
     pub beacon_header_root: Uint256,
     pub beacon_state_root: Uint256,

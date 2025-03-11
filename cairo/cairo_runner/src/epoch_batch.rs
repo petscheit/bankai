@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use garaga_zero_hints::types::CairoType;
-use cairo_vm::{hint_processor::builtin_hint_processor::{builtin_hint_processor_definition::HintProcessorData, hint_utils::{get_integer_from_var_name, get_relocatable_from_var_name}}, types::exec_scope::ExecutionScopes, vm::{errors::hint_errors::HintError, vm_core::VirtualMachine}, Felt252};
+use cairo_vm::{hint_processor::builtin_hint_processor::{builtin_hint_processor_definition::HintProcessorData, hint_utils::{get_integer_from_var_name, get_ptr_from_var_name, get_relocatable_from_var_name}}, types::exec_scope::ExecutionScopes, vm::{errors::hint_errors::HintError, vm_core::VirtualMachine}, Felt252};
 
 use crate::{epoch_update::{assert_epoch_update_result, write_epoch_update, EpochUpdateCircuit, ExpectedEpochUpdateCircuitOutputs}, hint_processor::CustomHintProcessor, types::{Felt, Uint256}};
 
@@ -8,7 +8,7 @@ use crate::{epoch_update::{assert_epoch_update_result, write_epoch_update, Epoch
 
 pub struct EpochUpdateBatchCircuit {
     pub circuit_inputs: EpochUpdateBatchCircuitInputs,
-    // pub expected_circuit_outputs: ExpectedEpochUpdateCircuitOutputs,
+    pub expected_circuit_outputs: ExpectedEpochUpdateBatchCircuitOutputs,
 }
 
 pub struct EpochUpdateBatchCircuitInputs {
@@ -17,7 +17,7 @@ pub struct EpochUpdateBatchCircuitInputs {
 }
 
 pub struct ExpectedEpochUpdateBatchCircuitOutputs {
-    pub batch_root: Uint256,
+    pub batch_root: Felt,
     pub latest_batch_output: ExpectedEpochUpdateCircuitOutputs,
 }
 
@@ -33,13 +33,11 @@ impl CustomHintProcessor {
         _constants: &HashMap<String, Felt252>,
     ) -> Result<(), HintError> {
         if let Some(epoch_batch) = &self.epoch_batch_input {
-            println!("Writing epoch batch inputs");
             let input = &epoch_batch.circuit_inputs;
             let epoch_batch_ptr = get_relocatable_from_var_name("epoch_batch", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
             let mut current_ptr = epoch_batch_ptr;
 
             current_ptr = input.committee_hash.to_memory(vm, current_ptr)?;
-            println!("Committee hash written");
             
             // Create a segment for the epochs array
             let epochs_segment = vm.add_memory_segment();
@@ -51,13 +49,10 @@ impl CustomHintProcessor {
             let mut epoch_ptr = epochs_segment;
             for epoch in &input.epochs {
                 epoch_ptr = write_epoch_update(epoch_ptr, &epoch.circuit_inputs, vm)?;
-                println!("Epoch written");
             }
 
             let batch_len_ptr = get_relocatable_from_var_name("batch_len", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
             vm.insert_value(batch_len_ptr, input.epochs.len())?;
-
-            println!("Batch length written");
 
             Ok(())
         } else {
@@ -83,4 +78,42 @@ impl CustomHintProcessor {
             panic!("EpochUpdateBatchCircuit input not found");
         }
     }
+
+    pub fn assert_epoch_batch_outputs(
+        &self,
+        vm: &mut VirtualMachine,
+        _exec_scopes: &mut ExecutionScopes,
+        hint_data: &HintProcessorData,
+        _constants: &HashMap<String, Felt252>,
+    ) -> Result<(), HintError> {
+
+        let output_ptr = (get_ptr_from_var_name("output_ptr", vm, &hint_data.ids_data, &hint_data.ap_tracking)? - 12)?;
+        let expected_outputs = &self.epoch_batch_input.as_ref().unwrap().expected_circuit_outputs;
+        let batch_root = Felt::from_memory(vm, output_ptr)?;
+        if batch_root != expected_outputs.batch_root {
+            return Err(HintError::AssertionFailed(format!(
+                "Batch Root Mismatch: {:?} != {:?}", 
+                batch_root, expected_outputs.batch_root
+            ).into_boxed_str()));
+        }
+
+        assert_epoch_update_result(vm, (output_ptr + 1)?, &expected_outputs.latest_batch_output)
+    }
+}
+
+pub fn set_next_power_of_2(
+    vm: &mut VirtualMachine,
+    _exec_scopes: &mut ExecutionScopes,
+    hint_data: &HintProcessorData,
+    _constants: &HashMap<String, Felt252>,
+) -> Result<(), HintError> {
+    let batch_len: usize = get_integer_from_var_name("batch_len", vm, &hint_data.ids_data, &hint_data.ap_tracking)?.try_into().unwrap();
+    let mut next_power_of_2: usize = 1;
+    let mut power: usize = 0;
+    while next_power_of_2 < batch_len {
+        next_power_of_2 *= 2;
+        power += 1;
+    }    
+    vm.insert_value(get_relocatable_from_var_name("next_power_of_2_index", vm, &hint_data.ids_data, &hint_data.ap_tracking)?, next_power_of_2)?;
+    Ok(())
 }

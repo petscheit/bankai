@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bankai_runner::committee_update::{CommitteeUpdateCircuit, CircuitInput, CircuitOutput};
-use bankai_runner::epoch_batch::{EpochUpdateBatchCircuit, EpochUpdateBatchCircuitInputs};
+use bankai_runner::epoch_batch::{EpochUpdateBatchCircuit, EpochUpdateBatchCircuitInputs, ExpectedEpochUpdateBatchCircuitOutputs};
 use bankai_runner::epoch_update::{BeaconHeaderCircuit, EpochCircuitInputs, EpochUpdateCircuit, ExecutionHeaderCircuitProof, ExecutionPayloadHeaderCircuit, ExpectedEpochUpdateCircuitOutputs};
 use bankai_runner::types::{Uint256, UInt384, Uint256Bits32, Felt, G1CircuitPoint, G2CircuitPoint};
 pub use bankai_runner::run_committee_update;
@@ -203,9 +203,14 @@ impl Into<EpochUpdateBatchCircuit> for EpochUpdateBatch {
             committee_hash: Uint256(BigUint::from_bytes_be(self.circuit_inputs.committee_hash.as_slice())),
             epochs: self.circuit_inputs.epochs.into_iter().map(|e| e.into()).collect::<Vec<EpochUpdateCircuit>>(),
         };
+        let latest_batch_output = circuit_input.epochs.last().unwrap().expected_circuit_outputs.clone();
+        let expected_circuit_outputs = ExpectedEpochUpdateBatchCircuitOutputs {
+            batch_root: Felt(self.expected_circuit_outputs.batch_root),
+            latest_batch_output
+        };
         EpochUpdateBatchCircuit {
             circuit_inputs: circuit_input,
-            // expected_circuit_outputs: self.expected_circuit_outputs,
+            expected_circuit_outputs: expected_circuit_outputs,
         }
     }
 }
