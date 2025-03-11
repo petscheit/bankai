@@ -23,6 +23,7 @@ pub struct ExpectedEpochUpdateBatchCircuitOutputs {
 
 pub const HINT_WRITE_EPOCH_UPDATE_BATCH_INPUTS: &str = r#"write_epoch_update_batch_inputs()"#;
 pub const HINT_ASSERT_BATCHED_EPOCH_OUTPUTS: &str = r#"assert_batched_epoch_outputs()"#;
+pub const HINT_ASSERT_EPOCH_BATCH_OUTPUTS: &str = r#"assert_epoch_batch_outputs()"#;
 
 impl CustomHintProcessor {
     pub fn write_epoch_update_batch_inputs(
@@ -101,6 +102,8 @@ impl CustomHintProcessor {
     }
 }
 
+pub const HINT_SET_NEXT_POWER_OF_2: &str = r#"set_next_power_of_2()"#;
+
 pub fn set_next_power_of_2(
     vm: &mut VirtualMachine,
     _exec_scopes: &mut ExecutionScopes,
@@ -114,6 +117,6 @@ pub fn set_next_power_of_2(
         next_power_of_2 *= 2;
         power += 1;
     }    
-    vm.insert_value(get_relocatable_from_var_name("next_power_of_2_index", vm, &hint_data.ids_data, &hint_data.ap_tracking)?, next_power_of_2)?;
+    vm.insert_value(get_relocatable_from_var_name("next_power_of_2_index", vm, &hint_data.ids_data, &hint_data.ap_tracking)?, power)?;
     Ok(())
 }

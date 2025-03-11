@@ -9,7 +9,7 @@ from starkware.cairo.common.builtin_poseidon.poseidon import (
 )
 from starkware.cairo.common.memcpy import memcpy
 from starkware.cairo.common.memset import memset
-from starkware.cairo.common.math import assert_lt
+from starkware.cairo.common.math import assert_lt, assert_le
 from cairo.src.merkle import PoseidonMerkleTree
 from cairo.src.verify_epoch import run_epoch_update
 
@@ -35,18 +35,26 @@ func main{
     local epoch_batch: EpochUpdateBatch;
     local batch_len: felt;
     %{ write_epoch_update_batch_inputs() %}
-    print_string('wrote inputs');
     
     with pow2_array, sha256_ptr {
         let (epoch_outputs: felt*) = alloc();
-        print_string('alloc out ptr');
         let (latest_batch_output: felt*) = run_epoch_batches{
             output_ptr=epoch_outputs,
         }(epoch_batch, 0, batch_len, 0);
 
-        // ToDo: ensure this can stay unvalidated
-        local next_power_of_2 = 32;
-        // %{ set_next_power_of_2() %}
+        // Retrieve the next power of 2 index
+        local next_power_of_2_index: felt;
+        %{ set_next_power_of_2() %}
+
+        // Retrieve actual next power of 2
+        let next_power_of_2 = pow2_array[next_power_of_2_index];
+
+        // Ensure the batch length is less than the next power of 2
+        assert_le(batch_len, next_power_of_2);
+
+        let previous_power_of_2 = pow2_array[next_power_of_2_index - 1];
+        // Ensure the previous power of 2 is less than the batch length
+        assert_le(previous_power_of_2, batch_len);
 
         // Pad the epoch outputs with zeros to the next power of 2
         memset(dst=epoch_outputs + batch_len, value=0, n=next_power_of_2 - batch_len);
@@ -54,21 +62,14 @@ func main{
         // now we compute a merkle root of the epoch outputs
         let batch_root = PoseidonMerkleTree.compute_root(epoch_outputs, next_power_of_2);
     }
-    // %{ print("computed batch root", hex(ids.batch_root)) %}
-
-    // %{
-    //     from cairo.py.utils import uint256_to_int
-
-    //     assert uint256_to_int(ids.committee_hash) == int(program_input["expected_circuit_outputs"]["latest_batch_output"]["committee_hash"], 16), "Committee Hash Mismatch"
-    //     assert ids.batch_root == int(program_input["expected_circuit_outputs"]["batch_root"], 16), "Batch Root Mismatch"
-    
-    // %}
 
     assert [output_ptr] = batch_root;
 
     // Copy the latest batch output to the output_ptr
     memcpy(dst=output_ptr + 1, src=latest_batch_output, len=11);
     tempvar output_ptr = output_ptr + 12;
+
+    %{ assert_epoch_batch_outputs() %}
 
     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
     return ();
@@ -86,9 +87,7 @@ func run_epoch_batches{
     sha256_ptr: felt*,
 }(epoch_batch: EpochUpdateBatch, index: felt, batch_len: felt, previous_epoch_slot: felt) -> (latest_batch_output: felt*) {
     alloc_locals;
-    print_string('running epoch batch');
-    // %{ vm_enter_scope({'program_input': program_input["circuit_inputs"]["epochs"][ids.index]}) %}
-    print_felt(index);
+
     // Create a new output_ptr per batch
     let (epoch_output: felt*) = alloc();
     let epoch = epoch_batch.epochs[index];
@@ -98,9 +97,6 @@ func run_epoch_batches{
 
     // set output_ptr to first output
     let epoch_output = epoch_output - 11;
-    // %{ vm_exit_scope() %}
-
-    // %{ assert_batched_epoch_outputs() %}
 
     // Verify the slot number matches what we expect
     let current_slot = epoch_output[4];

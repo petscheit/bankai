@@ -2,8 +2,8 @@ pub mod hint_processor;
 pub mod error;
 pub mod committee_update;
 pub mod types;
-pub mod epoch_update;
 pub mod epoch_batch;
+pub mod epoch_update;
 use cairo_vm::{
     cairo_run::{self, cairo_run_program},
     types::{layout_name::LayoutName, program::Program}, vm::runners::cairo_pie::CairoPie,

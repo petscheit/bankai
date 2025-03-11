@@ -11,7 +11,11 @@ use cairo_vm::{
 };
 use garaga_zero_hints::*;
 
-use crate::{committee_update::{CommitteeUpdateCircuit, HINT_ASSERT_COMMITTEE_UPDATE_RESULT, HINT_WRITE_COMMITTEE_UPDATE_INPUTS}, epoch_update::{self, EpochUpdateCircuit, HINT_ASSERT_EPOCH_UPDATE_RESULT, HINT_WRITE_EPOCH_UPDATE_INPUTS}, epoch_batch::{EpochUpdateBatchCircuit, HINT_WRITE_EPOCH_UPDATE_BATCH_INPUTS, HINT_ASSERT_BATCHED_EPOCH_OUTPUTS}};
+use crate::{
+    committee_update::{CommitteeUpdateCircuit, HINT_ASSERT_COMMITTEE_UPDATE_RESULT, HINT_WRITE_COMMITTEE_UPDATE_INPUTS},
+    epoch_batch::{self, EpochUpdateBatchCircuit, HINT_ASSERT_BATCHED_EPOCH_OUTPUTS, HINT_WRITE_EPOCH_UPDATE_BATCH_INPUTS, HINT_ASSERT_EPOCH_BATCH_OUTPUTS}, 
+    epoch_update::{self, EpochUpdateCircuit, HINT_ASSERT_EPOCH_UPDATE_RESULT, HINT_WRITE_EPOCH_UPDATE_INPUTS}
+};
 
 pub type HintImpl = fn(&mut VirtualMachine, &mut ExecutionScopes, &HintProcessorData, &HashMap<String, Felt252>) -> Result<(), HintError>;
 
@@ -68,7 +72,7 @@ impl CustomHintProcessor {
         hints.insert(debug::PRINT_UINT384.into(), debug::print_uint384);
 
         hints.insert(epoch_update::HINT_CHECK_FORK_VERSION.into(), epoch_update::hint_check_fork_version);
-
+        hints.insert(epoch_batch::HINT_SET_NEXT_POWER_OF_2.into(), epoch_batch::set_next_power_of_2);
         
         hints
     }
@@ -103,6 +107,7 @@ impl HintProcessorLogic for CustomHintProcessor {
                 HINT_ASSERT_EPOCH_UPDATE_RESULT => self.assert_epoch_update_result(vm, exec_scopes, hpd, constants),
                 HINT_WRITE_EPOCH_UPDATE_BATCH_INPUTS => self.write_epoch_update_batch_inputs(vm, exec_scopes, hpd, constants),
                 HINT_ASSERT_BATCHED_EPOCH_OUTPUTS => self.assert_batched_epoch_outputs(vm, exec_scopes, hpd, constants),
+                HINT_ASSERT_EPOCH_BATCH_OUTPUTS => self.assert_epoch_batch_outputs(vm, exec_scopes, hpd, constants),
                 _ => Err(HintError::UnknownHint(hint_code.to_string().into_boxed_str())),
             };
 
