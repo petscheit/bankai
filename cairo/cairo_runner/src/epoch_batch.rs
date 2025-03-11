@@ -120,3 +120,19 @@ pub fn set_next_power_of_2(
     vm.insert_value(get_relocatable_from_var_name("next_power_of_2_index", vm, &hint_data.ids_data, &hint_data.ap_tracking)?, power)?;
     Ok(())
 }
+
+pub const HINT_COMPUTE_EPOCH_FROM_SLOT: &str = r#"compute_epoch_from_slot()"#;
+pub fn compute_epoch_from_slot(
+    vm: &mut VirtualMachine,
+    _exec_scopes: &mut ExecutionScopes,
+    hint_data: &HintProcessorData,
+    _constants: &HashMap<String, Felt252>,
+) -> Result<(), HintError> {
+    let current_slot: usize = get_integer_from_var_name("current_slot", vm, &hint_data.ids_data, &hint_data.ap_tracking)?.try_into().unwrap();
+    
+    // Calculate current epoch: slot / 32 (integer division automatically floors)
+    let current_epoch = current_slot / 32;
+    vm.insert_value(get_relocatable_from_var_name("current_epoch", vm, &hint_data.ids_data, &hint_data.ap_tracking)?, current_epoch)?;
+    
+    Ok(())
+}

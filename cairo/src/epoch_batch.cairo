@@ -85,7 +85,7 @@ func run_epoch_batches{
     mul_mod_ptr: ModBuiltin*,
     pow2_array: felt*,
     sha256_ptr: felt*,
-}(epoch_batch: EpochUpdateBatch, index: felt, batch_len: felt, previous_epoch_slot: felt) -> (latest_batch_output: felt*) {
+}(epoch_batch: EpochUpdateBatch, index: felt, batch_len: felt, previous_epoch: felt) -> (latest_batch_output: felt*) {
     alloc_locals;
 
     // Create a new output_ptr per batch
@@ -100,7 +100,19 @@ func run_epoch_batches{
 
     // Verify the slot number matches what we expect
     let current_slot = epoch_output[4];
-    assert_lt(previous_epoch_slot, current_slot);
+    local current_epoch: felt;
+    %{ compute_epoch_from_slot() %}
+
+    // Ensure the slot matches the computed epoch
+    // We dont guarantee that we use the checkpoint slot, but we do guarantee that the slot is in the correct epoch
+    assert_le(current_epoch * 32, current_slot);
+    assert_lt(current_slot, (current_epoch + 1) * 32);
+
+
+    // Ensure we dont skip any epochs
+    if (index != 0) {
+        assert current_epoch = previous_epoch + 1;
+    }
 
     // Ensure we only process batches using the predetermined committee hash
     // This is important to ensure we dont batch epochs that use an unknown committee
@@ -116,7 +128,7 @@ func run_epoch_batches{
     }
 
     // Otherwise, run the next batch
-    return run_epoch_batches(epoch_batch=epoch_batch, index=index + 1, batch_len=batch_len, previous_epoch_slot=current_slot);
+    return run_epoch_batches(epoch_batch=epoch_batch, index=index + 1, batch_len=batch_len, previous_epoch=current_epoch);
 }
 
 // The when batching, we want to compute one hash per epoch update.

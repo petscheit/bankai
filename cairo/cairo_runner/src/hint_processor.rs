@@ -73,7 +73,7 @@ impl CustomHintProcessor {
 
         hints.insert(epoch_update::HINT_CHECK_FORK_VERSION.into(), epoch_update::hint_check_fork_version);
         hints.insert(epoch_batch::HINT_SET_NEXT_POWER_OF_2.into(), epoch_batch::set_next_power_of_2);
-        
+        hints.insert(epoch_batch::HINT_COMPUTE_EPOCH_FROM_SLOT.into(), epoch_batch::compute_epoch_from_slot);
         hints
     }
 }
