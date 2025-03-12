@@ -3,11 +3,11 @@ from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.uint256 import Uint256
 from definitions import bn, bls, UInt384, one_E12D, N_LIMBS, BASE, E12D, G1Point, G2Point, G1G2Pair
-from bls12_381.multi_pairing_2 import multi_pairing_2P
+from bls12_381.multi_pairing_check_2 import multi_pairing_check_2P
 from hash_to_curve import hash_to_curve
 from cairo.src.ssz import SSZ, MerkleTree, MerkleUtils
 from cairo.src.constants import g1_negative
-from cairo.src.domain import Domain
+from cairo.src.domain import Domain, Network
 from cairo.src.signer import (
     faster_fast_aggregate_signer_pubs,
 )
@@ -33,7 +33,7 @@ func run_epoch_update{
     let (header_root, body_root, state_root) = hash_header(epoch_update.header);
 
     // 2. Compute signing root (this is what validators sign)
-    let signing_root = Domain.compute_signing_root(header_root, epoch_update.header.slot.low);
+    let signing_root = Domain.compute_signing_root(Network.SEPOLIA, header_root, epoch_update.header.slot.low);
 
     // 3. Hash to curve to get message point
     let (msg_point) = hash_to_curve(1, signing_root);
@@ -102,8 +102,6 @@ func verify_signature{
     assert inputs[1] = pk_msg_pair;
 
     // We check the pairs are on the curve in the pairing function
-    let (res) = multi_pairing_2P(inputs);
-    let (one) = one_E12D();
-    assert res = one;
+    multi_pairing_check_2P(inputs);
     return ();
 }
