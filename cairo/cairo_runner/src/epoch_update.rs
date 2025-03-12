@@ -154,31 +154,36 @@ pub fn hint_check_fork_version(
     vm: &mut VirtualMachine,
     _exec_scopes: &mut ExecutionScopes,
     hint_data: &HintProcessorData,
-    constants: &HashMap<String, Felt252>,
- ) -> Result<(), HintError> {
+    _constants: &HashMap<String, Felt252>,
+) -> Result<(), HintError> {
+    let slot = get_integer_from_var_name("slot", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
+    let network_id: usize = get_integer_from_var_name("network_id", vm, &hint_data.ids_data, &hint_data.ap_tracking)?.try_into().unwrap();
 
-    let altair_activation_slot = constants.get("cairo.src.domain.Domain.ALTAIR_ACTIVATION_SLOT").unwrap();
-    let bellatrix_activation_slot = constants.get("cairo.src.domain.Domain.BELLATRIX_ACTIVATION_SLOT").unwrap();
-    let capella_activation_slot = constants.get("cairo.src.domain.Domain.CAPPELLA_ACTIVATION_SLOT").unwrap();
-    let deneb_activation_slot = constants.get("cairo.src.domain.Domain.DENEB_ACTIVATION_SLOT").unwrap();
+    // Get the fork_data label address from Cairo memory
+    let fork_schedule_ptr = get_ptr_from_var_name("fork_schedule", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
     
-    let slot = &get_integer_from_var_name("slot", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
-    // Determine the fork version based on the slot
-    let fork_value = if slot < altair_activation_slot {
-        Felt252::from(0)
-    } else if slot < bellatrix_activation_slot {
-        Felt252::from(1)
-    } else if slot < capella_activation_slot {
-        Felt252::from(2)
-    } else if slot < deneb_activation_slot {
-        Felt252::from(3)
-    } else {
-        Felt252::from(4)
-    };
+    // Each network has 12 values (6 forks × 2 values per fork)
+    // For each fork: [version, slot]
+    let network_offset = network_id * 12;
+
+    // Read activation slots for the selected network
+    let mut activation_slots = Vec::new();
+    for i in 0..6 {
+        let slot_address = (fork_schedule_ptr + (i * 2 + 1 + network_offset))?;
+        let activation_slot = *vm.get_integer(slot_address)?;
+        activation_slots.push(activation_slot);
+    }
+    
+    let mut latest_fork = 0;
+    for (i, activation_slot) in activation_slots.iter().enumerate() {
+        if slot >= *activation_slot {
+            latest_fork = i;
+        }
+    }   
     
     // Store the fork value in the Cairo program
     let fork = get_relocatable_from_var_name("fork", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
-    vm.insert_value(fork, &fork_value)?;
+    vm.insert_value(fork, &Felt252::from(latest_fork))?;
     
     Ok(())
 }
