@@ -3,10 +3,11 @@ use crate::utils::merkle::sha256::{generate_path, hash_path};
 use crate::clients::beacon_chain::{BeaconError, BeaconRpcClient};
 use alloy_primitives::FixedBytes;
 use beacon_state_proof::state_proof_fetcher::TreeHash;
-use beacon_types::{BeaconBlockBody, ExecPayload, ExecutionPayloadHeader, MainnetEthSpec};
+use beacon_types::light_client_update::EXECUTION_PAYLOAD_INDEX;
+use beacon_types::{BeaconBlockBody, BeaconBlockBodyElectra, Error as BeaconStateError, ExecPayload, ExecutionPayloadHeader, ExecutionRequests, MainnetEthSpec};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-/// Index of the execution payload in the beacon block body merkle tree
+
 const EXECUTION_PAYLOAD_LEAF_INDEX: usize = 9;
 
 /// Represents a proof of inclusion for an execution payload header in a beacon block
@@ -56,16 +57,16 @@ impl ExecutionHeaderProof {
 
         // Generate merkle proof components
         let body_ref = beacon_block_body.to_ref();
+        let path = body_ref.block_body_merkle_proof(EXECUTION_PAYLOAD_INDEX).map_err(|e| ExecutionHeaderError::BeaconState(e))?;
         let leafs: Vec<FixedBytes<32>> = body_ref
             .body_merkle_leaves()
             .into_iter()
             .map(|leaf| FixedBytes::from_slice(leaf.as_slice()))
             .collect();
 
-        let path = generate_path(leafs.clone(), EXECUTION_PAYLOAD_LEAF_INDEX).unwrap();
         let leaf = leafs[EXECUTION_PAYLOAD_LEAF_INDEX];
 
-        // Verify the merkle proof
+        // Sanity Check: verify the merkle proof
         let computed_root = hash_path(path.clone(), leaf, EXECUTION_PAYLOAD_LEAF_INDEX as u64);
         assert_eq!(computed_root.as_slice(), root.as_slice());
 
@@ -87,4 +88,6 @@ impl ExecutionHeaderProof {
 pub enum ExecutionHeaderError {
     #[error("Beacon error: {0}")]
     Beacon(#[from] BeaconError),
+    #[error("Beacon state error")]
+    BeaconState(BeaconStateError),
 }

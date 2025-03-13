@@ -641,15 +641,9 @@ checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 [[package]]
 name = "beacon-state-proof"
 version = "0.1.0"
-source = "git+https://github.com/petscheit/beacon-state-proof?rev=a2cfe5e4594f8c08b70e25223c696daac1472a97#a2cfe5e4594f8c08b70e25223c696daac1472a97"
+source = "git+https://github.com/petscheit/beacon-state-proof?rev=9dddb71f2b037d68097bf50c0a7b02229bf4c3e2#9dddb71f2b037d68097bf50c0a7b02229bf4c3e2"
 dependencies = [
- "crate_crypto_internal_eth_kzg_bls12_381",
- "crate_crypto_internal_eth_kzg_erasure_codes",
- "crate_crypto_internal_eth_kzg_maybe_rayon",
- "crate_crypto_internal_eth_kzg_polynomial",
- "crate_crypto_kzg_multi_open_fk20",
  "reqwest 0.11.27",
- "rust_eth_kzg",
  "serde",
  "tokio",
  "types",
@@ -724,7 +718,7 @@ dependencies = [
 [[package]]
 name = "bls"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse.git?rev=577954111ac8526859534977960addeb5827e30b#577954111ac8526859534977960addeb5827e30b"
+source = "git+https://github.com/petscheit/lighthouse.git?rev=2ef065a16#2ef065a16f24b854d05c31822d8041c009c2df01"
 dependencies = [
  "alloy-primitives",
  "arbitrary",
@@ -1444,13 +1438,7 @@ dependencies = [
  "bankai-core",
  "beacon-state-proof",
  "clap",
- "crate_crypto_internal_eth_kzg_bls12_381",
- "crate_crypto_internal_eth_kzg_erasure_codes",
- "crate_crypto_internal_eth_kzg_maybe_rayon",
- "crate_crypto_internal_eth_kzg_polynomial",
- "crate_crypto_kzg_multi_open_fk20",
  "dotenv",
- "rust_eth_kzg",
  "serde_json",
  "starknet",
  "thiserror 2.0.12",
@@ -1481,7 +1469,7 @@ dependencies = [
 [[package]]
 name = "compare_fields"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse.git?rev=577954111ac8526859534977960addeb5827e30b#577954111ac8526859534977960addeb5827e30b"
+source = "git+https://github.com/petscheit/lighthouse.git?rev=2ef065a16#2ef065a16f24b854d05c31822d8041c009c2df01"
 dependencies = [
  "itertools 0.10.5",
 ]
@@ -1489,7 +1477,7 @@ dependencies = [
 [[package]]
 name = "compare_fields_derive"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse.git?rev=577954111ac8526859534977960addeb5827e30b#577954111ac8526859534977960addeb5827e30b"
+source = "git+https://github.com/petscheit/lighthouse.git?rev=2ef065a16#2ef065a16f24b854d05c31822d8041c009c2df01"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -1576,9 +1564,9 @@ dependencies = [
 
 [[package]]
 name = "crate_crypto_internal_eth_kzg_bls12_381"
-version = "0.5.1"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a23be5253f1bd7fd411721a58712308c4747d0a41d040bbf8ebb78d52909a480"
+checksum = "76f9cdad245e39a3659bc4c8958e93de34bd31ba3131ead14ccfb4b2cd60e52d"
 dependencies = [
  "blst",
  "blstrs",
@@ -1590,9 +1578,9 @@ dependencies = [
 
 [[package]]
 name = "crate_crypto_internal_eth_kzg_erasure_codes"
-version = "0.5.1"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2067ce20ef380ff33a93ce0af62bea22d35531b7f3586224d8d5176ec6cf578"
+checksum = "581d28bcc93eecd97a04cebc5293271e0f41650f03c102f24d6cd784cbedb9f2"
 dependencies = [
  "crate_crypto_internal_eth_kzg_bls12_381",
  "crate_crypto_internal_eth_kzg_polynomial",
@@ -1600,24 +1588,24 @@ dependencies = [
 
 [[package]]
 name = "crate_crypto_internal_eth_kzg_maybe_rayon"
-version = "0.5.1"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "558f50324ff016e5fe93113c78a72776d790d52f244ae9602a8013a67a189b66"
+checksum = "06fc0f984e585ea984a766c5b58d6bf6c51e463b0a0835b0dd4652d358b506b3"
 
 [[package]]
 name = "crate_crypto_internal_eth_kzg_polynomial"
-version = "0.5.1"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e051c4f5aa5696bd7c504930485436ec62bf14f30a4c2d78504f3f8ec6a3daf"
+checksum = "56dff7a45e2d80308b21abdbc5520ec23c3ebfb3a94fafc02edfa7f356af6d7f"
 dependencies = [
  "crate_crypto_internal_eth_kzg_bls12_381",
 ]
 
 [[package]]
 name = "crate_crypto_kzg_multi_open_fk20"
-version = "0.5.1"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66ed6bf8993d9f3b361da4ed38f067503e08c0b948af0d6f4bb941dd647c0f2c"
+checksum = "1a0c2f82695a88809e713e1ff9534cb90ceffab0a08f4bd33245db711f9d356f"
 dependencies = [
  "crate_crypto_internal_eth_kzg_bls12_381",
  "crate_crypto_internal_eth_kzg_maybe_rayon",
@@ -2017,7 +2005,7 @@ dependencies = [
 [[package]]
 name = "eth2_interop_keypairs"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse.git?rev=577954111ac8526859534977960addeb5827e30b#577954111ac8526859534977960addeb5827e30b"
+source = "git+https://github.com/petscheit/lighthouse.git?rev=2ef065a16#2ef065a16f24b854d05c31822d8041c009c2df01"
 dependencies = [
  "bls",
  "ethereum_hashing",
@@ -2167,7 +2155,7 @@ dependencies = [
 [[package]]
 name = "fixed_bytes"
 version = "0.1.0"
-source = "git+https://github.com/petscheit/lighthouse.git?rev=577954111ac8526859534977960addeb5827e30b#577954111ac8526859534977960addeb5827e30b"
+source = "git+https://github.com/petscheit/lighthouse.git?rev=2ef065a16#2ef065a16f24b854d05c31822d8041c009c2df01"
 dependencies = [
  "alloy-primitives",
  "safe_arith",
@@ -3037,7 +3025,7 @@ dependencies = [
 [[package]]
 name = "int_to_bytes"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse.git?rev=577954111ac8526859534977960addeb5827e30b#577954111ac8526859534977960addeb5827e30b"
+source = "git+https://github.com/petscheit/lighthouse.git?rev=2ef065a16#2ef065a16f24b854d05c31822d8041c009c2df01"
 dependencies = [
  "bytes",
 ]
@@ -3131,7 +3119,7 @@ dependencies = [
 [[package]]
 name = "kzg"
 version = "0.1.0"
-source = "git+https://github.com/petscheit/lighthouse.git?rev=577954111ac8526859534977960addeb5827e30b#577954111ac8526859534977960addeb5827e30b"
+source = "git+https://github.com/petscheit/lighthouse.git?rev=2ef065a16#2ef065a16f24b854d05c31822d8041c009c2df01"
 dependencies = [
  "arbitrary",
  "c-kzg",
@@ -3314,7 +3302,7 @@ dependencies = [
 [[package]]
 name = "merkle_proof"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse.git?rev=577954111ac8526859534977960addeb5827e30b#577954111ac8526859534977960addeb5827e30b"
+source = "git+https://github.com/petscheit/lighthouse.git?rev=2ef065a16#2ef065a16f24b854d05c31822d8041c009c2df01"
 dependencies = [
  "alloy-primitives",
  "ethereum_hashing",
@@ -4410,9 +4398,9 @@ dependencies = [
 
 [[package]]
 name = "rust_eth_kzg"
-version = "0.5.1"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3291fd0d9c629a56537d74bbc1e7bcaf5be610f2f7b55af85c4fea843c6aeca3"
+checksum = "3f83b5559e1dcd3f7721838909288faf4500fb466eff98eac99b67ac04335b93"
 dependencies = [
  "crate_crypto_internal_eth_kzg_bls12_381",
  "crate_crypto_internal_eth_kzg_erasure_codes",
@@ -4574,7 +4562,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "safe_arith"
 version = "0.1.0"
-source = "git+https://github.com/petscheit/lighthouse.git?rev=577954111ac8526859534977960addeb5827e30b#577954111ac8526859534977960addeb5827e30b"
+source = "git+https://github.com/petscheit/lighthouse.git?rev=2ef065a16#2ef065a16f24b854d05c31822d8041c009c2df01"
 
 [[package]]
 name = "salsa20"
@@ -5265,7 +5253,7 @@ dependencies = [
 [[package]]
 name = "swap_or_not_shuffle"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse.git?rev=577954111ac8526859534977960addeb5827e30b#577954111ac8526859534977960addeb5827e30b"
+source = "git+https://github.com/petscheit/lighthouse.git?rev=2ef065a16#2ef065a16f24b854d05c31822d8041c009c2df01"
 dependencies = [
  "alloy-primitives",
  "ethereum_hashing",
@@ -5401,7 +5389,7 @@ dependencies = [
 [[package]]
 name = "test_random_derive"
 version = "0.2.0"
-source = "git+https://github.com/petscheit/lighthouse.git?rev=577954111ac8526859534977960addeb5827e30b#577954111ac8526859534977960addeb5827e30b"
+source = "git+https://github.com/petscheit/lighthouse.git?rev=2ef065a16#2ef065a16f24b854d05c31822d8041c009c2df01"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -5815,7 +5803,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 [[package]]
 name = "types"
 version = "0.2.1"
-source = "git+https://github.com/petscheit/lighthouse.git?rev=577954111ac8526859534977960addeb5827e30b#577954111ac8526859534977960addeb5827e30b"
+source = "git+https://github.com/petscheit/lighthouse.git?rev=2ef065a16#2ef065a16f24b854d05c31822d8041c009c2df01"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -6584,6 +6572,7 @@ version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ced3678a2879b30306d323f4542626697a464a97c0a07c9aebf7ebca65cd4dde"
 dependencies = [
+ "serde",
  "zeroize_derive",
 ]
 

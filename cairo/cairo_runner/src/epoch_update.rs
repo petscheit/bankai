@@ -97,14 +97,14 @@ impl ExecutionPayloadHeaderCircuit {
                 roots
             },
             ExecutionPayloadHeader::Electra(h) => {
+                // The execution payload is the same as Deneb
                 let mut roots = extract_common_fields!(h);
                 roots.push(to_uint256(h.withdrawals_root.as_slice()));
                 roots.push(u64_to_uint256(h.blob_gas_used));
                 roots.push(u64_to_uint256(h.excess_blob_gas));
-                // roots.push(to_uint256(h.deposit_requests_root.as_slice()));
-                // roots.push(to_uint256(h.withdrawal_requests_root.as_slice()));
                 roots
             },
+            ExecutionPayloadHeader::Fulu(h) => panic!("Fulu not supported"),
         };
 
         roots
