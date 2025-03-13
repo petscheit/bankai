@@ -1,6 +1,4 @@
-use serde::Serialize;
 use starknet::core::types::Felt;
-
 use super::proofs::ProofError;
 
 /// A trait for the types that can be submitted on-chain
@@ -16,13 +14,6 @@ pub enum ProofType {
     SyncCommittee,
 }
 
-pub trait Provable: Serialize {
-    fn id(&self) -> String;
+pub trait Exportable {
     fn export(&self) -> Result<String, ProofError>;
-    // fn from_json<T>(slot: u64) -> Result<T, Error>
-    // where
-    //     T: serde::de::DeserializeOwned;
-    fn proof_type(&self) -> ProofType;
-    fn pie_path(&self) -> String;
-    fn inputs_path(&self) -> String;
 }

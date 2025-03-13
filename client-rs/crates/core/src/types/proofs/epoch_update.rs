@@ -7,13 +7,9 @@
 use std::fs;
 
 use crate::{
-    cairo_runner::python::CairoRunnerError,
-    clients::{beacon_chain::BeaconError, ClientError},
-    db::manager::DatabaseError,
-    types::{
-        proofs::execution_header::ExecutionHeaderProof,
-        traits::{ProofType, Provable, Submittable},
-    },
+    cairo_runner::CairoError, clients::{beacon_chain::BeaconError, ClientError}, db::manager::DatabaseError, types::{
+        proofs::execution_header::ExecutionHeaderProof, traits::{Exportable, Submittable}
+    }
 };
 
 use crate::clients::beacon_chain::BeaconRpcClient;
@@ -24,7 +20,6 @@ use alloy_rpc_types_beacon::{
 };
 use bls12_381::{G1Affine, G1Projective, G2Affine};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use starknet::{core::types::Felt, macros::selector};
 use starknet_crypto::poseidon_hash_many;
 use thiserror::Error;
@@ -140,42 +135,17 @@ impl EpochUpdate {
     }
 }
 
-impl Provable for EpochUpdate {
-    fn id(&self) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(b"epoch_update");
-        hasher.update(self.circuit_inputs.header.tree_hash_root().as_slice());
-        hex::encode(hasher.finalize().as_slice())
-    }
-
+impl Exportable for EpochUpdate {
     fn export(&self) -> Result<String, ProofError> {
         let json = serde_json::to_string_pretty(&self).unwrap();
         let dir_path = format!("batches/epoch/{}", self.circuit_inputs.header.slot);
-        fs::create_dir_all(dir_path.clone());
+        let _ = fs::create_dir_all(dir_path.clone()).map_err(EpochUpdateError::Io)?;
         let path = format!(
             "{}/input_{}.json",
             dir_path, self.circuit_inputs.header.slot
         );
-        fs::write(path.clone(), json);
+        let _ = fs::write(path.clone(), json).map_err(EpochUpdateError::Io)?;
         Ok(path)
-    }
-
-    fn pie_path(&self) -> String {
-        format!(
-            "batches/epoch/{}/pie_{}.zip",
-            self.circuit_inputs.header.slot, self.circuit_inputs.header.slot
-        )
-    }
-
-    fn proof_type(&self) -> ProofType {
-        ProofType::Epoch
-    }
-
-    fn inputs_path(&self) -> String {
-        format!(
-            "batches/epoch/{}/input_{}.json",
-            self.circuit_inputs.header.slot, self.circuit_inputs.header.slot
-        )
     }
 }
 
@@ -637,8 +607,8 @@ impl Submittable<EpochInputs> for ExpectedEpochUpdateOutputs {
 #[derive(Debug, Error)]
 pub enum EpochUpdateError {
     /// Error during Cairo program execution
-    #[error("Cairo run error: {0}")]
-    CairoRun(#[from] CairoRunnerError),
+   #[error("Cairo run error: {0}")]
+    Cairo(#[from] CairoError),
     /// Database operation error
     #[error("Database error: {0}")]
     Database(#[from] DatabaseError),

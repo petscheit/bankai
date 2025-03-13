@@ -1,10 +1,10 @@
-use crate::utils::merkle::sha256::{generate_path, hash_path};
+use crate::utils::merkle::sha256::hash_path;
 // use crate::utils::rpc::BeaconRpcClient;
 use crate::clients::beacon_chain::{BeaconError, BeaconRpcClient};
 use alloy_primitives::FixedBytes;
 use beacon_state_proof::state_proof_fetcher::TreeHash;
 use beacon_types::light_client_update::EXECUTION_PAYLOAD_INDEX;
-use beacon_types::{BeaconBlockBody, BeaconBlockBodyElectra, Error as BeaconStateError, ExecPayload, ExecutionPayloadHeader, ExecutionRequests, MainnetEthSpec};
+use beacon_types::{BeaconBlockBody, Error as BeaconStateError, ExecPayload, ExecutionPayloadHeader, MainnetEthSpec};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

@@ -8,7 +8,7 @@ use std::fs;
 
 use crate::{
     clients::beacon_chain::{BeaconError, BeaconRpcClient},
-    types::traits::{ProofType, Provable, Submittable},
+    types::traits::{Exportable, Submittable},
     utils::{hashing::get_committee_hash, merkle},
 };
 use alloy_primitives::FixedBytes;
@@ -79,18 +79,7 @@ impl SyncCommitteeUpdate {
     }
 }
 
-impl Provable for SyncCommitteeUpdate {
-    /// Generates a unique identifier for the update
-    ///
-    /// # Returns
-    /// * `String` - Unique identifier based on slot number
-    fn id(&self) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(b"committee_update");
-        hasher.update(self.circuit_inputs.beacon_slot.to_be_bytes());
-        hex::encode(hasher.finalize().as_slice())
-    }
-
+impl Exportable for SyncCommitteeUpdate {
     /// Exports the update data to a JSON file
     ///
     /// # Returns
@@ -98,45 +87,14 @@ impl Provable for SyncCommitteeUpdate {
     fn export(&self) -> Result<String, ProofError> {
         let json = serde_json::to_string_pretty(&self).unwrap();
         let dir_path = format!("batches/committee/{}", self.circuit_inputs.beacon_slot);
-        fs::create_dir_all(&dir_path);
+        let _ = fs::create_dir_all(&dir_path).map_err(SyncCommitteeError::Io)?;
 
         let path = format!(
             "{}/input_{}.json",
             dir_path, self.circuit_inputs.beacon_slot
         );
-        fs::write(path.clone(), json);
+        let _ = fs::write(path.clone(), json).map_err(SyncCommitteeError::Io);
         Ok(path)
-    }
-
-    /// Gets the path to the PIE file for this update
-    ///
-    /// # Returns
-    /// * `String` - Path to the PIE file
-    fn pie_path(&self) -> String {
-        format!(
-            "batches/committee/{}/pie_{}.zip",
-            self.circuit_inputs.beacon_slot,
-            self.id()
-        )
-    }
-
-    /// Gets the path to the inputs file for this update
-    ///
-    /// # Returns
-    /// * `String` - Path to the inputs file
-    fn inputs_path(&self) -> String {
-        format!(
-            "batches/committee/{}/input_{}.json",
-            self.circuit_inputs.beacon_slot, self.circuit_inputs.beacon_slot,
-        )
-    }
-
-    /// Gets the type of proof for this update
-    ///
-    /// # Returns
-    /// * `ProofType` - Type of proof (SyncCommittee)
-    fn proof_type(&self) -> ProofType {
-        ProofType::SyncCommittee
     }
 }
 

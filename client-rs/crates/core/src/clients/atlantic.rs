@@ -4,7 +4,7 @@
 //! and verification. It handles file uploads, proof submissions, and status polling for
 //! batch processing operations.
 
-use std::{env, path::PathBuf};
+use std::env;
 
 use cairo_vm::vm::runners::cairo_pie::CairoPie;
 use futures::StreamExt;
@@ -21,7 +21,7 @@ use tokio::{
 use tokio_util::io::ReaderStream;
 use tracing::{debug, error, info, trace};
 
-use crate::types::traits::{ProofType, Provable};
+use crate::types::traits::ProofType;
 
 /// Client for interacting with the Atlantic API service.
 /// 

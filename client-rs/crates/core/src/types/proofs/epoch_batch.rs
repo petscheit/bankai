@@ -5,30 +5,21 @@
 //! including merkle tree generation and proof verification.
 
 use crate::{
-    cairo_runner::python::CairoRunnerError,
-    clients::ClientError,
-    db::manager::{DatabaseError, DatabaseManager},
-    types::{
-        job::JobStatus,
-        proofs::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs},
-        traits::{ProofType, Provable, Submittable},
-    },
-    utils::{
+    cairo_runner::CairoError, clients::ClientError, db::manager::{DatabaseError, DatabaseManager}, types::{
+        job::JobStatus, proofs::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs}, traits::{Exportable, Submittable}
+    }, utils::{
         constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE},
         hashing::get_committee_hash,
         helpers::{
             self, get_first_slot_for_epoch, get_sync_committee_id_by_epoch, slot_to_epoch_id,
         },
         merkle::poseidon::{compute_paths, compute_root, hash_path},
-    },
-    BankaiClient,
+    }, BankaiClient
 };
 
 use alloy_primitives::FixedBytes;
-use hex;
 use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use starknet::macros::selector;
 use starknet_crypto::Felt;
 use std::fs;
@@ -289,18 +280,7 @@ impl EpochUpdateBatch {
     }
 }
 
-impl Provable for EpochUpdateBatch {
-    /// Generates a unique identifier for the batch
-    ///
-    /// # Returns
-    /// * `String` - Unique identifier based on batch root
-    fn id(&self) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(b"epoch_update_batch");
-        hasher.update(self.expected_circuit_outputs.batch_root.to_bytes_be());
-        hex::encode(hasher.finalize().as_slice())
-    }
-
+impl Exportable for EpochUpdateBatch {
     /// Exports the batch data to a JSON file
     ///
     /// # Returns
@@ -326,79 +306,13 @@ impl Provable for EpochUpdateBatch {
             .slot;
         let last_epoch = helpers::slot_to_epoch_id(last_slot);
         let dir_path = format!("batches/epoch_batch/{}_to_{}", first_epoch, last_epoch);
-        fs::create_dir_all(dir_path.clone());
+        let _ = fs::create_dir_all(dir_path.clone()).map_err(EpochBatchError::Io)?;
         let path = format!(
             "{}/input_batch_{}_to_{}.json",
             dir_path, first_epoch, last_epoch
         );
-        fs::write(path.clone(), json);
+        let _ = fs::write(path.clone(), json).map_err(EpochBatchError::Io)?;
         Ok(path)
-    }
-
-    /// Gets the type of proof for this batch
-    ///
-    /// # Returns
-    /// * `ProofType` - Type of proof (EpochBatch)
-    fn proof_type(&self) -> ProofType {
-        ProofType::EpochBatch
-    }
-
-    /// Gets the path to the PIE file for this batch
-    ///
-    /// # Returns
-    /// * `String` - Path to the PIE file
-    fn pie_path(&self) -> String {
-        let first_slot = self
-            .circuit_inputs
-            .epochs
-            .first()
-            .unwrap()
-            .circuit_inputs
-            .header
-            .slot;
-        let first_epoch = helpers::slot_to_epoch_id(first_slot);
-        let last_slot = self
-            .circuit_inputs
-            .epochs
-            .last()
-            .unwrap()
-            .circuit_inputs
-            .header
-            .slot;
-        let last_epoch = helpers::slot_to_epoch_id(last_slot);
-        format!(
-            "batches/epoch_batch/{}_to_{}/pie_batch_{}_to_{}.zip",
-            first_epoch, last_epoch, first_epoch, last_epoch
-        )
-    }
-
-    /// Gets the path to the inputs file for this batch
-    ///
-    /// # Returns
-    /// * `String` - Path to the inputs file
-    fn inputs_path(&self) -> String {
-        let first_slot = self
-            .circuit_inputs
-            .epochs
-            .first()
-            .unwrap()
-            .circuit_inputs
-            .header
-            .slot;
-        let first_epoch = helpers::slot_to_epoch_id(first_slot);
-        let last_slot = self
-            .circuit_inputs
-            .epochs
-            .last()
-            .unwrap()
-            .circuit_inputs
-            .header
-            .slot;
-        let last_epoch = helpers::slot_to_epoch_id(last_slot);
-        format!(
-            "batches/epoch_batch/{}_to_{}/input_batch_{}_to_{}.json",
-            first_epoch, last_epoch, first_epoch, last_epoch
-        )
     }
 }
 
@@ -487,7 +401,7 @@ impl Submittable<EpochUpdateBatchInputs> for ExpectedEpochBatchOutputs {
 pub enum EpochBatchError {
     /// Error during Cairo program execution
     #[error("Cairo run error: {0}")]
-    CairoRun(#[from] CairoRunnerError),
+    Cairo(#[from] CairoError),
     /// Database operation error
     #[error("Database error: {0}")]
     Database(#[from] DatabaseError),
