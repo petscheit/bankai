@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{hint_processor::CustomHintProcessor, types::{Bytes32, Felt, G1CircuitPoint, G2CircuitPoint, Uint256, Uint256Bits32}};
 use cairo_vm::{hint_processor::builtin_hint_processor::{builtin_hint_processor_definition::HintProcessorData, hint_utils::{get_integer_from_var_name, get_ptr_from_var_name, get_relocatable_from_var_name}}, types::{exec_scope::ExecutionScopes, relocatable::Relocatable}, vm::{errors::hint_errors::HintError, vm_core::VirtualMachine}, Felt252};
-use garaga_zero_hints::types::CairoType;
+use garaga_zero::types::CairoType;
 use serde::Deserialize;
 use beacon_types::{ExecutionPayloadHeader, MainnetEthSpec};
 
@@ -104,7 +104,7 @@ impl ExecutionPayloadHeaderCircuit {
                 roots.push(u64_to_uint256(h.excess_blob_gas));
                 roots
             },
-            ExecutionPayloadHeader::Fulu(h) => panic!("Fulu not supported"),
+            ExecutionPayloadHeader::Fulu(_h) => panic!("Fulu not supported"),
         };
 
         roots

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{hint_processor::CustomHintProcessor, types::{Felt, UInt384, Uint256, Uint256Bits32}};
 use cairo_vm::{hint_processor::builtin_hint_processor::{builtin_hint_processor_definition::HintProcessorData, hint_utils::{get_ptr_from_var_name, get_relocatable_from_var_name}}, types::exec_scope::ExecutionScopes, vm::{errors::hint_errors::HintError, vm_core::VirtualMachine}, Felt252};
-use garaga_zero_hints::types::CairoType;
+use garaga_zero::types::CairoType;
 use serde::Deserialize;
 use serde_json;
 

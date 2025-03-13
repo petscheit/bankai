@@ -604,7 +604,7 @@ name = "bankai-runner"
 version = "0.1.0"
 dependencies = [
  "cairo-vm",
- "garaga-zero-hints",
+ "garaga-zero",
  "hex",
  "num-bigint",
  "serde",
@@ -2309,7 +2309,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "garaga-zero-hints"
+name = "garaga-zero"
 version = "0.1.0"
 dependencies = [
  "ark-bls12-381",

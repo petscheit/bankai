@@ -9,7 +9,7 @@ use cairo_vm::{
     types::exec_scope::ExecutionScopes,
     vm::{errors::hint_errors::HintError, runners::cairo_runner::ResourceTracker, vm_core::VirtualMachine},
 };
-use garaga_zero_hints::*;
+use garaga_zero::*;
 
 use crate::{
     committee_update::{CommitteeUpdateCircuit, HINT_ASSERT_COMMITTEE_UPDATE_RESULT, HINT_WRITE_COMMITTEE_UPDATE_INPUTS},

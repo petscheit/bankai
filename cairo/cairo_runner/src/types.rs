@@ -1,5 +1,5 @@
-pub use garaga_zero_hints::types::CairoType;
-use cairo_vm::{types::relocatable::Relocatable, vm::{errors::memory_errors::MemoryError, vm_core::VirtualMachine}, Felt252};
+pub use garaga_zero::types::CairoType;
+use cairo_vm::{types::relocatable::Relocatable, vm::{errors::{hint_errors::HintError, memory_errors::MemoryError}, vm_core::VirtualMachine}, Felt252};
 use num_bigint::BigUint;
 use serde::Deserialize;
 use hex;
@@ -35,14 +35,14 @@ impl Uint256 {
 }
 
 impl CairoType for Uint256 {
-    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, MemoryError> {
+    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, HintError> {
         let d0 = BigUint::from_bytes_be(&vm.get_integer((address + 0)?)?.to_bytes_be());
         let d1 = BigUint::from_bytes_be(&vm.get_integer((address + 1)?)?.to_bytes_be());
         let bigint = d1 << 128 | d0;
         Ok(Self(bigint))
     }
 
-    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, MemoryError> {
+    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, HintError> {
         let limbs = self.to_limbs();
         vm.insert_value((address + 0)?, &limbs[0])?;
         vm.insert_value((address + 1)?, &limbs[1])?;
@@ -85,7 +85,7 @@ impl Uint256Bits32 {
 }
 
 impl CairoType for Uint256Bits32 {
-    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, MemoryError> {
+    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, HintError> {
         let mut bigint = BigUint::from(0u32);
         
         for i in (0..8).rev() {
@@ -96,7 +96,7 @@ impl CairoType for Uint256Bits32 {
         Ok(Self(bigint))
     }
 
-    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, MemoryError> {
+    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, HintError> {
         let limbs = self.to_limbs();
         
         for i in 0..8 {
@@ -146,7 +146,7 @@ impl UInt384 {
 }
 
 impl CairoType for UInt384 {
-    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, MemoryError> {
+    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, HintError> {
         let d0 = BigUint::from_bytes_be(&vm.get_integer((address + 0)?)?.to_bytes_be());
         let d1 = BigUint::from_bytes_be(&vm.get_integer((address + 1)?)?.to_bytes_be());
         let d2 = BigUint::from_bytes_be(&vm.get_integer((address + 2)?)?.to_bytes_be());
@@ -155,7 +155,7 @@ impl CairoType for UInt384 {
         Ok(Self(bigint))
     }
 
-    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, MemoryError> {
+    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, HintError> {
         let limbs = self.to_limbs();
 
         vm.insert_value((address + 0)?, &limbs[0])?;
@@ -175,12 +175,12 @@ impl CairoType for UInt384 {
 pub struct Felt(pub Felt252);
 
 impl CairoType for Felt {
-    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, MemoryError> {
+    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, HintError> {
         let value = vm.get_integer((address + 0)?)?;
         Ok(Self(*value))
     }
 
-    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, MemoryError> {
+    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, HintError> {
         vm.insert_value((address + 0)?, &self.0)?;
         Ok((address + 1)?)
     }
@@ -197,13 +197,13 @@ pub struct G1CircuitPoint{
 }
 
 impl CairoType for G1CircuitPoint {
-    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, MemoryError> {
+    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, HintError> {
         let x = UInt384::from_memory(vm, address)?;
         let y = UInt384::from_memory(vm, (address + 4)?)?;
         Ok(Self{x, y})
     }
 
-    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, MemoryError> {
+    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, HintError> {
         self.x.to_memory(vm, address)?;
         self.y.to_memory(vm, (address + 4)?)?;
         Ok((address + 8)?)
@@ -223,7 +223,7 @@ pub struct G2CircuitPoint{
 }
 
 impl CairoType for G2CircuitPoint {
-    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, MemoryError> {
+    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, HintError> {
         let x0 = UInt384::from_memory(vm, address)?;
         let x1 = UInt384::from_memory(vm, (address + 4)?)?;
         let y0 = UInt384::from_memory(vm, (address + 8)?)?;
@@ -231,7 +231,7 @@ impl CairoType for G2CircuitPoint {
         Ok(Self{x0, x1, y0, y1})
     }
 
-    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, MemoryError> {
+    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, HintError> {
         self.x0.to_memory(vm, address)?;
         self.x1.to_memory(vm, (address + 4)?)?;
         self.y0.to_memory(vm, (address + 8)?)?;
@@ -301,7 +301,7 @@ impl Bytes32 {
 }
 
 impl CairoType for Bytes32 {
-    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, MemoryError> {
+    fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, HintError> {
         // Read the two limbs directly
         let low_felt = vm.get_integer((address + 0)?)?;
         let high_felt = vm.get_integer((address + 1)?)?;
@@ -323,7 +323,7 @@ impl CairoType for Bytes32 {
         Ok(Self(result))
     }
 
-    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, MemoryError> {
+    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, HintError> {
         let limbs = self.to_limbs();
         
         vm.insert_value((address + 0)?, &limbs[0])?;

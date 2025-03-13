@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use garaga_zero_hints::types::CairoType;
+use garaga_zero::types::CairoType;
 use cairo_vm::{hint_processor::builtin_hint_processor::{builtin_hint_processor_definition::HintProcessorData, hint_utils::{get_integer_from_var_name, get_ptr_from_var_name, get_relocatable_from_var_name}}, types::exec_scope::ExecutionScopes, vm::{errors::hint_errors::HintError, vm_core::VirtualMachine}, Felt252};
 
 use crate::{epoch_update::{assert_epoch_update_result, write_epoch_update, EpochUpdateCircuit, ExpectedEpochUpdateCircuitOutputs}, hint_processor::CustomHintProcessor, types::{Felt, Uint256}};

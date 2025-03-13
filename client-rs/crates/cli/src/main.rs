@@ -1,6 +1,7 @@
-use bankai_core::cairo_runner::python::{CairoRunner, CairoRunnerError};
-use bankai_core::cairo_runner::rust::{generate_epoch_batch_pie, generate_epoch_update_pie};
-use bankai_core::cairo_runner::rust::generate_pie;
+use bankai_core::cairo_runner::CairoError;
+use bankai_core::cairo_runner::{
+    generate_committee_update_pie, generate_epoch_batch_pie, generate_epoch_update_pie,
+};
 use bankai_core::clients::atlantic::AtlanticError;
 use bankai_core::clients::starknet::StarknetError;
 use bankai_core::types::error::BankaiCoreError;
@@ -9,13 +10,14 @@ use bankai_core::types::proofs::epoch_update::EpochUpdate;
 use bankai_core::types::proofs::execution_header::ExecutionHeaderProof;
 use bankai_core::types::proofs::sync_committee::SyncCommitteeUpdate;
 use bankai_core::types::proofs::ProofError;
-use bankai_core::types::traits::{ProofType, Provable};
+use bankai_core::types::traits::ProofType;
 use bankai_core::BankaiClient;
 use clap::{Parser, Subcommand};
 use dotenv::from_filename;
 use starknet::core::types::Felt;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
+
 #[derive(Subcommand)]
 enum Commands {
     /// Generate and manage proofs for the light client state
@@ -195,23 +197,24 @@ async fn main() -> Result<(), BankaiCliError> {
     match cli.command {
         Commands::Prove(cmd) => match cmd {
             ProveCommands::NextCommittee => {
-                // let latest_committee_id = bankai
-                //     .starknet_client
-                //     .get_latest_committee_id(&bankai.config)
-                //     .await?;
-                // let lowest_committee_update_slot = (latest_committee_id) * Felt::from(0x2000);
-                // println!("Min Slot Required: {}", lowest_committee_update_slot);
-                // let latest_epoch_slot = bankai
-                //     .starknet_client
-                //     .get_latest_epoch_slot(&bankai.config)
-                //     .await?;
-                // println!("Latest epoch slot: {}", latest_epoch_slot);
-                // if latest_epoch_slot < lowest_committee_update_slot {
-                //     return Err(BankaiCliError::RequiresNewerEpoch(latest_epoch_slot));
-                // }
-                let update: SyncCommitteeUpdate = bankai.get_sync_committee_update(5555555).await?;
-                let _ = update.export()?;
-                let pie = generate_pie(update, &bankai.config, None, None).await?;
+                let latest_committee_id = bankai
+                    .starknet_client
+                    .get_latest_committee_id(&bankai.config)
+                    .await?;
+                let lowest_committee_update_slot = (latest_committee_id) * Felt::from(0x2000);
+                println!("Min Slot Required: {}", lowest_committee_update_slot);
+                let latest_epoch_slot = bankai
+                    .starknet_client
+                    .get_latest_epoch_slot(&bankai.config)
+                    .await?;
+                println!("Latest epoch slot: {}", latest_epoch_slot);
+                if latest_epoch_slot < lowest_committee_update_slot {
+                    return Err(BankaiCliError::RequiresNewerEpoch(latest_epoch_slot));
+                }
+                let update: SyncCommitteeUpdate = bankai
+                    .get_sync_committee_update(latest_epoch_slot.try_into().unwrap())
+                    .await?;
+                let pie = generate_committee_update_pie(update, &bankai.config, None, None).await?;
                 let batch_id = bankai
                     .atlantic_client
                     .submit_batch(pie, ProofType::SyncCommittee)
@@ -219,36 +222,36 @@ async fn main() -> Result<(), BankaiCliError> {
                 println!("Batch Submitted: {}", batch_id);
             }
             ProveCommands::NextEpoch => {
-                // let latest_epoch = bankai
-                //     .starknet_client
-                //     .get_latest_epoch_slot(&bankai.config)
-                //     .await?;
-                // println!("Latest Epoch: {}", latest_epoch);
-                // // make sure next_epoch % 32 == 0
-                // let next_epoch = (u64::try_from(latest_epoch).unwrap() / 32) * 32 + 32;
-                // println!("Fetching Inputs for Epoch: {}", next_epoch);
-                let epoch_update = EpochUpdate::new(&bankai.client, 6981632)
+                let latest_epoch = bankai
+                    .starknet_client
+                    .get_latest_epoch_slot(&bankai.config)
+                    .await?;
+                println!("Latest Epoch: {}", latest_epoch);
+                // make sure next_epoch % 32 == 0
+                let next_epoch = (u64::try_from(latest_epoch).unwrap() / 32) * 32 + 32;
+                println!("Fetching Inputs for Epoch: {}", next_epoch);
+                let epoch_update = EpochUpdate::new(&bankai.client, next_epoch)
                     .await
                     .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
-                let _ = epoch_update.export().unwrap();
                 let pie =
                     generate_epoch_update_pie(epoch_update, &bankai.config, None, None).await?;
-                // let batch_id = bankai.atlantic_client.submit_batch(pie, ProofType::Epoch).await?;
-                // println!("Batch Submitted: {}", batch_id);
-                // CairoRunner::generate_pie(&epoch_update, &bankai.config, None, None).await?;
-                // let batch_id = bankai.atlantic_client.submit_batch(epoch_update).await?;
-                // println!("Batch Submitted: {}", batch_id);
+                let batch_id = bankai
+                    .atlantic_client
+                    .submit_batch(pie, ProofType::Epoch)
+                    .await?;
+                println!("Batch Submitted: {}", batch_id);
             }
             ProveCommands::NextEpochBatch => {
                 let epoch_update = EpochUpdateBatch::new(&bankai)
                     .await
                     .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
-                // println!("Update contents: {:?}", epoch_update);
-                // let _ = epoch_update.export().unwrap();
-                let pie = generate_epoch_batch_pie(epoch_update, &bankai.config, None, None).await?;
-                // CairoRunner::generate_pie(&epoch_update, &bankai.config, None, None).await?;
-                // let batch_id = bankai.atlantic_client.submit_batch(epoch_update).await?;
-                // println!("Batch Submitted: {}", batch_id);
+                let pie =
+                    generate_epoch_batch_pie(epoch_update, &bankai.config, None, None).await?;
+                let batch_id = bankai
+                    .atlantic_client
+                    .submit_batch(pie, ProofType::EpochBatch)
+                    .await?;
+                println!("Batch Submitted: {}", batch_id);
             }
             ProveCommands::CommitteeAtSlot { slot } => {
                 let latest_committee_id = bankai
@@ -260,10 +263,12 @@ async fn main() -> Result<(), BankaiCliError> {
                 let update = bankai
                     .get_sync_committee_update(slot.try_into().unwrap())
                     .await?;
-                let _ = update.export().unwrap();
-                // CairoRunner::generate_pie(&update, &bankai.config, None, None).await?;
-                // let batch_id = bankai.atlantic_client.submit_batch(update).await?;
-                // println!("Batch Submitted: {}", batch_id);
+                let pie = generate_committee_update_pie(update, &bankai.config, None, None).await?;
+                let batch_id = bankai
+                    .atlantic_client
+                    .submit_batch(pie, ProofType::SyncCommittee)
+                    .await?;
+                println!("Batch Submitted: {}", batch_id);
             }
             ProveCommands::SubmitWrapped { batch_id } => {
                 let status = bankai
@@ -454,5 +459,5 @@ pub enum BankaiCliError {
     #[error("Proof fetch error: {0}")]
     ProofFetch(#[from] ProofError),
     #[error("Cairo runner error: {0}")]
-    CairoRunner(#[from] CairoRunnerError),
+    CairoRunner(#[from] CairoError),
 }
