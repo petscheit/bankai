@@ -47,9 +47,13 @@ impl SyncCommitteeUpdate {
         let proof = state_proof_fetcher
             .fetch_next_sync_committee_proof(slot)
             .await?;
-
         let circuit_inputs = CommitteeCircuitInputs::from(proof);
-        let expected_circuit_outputs = ExpectedCircuitOutputs::from_inputs(&circuit_inputs);
+        let mut expected_circuit_outputs = ExpectedCircuitOutputs::from_inputs(&circuit_inputs);
+        
+        // ToDo: revamp traits to prevent the pot. wrong root from being written
+        let header_res = client.get_header(slot).await?;
+        let state_root = header_res.data.header.message.state_root;
+        expected_circuit_outputs.state_root = state_root;
 
         Ok(SyncCommitteeUpdate {
             circuit_inputs,

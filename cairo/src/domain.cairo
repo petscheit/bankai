@@ -26,6 +26,16 @@ namespace Network {
         }
     }
 
+    func get_fork_version{range_check_ptr}(network_id: felt, slot: felt) -> felt {
+        alloc_locals;
+
+        local fork: felt;
+        let (fork_schedule) = get_fork_schedule(); // required for hint, no great way to do this
+        %{ check_fork_version() %}
+
+        return fork;
+    }
+
     func get_fork_root{range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*, sha256_ptr: felt*}(network_id: felt, slot: felt) -> Uint256 {
         alloc_locals;
         let fork_id = get_fork_id(network_id, slot);
@@ -38,9 +48,7 @@ namespace Network {
     func get_fork_id{range_check_ptr}(network_id: felt, slot: felt) -> felt {
         alloc_locals;
 
-        local fork: felt;
-        let (fork_schedule) = get_fork_schedule(); // required for hint, no great way to do this
-        %{ check_fork_version() %}
+        let fork = get_fork_version(network_id, slot);
 
         if (fork == Network.GENESIS) {
             let (fork_id, _) = get_fork_data(network_id, Network.GENESIS);
@@ -175,9 +183,7 @@ namespace Domain {
     func get_domain{range_check_ptr}(network_id: felt, slot: felt) -> Uint256 {
         alloc_locals;
 
-        local fork: felt;
-        let (fork_schedule) = Network.get_fork_schedule(); // required for hint, no great way to do this
-        %{ check_fork_version() %}
+        let fork = Network.get_fork_version(network_id, slot);
 
         if (network_id == Network.MAINNET) {
             let (data_address) = get_label_location(domain_data_mainnet);

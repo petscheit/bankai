@@ -8,13 +8,13 @@ from starkware.cairo.common.uint256 import Uint256
 from starkware.cairo.common.memcpy import memcpy
 from starkware.cairo.common.memset import memset
 from definitions import UInt384
-
+from cairo.src.domain import Network
 from cairo.src.utils import pow2alloc128, felt_divmod
 from cairo.src.signer import commit_committee_key
 from cairo.src.ssz import MerkleTree
 from sha import SHA256, HashUtils
 from ec_ops import derive_g1_point_from_x
-from debug import print_felt_hex, print_uint384
+from debug import print_felt_hex, print_uint384, print_string
 
 // Main function to update the committee
 func main{
@@ -41,12 +41,20 @@ func main{
 
     %{ write_committee_update_inputs() %}
 
+    let fork = Network.get_fork_version(Network.SEPOLIA, slot);
+    local next_committee_index: felt;
+    if (fork == Network.ELECTRA) {
+        next_committee_index = 87;
+    } else {
+        next_committee_index = 55;
+    }
+
     // Compute hashes and update state
     with sha256_ptr, pow2_array {
         let leaf_hash = compute_leaf_hash(committee_keys_root, aggregate_committee_key);
-        // The next sync committee is always at index 55
+        
         let state_root = MerkleTree.hash_merkle_path(
-            path=path, path_len=path_len, leaf=leaf_hash, index=55
+            path=path, path_len=path_len, leaf=leaf_hash, index=next_committee_index
         );
         let committee_hash = compute_committee_hash(aggregate_committee_key);
     }
