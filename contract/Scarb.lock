@@ -6,6 +6,8 @@ name = "bankai"
 version = "0.1.0"
 dependencies = [
  "integrity",
+ "openzeppelin_access",
+ "openzeppelin_upgrades",
 ]
 
 [[package]]
@@ -13,3 +15,24 @@ name = "integrity"
 version = "2.0.0"
 source = "registry+https://scarbs.xyz/"
 checksum = "sha256:f5e91cd5280bc0c02cfb12ce1a521e25064956dd12f3e38fca3d841c538723a0"
+
+[[package]]
+name = "openzeppelin_access"
+version = "0.20.0"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:7734901a0ca7a7065e69416fea615dd1dc586c8dc9e76c032f25ee62e8b2a06c"
+dependencies = [
+ "openzeppelin_introspection",
+]
+
+[[package]]
+name = "openzeppelin_introspection"
+version = "0.20.0"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:13e04a2190684e6804229a77a6c56de7d033db8b9ef519e5e8dee400a70d8a3d"
+
+[[package]]
+name = "openzeppelin_upgrades"
+version = "0.20.0"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:15fdd63f6b50a0fda7b3f8f434120aaf7637bcdfe6fd8d275ad57343d5ede5e1"
