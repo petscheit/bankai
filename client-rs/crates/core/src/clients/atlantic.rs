@@ -144,11 +144,17 @@ impl AtlanticClient {
                 ProofType::EpochBatch => "epoch_batch",
             }
         );
+
+        let job_size = match proof_type {
+            ProofType::Epoch => "XS",
+            ProofType::SyncCommittee => "XS",
+            ProofType::EpochBatch => "S",
+        };
         
         // Build the form with updated API parameters
         let form = Form::new()
             .part("pieFile", file_part)
-            .text("declaredJobSize", "XS")
+            .text("declaredJobSize", job_size)
             .text("layout", "dynamic")
             .text("cairoVm", "rust")
             .text("cairoVersion", "cairo0")

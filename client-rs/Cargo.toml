@@ -7,6 +7,7 @@ edition = "2021"
 members = [
     "crates/core",
     "crates/cli",
+    "crates/api",
 ]
 
 [workspace.dependencies]
@@ -63,4 +64,5 @@ tokio-util = "0.7.13"
 garaga-zero-hints = { path = "../cairo/packages/garaga-zero/hints/rust-vm" }
 bankai-core = { path = "crates/core" }
 bankai-cli = { path = "crates/cli" }
+bankai-api = { path = "crates/api" }
 bankai-runner = { path = "../cairo/cairo_runner" }
