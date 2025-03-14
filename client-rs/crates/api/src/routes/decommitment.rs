@@ -1,5 +1,11 @@
+use crate::{
+    handlers::decommitment::{
+        handle_get_decommitment_data_by_epoch, handle_get_decommitment_data_by_execution_height,
+        handle_get_decommitment_data_by_slot,
+    },
+    types::AppState,
+};
 use axum::{routing::get, Router};
-use crate::{handlers::decommitment::{handle_get_decommitment_data_by_epoch, handle_get_decommitment_data_by_execution_height, handle_get_decommitment_data_by_slot}, types::AppState};
 
 pub(crate) fn router() -> Router<AppState> {
     Router::new()

@@ -1,13 +1,16 @@
 use std::collections::HashMap;
 
-use axum::{extract::{State, Path}, response::IntoResponse, Json};
+use crate::types::AppState;
+use axum::{
+    extract::{Path, State},
+    response::IntoResponse,
+    Json,
+};
 use bankai_core::types::job::JobStatus;
 use num_traits::ToPrimitive;
 use serde_json::json;
-use crate::types::AppState;
 
 use uuid::Uuid;
-
 
 pub async fn handle_get_latest_verified_slot(State(state): State<AppState>) -> impl IntoResponse {
     match state
@@ -16,9 +19,7 @@ pub async fn handle_get_latest_verified_slot(State(state): State<AppState>) -> i
         .get_latest_epoch_slot(&state.bankai.config)
         .await
     {
-        Ok(latest_epoch) => {
-            Json(json!({ "latest_verified_slot": latest_epoch.to_string() }))
-        }
+        Ok(latest_epoch) => Json(json!({ "latest_verified_slot": latest_epoch.to_string() })),
         Err(err) => {
             eprintln!("Failed to fetch latest epoch: {:?}", err);
             Json(json!({ "error": "Failed to fetch latest epoch" }))
@@ -35,7 +36,9 @@ pub async fn handle_get_latest_verified_committee(
         .get_latest_committee_id(&state.bankai.config)
         .await
     {
-        Ok(latest_verified_committee) => Json(json!({ "latest_verified_committee": latest_verified_committee.to_string() })),
+        Ok(latest_verified_committee) => {
+            Json(json!({ "latest_verified_committee": latest_verified_committee.to_string() }))
+        }
         Err(err) => {
             eprintln!(
                 "Failed to parse latest_verified_committee as decimal: {:?}",
@@ -117,8 +120,8 @@ pub async fn handle_get_committee_hash(
 pub async fn handle_get_status(State(state): State<AppState>) -> impl IntoResponse {
     let last_epoch_in_progress = match state.db_manager.get_latest_epoch_in_progress().await {
         Ok(Some(epoch)) => {
-            let last_epoch_in_progress = epoch.to_u64().unwrap();
-            last_epoch_in_progress
+            
+            epoch.to_u64().unwrap()
         }
         Ok(None) => 0,
         Err(_) => 0,

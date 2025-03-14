@@ -1,28 +1,20 @@
 use std::{env, sync::Arc};
 
-use axum::{
-    extract::DefaultBodyLimit,
-    routing::get,
-    Router,
-};
-use tokio::{
-    signal, sync::mpsc, time::{timeout, Duration}
-};
-use std::net::SocketAddr;
+use bankai_core::{db::manager::DatabaseManager, BankaiClient};
 use dotenv::from_filename;
+use std::net::SocketAddr;
+use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
-use tracing::{debug, error, info, warn, Level};
-use bankai_core::{BankaiClient, db::manager::DatabaseManager, types::job::Job};
 
-mod types;
-mod routes;
-mod utils;
 mod handlers;
+mod routes;
+mod types;
+mod utils;
 
 use types::AppState;
 
-
-#[tokio::main(flavor = "multi_thread", worker_threads = 2)]
+// #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Load .env.sepolia file
     from_filename(".env.sepolia").ok();
@@ -71,9 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     info!("Bankai RPC HTTP server is listening on http://{}", addr);
 
-    axum::serve(listener, app)
-        .await
-        .unwrap();
+    axum::serve(listener, app).await.unwrap();
 
     Ok(())
 }

@@ -1,10 +1,10 @@
 use crate::types::AppState;
 use axum::extract::State;
-use num_traits::ToPrimitive;
 use bankai_core::{
+    types::job::JobStatus,
     utils::helpers,
-    types::job::{JobStatus, JobType},
 };
+use num_traits::ToPrimitive;
 
 pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
     let db = state.db_manager.clone();
@@ -66,7 +66,7 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
         .map(|entry| {
             format!(
                 "║  Batch {:}: {} -> {} [{}] {:<32} {:<66}  {}   ║",
-                entry.job.job_uuid.to_string()[..8].to_string(),
+                &entry.job.job_uuid.to_string()[..8],
                 entry.job.batch_range_begin_epoch,
                 entry.job.batch_range_end_epoch,
                 match entry.job.job_status {
@@ -104,7 +104,7 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
         .map(|entry| {
             format!(
                 "║  Job   {:}: {}  {}     [{}] {:<32} {:<66}  {}   ║",
-                entry.job.job_uuid.to_string()[..8].to_string(),
+                &entry.job.job_uuid.to_string()[..8],
                 entry.job.slot,
                 helpers::get_sync_committee_id_by_slot(entry.job.slot.to_u64().unwrap()),
                 match entry.job.job_status {

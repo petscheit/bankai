@@ -1,8 +1,7 @@
 use axum::{
-    routing::{get, post},
+    routing::get,
     Router,
 };
-use thiserror::Error;
 
 use crate::types::AppState;
 
@@ -14,10 +13,7 @@ mod decommitment;
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route(
-            "/dashboard",
-            get(handle_get_dashboard),
-        )
+        .route("/dashboard", get(handle_get_dashboard))
         .merge(debug::router())
         .merge(decommitment::router())
 }

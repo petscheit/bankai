@@ -1,10 +1,13 @@
-
-use axum::{extract::{Path, State}, response::IntoResponse, Json};
+use crate::types::AppState;
+use axum::{
+    extract::{Path, State},
+    response::IntoResponse,
+    Json,
+};
+use bankai_core::utils::helpers;
+use num_traits::ToPrimitive;
 use serde_json::json;
 use tracing::error;
-use bankai_core::utils::helpers;
-use crate::types::AppState;
-use num_traits::ToPrimitive;
 
 pub async fn handle_get_decommitment_data_by_epoch(
     Path(epoch_id): Path<i32>,
@@ -13,13 +16,14 @@ pub async fn handle_get_decommitment_data_by_epoch(
     match state.db_manager.get_merkle_paths_for_epoch(epoch_id).await {
         Ok(merkle_paths) => {
             if !merkle_paths.is_empty() {
-                let epoch_decommitment_data = state
+                let epoch_decommitment_data: bankai_core::types::proofs::epoch_update::EpochDecommitmentData = state
                     .db_manager
                     .get_epoch_decommitment_data(epoch_id)
                     .await
                     .unwrap(); //ExpectedEpochUpdateOutputs
 
-                let circuit_outputs_decommitment_data = epoch_decommitment_data.epoch_update_outputs;
+                let circuit_outputs_decommitment_data =
+                    epoch_decommitment_data.epoch_update_outputs;
 
                 Json(json!({
                     "epoch_id": epoch_id,

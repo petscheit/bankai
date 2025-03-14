@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bankai_core::{BankaiClient, db::manager::DatabaseManager};
+use bankai_core::{db::manager::DatabaseManager, BankaiClient};
 
 #[derive(Clone, Debug)]
 pub struct AppState {
