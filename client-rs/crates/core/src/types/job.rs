@@ -28,8 +28,10 @@ pub enum JobStatus {
     #[postgres(name = "PIE_GENERATED")]
     PieGenerated,
     #[postgres(name = "OFFCHAIN_PROOF_REQUESTED")]
+    #[strum(serialize = "OFFCHAIN_PROOF_REQUESTED")]
     AtlanticProofRequested,
     #[postgres(name = "OFFCHAIN_PROOF_RETRIEVED")]
+    #[strum(serialize = "OFFCHAIN_PROOF_RETRIEVED")]
     AtlanticProofRetrieved,
     #[postgres(name = "WRAP_PROOF_REQUESTED")]
     WrapProofRequested,

@@ -1025,15 +1025,15 @@ impl DatabaseManager {
         let jobs = rows
             .into_iter()
             .map(|row| {
-                let job = Self::map_row_to_job(row.clone()).unwrap();
-                JobWithTimestamps {
+                let job = Self::map_row_to_job(row.clone())?;
+                Ok(JobWithTimestamps {
                     job,
                     created_at: row.get("created_time"),
                     updated_at: row.get("updated_time"),
                     tx_hash: row.get("tx_hash"),
-                }
+                })
             })
-            .collect();
+            .collect::<Result<Vec<JobWithTimestamps>, DatabaseError>>()?;
 
         Ok(jobs)
     }
@@ -1066,15 +1066,15 @@ impl DatabaseManager {
         let jobs = rows
             .into_iter()
             .map(|row| {
-                let job = Self::map_row_to_job(row.clone()).unwrap();
-                JobWithTimestamps {
+                let job = Self::map_row_to_job(row.clone())?;
+                Ok(JobWithTimestamps {
                     job,
                     created_at: row.get("created_time"),
                     updated_at: row.get("updated_time"),
                     tx_hash: row.get("tx_hash"),
-                }
+                })
             })
-            .collect();
+            .collect::<Result<Vec<JobWithTimestamps>, DatabaseError>>()?;
 
         Ok(jobs)
     }
@@ -1113,15 +1113,15 @@ impl DatabaseManager {
         let jobs = rows
             .into_iter()
             .map(|row| {
-                let job = Self::map_row_to_job(row.clone()).unwrap();
-                JobWithTimestamps {
+                let job = Self::map_row_to_job(row.clone())?;
+                Ok(JobWithTimestamps {
                     job,
                     created_at: row.get("created_time"),
                     updated_at: row.get("updated_time"),
                     tx_hash: row.get("tx_hash"),
-                }
+                })
             })
-            .collect();
+            .collect::<Result<Vec<JobWithTimestamps>, DatabaseError>>()?;
 
         Ok(jobs)
     }

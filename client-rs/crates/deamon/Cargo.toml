@@ -1,0 +1,10 @@
+[package]
+name = "deamon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bankai-core.workspace = true
+beacon-state-proof.workspace = true
+starknet.workspace = true
+

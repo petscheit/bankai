@@ -52,7 +52,7 @@ impl Default for BankaiConfig {
             epoch_circuit_path: "../../../cairo/build/epoch_update.json".to_string(),
             epoch_batch_circuit_path: "../../../cairo/build/epoch_batch.json".to_string(),
             committee_circuit_path: "../../../cairo/build/committee_update.json".to_string(),
-            cairo_verifier_path: "../cairo/cairo_runner/cairo_verifier.json".to_string(),
+            cairo_verifier_path: "../core/cairo/cairo_verifier.json".to_string(),
             atlantic_endpoint: "https://staging.atlantic.api.herodotus.cloud".to_string(),
             transactor_endpoint: "https://staging.api.herodotus.cloud".to_string(),
             // Set how many concurrent pie generation (trace generation) tasks are allowed
