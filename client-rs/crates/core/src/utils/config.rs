@@ -36,15 +36,15 @@ impl Default for BankaiConfig {
             )
             .unwrap(),
             committee_update_program_hash: Felt::from_hex(
-                "0x229e5ad2e3b8c6dd4d0319cdd957bbd7bdf2ea685e172b049c3e5f55b0352c1",
+                "0x5ed209e0e60206c61e81b708d202e5c34a6184f3eb749ea9c5a2139d8997ae0",
             )
             .unwrap(),
             epoch_update_program_hash: Felt::from_hex(
-                "0x5daec246cf8296195084c05ca21ee0f77452c39e635232565557a9f3ce9f596",
+                "0x03b515930ea20dcf5115ca00c6f7084220a45395c8f48e170e6ff4bcc27c5d4d",
             )
             .unwrap(),
             epoch_batch_program_hash: Felt::from_hex(
-                "0x5f4dad2d8549e91c25694875eb02fc2910eeead0e1a13d3061464a3eaa4bd8d",
+                "0x82c00cdcb19e0248ab95bff1045d1296c309e9a63bf9ff76af03175369d71d",
             )
             .unwrap(),
             contract_path: "../../contract/target/release/bankai_BankaiContract.contract_class.json"
@@ -77,15 +77,15 @@ impl BankaiConfig {
             )
             .unwrap(),
             committee_update_program_hash: Felt::from_hex(
-                "0x229e5ad2e3b8c6dd4d0319cdd957bbd7bdf2ea685e172b049c3e5f55b0352c1",
+                "0x5ed209e0e60206c61e81b708d202e5c34a6184f3eb749ea9c5a2139d8997ae0",
             )
             .unwrap(),
             epoch_update_program_hash: Felt::from_hex(
-                "0x5daec246cf8296195084c05ca21ee0f77452c39e635232565557a9f3ce9f596",
+                "0x03b515930ea20dcf5115ca00c6f7084220a45395c8f48e170e6ff4bcc27c5d4d",
             )
             .unwrap(),
             epoch_batch_program_hash: Felt::from_hex(
-                "0x5f4dad2d8549e91c25694875eb02fc2910eeead0e1a13d3061464a3eaa4bd8d",
+                "0x82c00cdcb19e0248ab95bff1045d1296c309e9a63bf9ff76af03175369d71d",
             )
             .unwrap(),
             contract_path: "./test_data/bankai_contract.json".to_string(),
