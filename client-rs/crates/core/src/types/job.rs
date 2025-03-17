@@ -28,11 +28,9 @@ pub enum JobStatus {
     #[postgres(name = "PIE_GENERATED")]
     PieGenerated,
     #[postgres(name = "OFFCHAIN_PROOF_REQUESTED")]
-    #[strum(serialize = "OFFCHAIN_PROOF_REQUESTED")]
-    AtlanticProofRequested,
+    OffchainProofRequested,
     #[postgres(name = "OFFCHAIN_PROOF_RETRIEVED")]
-    #[strum(serialize = "OFFCHAIN_PROOF_RETRIEVED")]
-    AtlanticProofRetrieved,
+    OffchainProofRetrieved,
     #[postgres(name = "WRAP_PROOF_REQUESTED")]
     WrapProofRequested,
     #[postgres(name = "WRAPPED_PROOF_DONE")]
@@ -51,7 +49,7 @@ pub enum JobStatus {
     Cancelled,
 }
 
-#[derive(Debug, FromSql, ToSql, Clone, Serialize, Display, EnumString)]
+#[derive(Debug, FromSql, ToSql, Clone, Serialize, Display, EnumString, PartialEq, Eq)]
 #[postgres(name = "job_type")]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum JobType {
