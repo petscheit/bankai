@@ -57,6 +57,35 @@ pub struct JobSchema {
     pub last_failure_time: Option<NaiveDateTime>,
 }
 
+impl TryInto<Job> for JobSchema {
+    type Error = DatabaseError;
+
+    fn try_into(self) -> Result<Job, Self::Error> {
+        let slot = i64_to_u64(self.slot)?;
+        
+        Ok(Job {
+            job_id: self.job_uuid,
+            job_type: self.job_type,
+            job_status: self.job_status,
+            slot: Some(slot),
+            batch_range_begin_epoch: Some(i64_to_u64(self.batch_range_begin_epoch)?),
+            batch_range_end_epoch: Some(i64_to_u64(self.batch_range_end_epoch)?),
+        })
+    }
+}
+
+// Helper function to convert i64 to u64 safely
+fn i64_to_u64(value: i64) -> Result<u64, DatabaseError> {
+    if value < 0 {
+        Err(DatabaseError::IntegerConversion(format!(
+            "Cannot convert negative value {} to unsigned integer",
+            value
+        )))
+    } else {
+        Ok(value as u64)
+    }
+}
+
 /// Extended job information including timestamps
 #[derive(Debug)]
 pub struct JobWithTimestamps {
@@ -251,9 +280,7 @@ impl DatabaseManager {
                     &[&atlantic_batch_job_id.to_string(), &job_id],
                 )
                 .await?;
-            } // _ => {
-              //     println!("Unk", status);
-              // }
+            }
         }
 
         Ok(())
@@ -334,13 +361,17 @@ impl DatabaseManager {
         Ok(job)
     }
 
+    pub async fn fetch_jobs_in_proof_generation(&self) -> Result<Vec<Job>, DatabaseError> {
+        let rows = self.client.query("SELECT * FROM jobs WHERE job_status IN ('OFFCHAIN_PROOF_REQUESTED', 'WRAP_PROOF_REQUESTED')", &[]).await?;
+        let jobs = rows.into_iter().map(Self::map_row_to_job).collect::<Result<Vec<_>, _>>()?;
+        Ok(jobs.into_iter().map(|job| job.try_into().unwrap()).collect())
+    }
+
     /// Gets the latest epoch that is in progress
     ///
     /// # Returns
     /// * `Result<Option<u64>, DatabaseError>` - Latest epoch ID or error
     pub async fn get_latest_epoch_in_progress(&self) -> Result<Option<u64>, DatabaseError> {
-        // Query the latest slot with job_status in ('in_progress', 'initialized')
-        // //, 'CANCELLED', 'ERROR'
         let row_opt = self
             .client
             .query_opt(
@@ -1181,8 +1212,8 @@ impl DatabaseManager {
             JobStatus::ProgramInputsPrepared,
             JobStatus::StartedTraceGeneration,
             JobStatus::PieGenerated,
-            JobStatus::AtlanticProofRequested,
-            JobStatus::AtlanticProofRetrieved,
+            JobStatus::OffchainProofRequested,
+            JobStatus::OffchainProofRetrieved,
             JobStatus::WrapProofRequested,
             JobStatus::WrappedProofDone,
             JobStatus::OffchainComputationFinished,
