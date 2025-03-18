@@ -195,20 +195,18 @@ impl Daemon {
                 let bankai_clone = bankai.clone();
                 let tx_clone = tx.clone();
 
-                // Inner spawn - Individual head event processor
-                tokio::spawn(async move {
-                    let _ = db_clone
-                        .update_daemon_state_info(event.slot, event.block)
-                        .await;
+                // Process synchronously in the main event loop
+                let _ = db_clone
+                    .update_daemon_state_info(event.slot, event.block)
+                    .await;
 
-                    create_new_jobs(&event, db_clone, bankai_clone, tx_clone)
-                        .await
-                        .map_err(|e| {
-                            error!("Error creating new jobs: {:?}", e);
-                            e
-                        })
-                        .unwrap();
-                });
+                create_new_jobs(&event, db_clone.clone(), bankai_clone.clone(), tx_clone.clone())
+                    .await
+                    .map_err(|e| {
+                        error!("Error creating new jobs: {:?}", e);
+                        e
+                    })
+                    .unwrap();
             }
         });
     }
