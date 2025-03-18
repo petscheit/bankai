@@ -235,7 +235,7 @@ async fn main() -> Result<(), BankaiCliError> {
                 let epoch_update = EpochUpdate::new(&bankai.client, next_epoch)
                     .await
                     .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
-                
+
                 let export_path = epoch_update.export()?;
                 println!("Update exported to {}", export_path);
                 let pie =
@@ -293,7 +293,11 @@ async fn main() -> Result<(), BankaiCliError> {
                         .await?;
                     let batch_id = bankai
                         .atlantic_client
-                        .submit_wrapped_proof(proof, bankai.config.cairo_verifier_path, format!("wrap_{}", batch_id))
+                        .submit_wrapped_proof(
+                            proof,
+                            bankai.config.cairo_verifier_path,
+                            format!("wrap_{}", batch_id),
+                        )
                         .await?;
                     println!("Batch Submitted: {}", batch_id);
                 } else {

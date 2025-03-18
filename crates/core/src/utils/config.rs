@@ -47,8 +47,9 @@ impl Default for BankaiConfig {
                 "0x82c00cdcb19e0248ab95bff1045d1296c309e9a63bf9ff76af03175369d71d",
             )
             .unwrap(),
-            contract_path: "../../contract/target/release/bankai_BankaiContract.contract_class.json"
-                .to_string(),
+            contract_path:
+                "../../contract/target/release/bankai_BankaiContract.contract_class.json"
+                    .to_string(),
             epoch_circuit_path: "../../cairo/build/epoch_update.json".to_string(),
             epoch_batch_circuit_path: "../../cairo/build/epoch_batch.json".to_string(),
             committee_circuit_path: "../../cairo/build/committee_update.json".to_string(),
@@ -96,10 +97,10 @@ impl BankaiConfig {
             atlantic_endpoint: "https://staging.atlantic.api.herodotus.cloud".to_string(),
             transactor_endpoint: "https://staging.api.herodotus.cloud".to_string(),
             pie_generation_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_PIE_GENERATIONS)),
-            epoch_data_fetching_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_RPC_DATA_FETCH_JOBS)),
+            epoch_data_fetching_semaphore: Arc::new(Semaphore::new(
+                MAX_CONCURRENT_RPC_DATA_FETCH_JOBS,
+            )),
             proof_settlement_chain_id: Felt::from_hex(STARKNET_SEPOLIA).unwrap(),
         }
     }
 }
-
-

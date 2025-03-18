@@ -1,5 +1,5 @@
 //! Epoch Update Processing Implementation
-//! 
+//!
 //! This module handles individual epoch updates and their verification on the StarkNet blockchain.
 //! It provides functionality to process beacon chain headers, sync committee signatures, and execution
 //! payload proofs, generating the necessary data for verification on StarkNet.
@@ -7,9 +7,13 @@
 use std::fs;
 
 use crate::{
-    cairo_runner::CairoError, clients::{beacon_chain::BeaconError, ClientError}, db::manager::DatabaseError, types::{
-        proofs::execution_header::ExecutionHeaderProof, traits::{Exportable, Submittable}
-    }
+    cairo_runner::CairoError,
+    clients::{beacon_chain::BeaconError, ClientError},
+    db::manager::DatabaseError,
+    types::{
+        proofs::execution_header::ExecutionHeaderProof,
+        traits::{Exportable, Submittable},
+    },
 };
 
 use crate::clients::beacon_chain::BeaconRpcClient;
@@ -607,7 +611,7 @@ impl Submittable<EpochInputs> for ExpectedEpochUpdateOutputs {
 #[derive(Debug, Error)]
 pub enum EpochUpdateError {
     /// Error during Cairo program execution
-   #[error("Cairo run error: {0}")]
+    #[error("Cairo run error: {0}")]
     Cairo(#[from] CairoError),
     /// Database operation error
     #[error("Database error: {0}")]

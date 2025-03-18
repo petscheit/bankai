@@ -1,6 +1,6 @@
 use crate::handlers::debug::{
-    handle_get_committee_hash, handle_get_epoch_proof,
-    handle_get_latest_verified_committee, handle_get_latest_verified_slot, handle_get_status,
+    handle_get_committee_hash, handle_get_epoch_proof, handle_get_latest_verified_committee,
+    handle_get_latest_verified_slot, handle_get_status,
 };
 use crate::AppState;
 use axum::{routing::get, Router};

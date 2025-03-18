@@ -1,13 +1,22 @@
 use std::sync::Arc;
 
 use alloy_rpc_types_beacon::events::HeadEvent;
-use bankai_core::{cairo_runner::{self, generate_committee_update_pie}, db::manager::DatabaseManager, types::{job::{AtlanticJobType, Job, JobStatus, JobType}, proofs::epoch_batch::EpochUpdateBatch, traits::{Exportable, ProofType}}, utils::{config, constants, helpers}, BankaiClient};
+use bankai_core::{
+    cairo_runner::{self, generate_committee_update_pie},
+    db::manager::DatabaseManager,
+    types::{
+        job::{AtlanticJobType, Job, JobStatus, JobType},
+        proofs::epoch_batch::EpochUpdateBatch,
+        traits::{Exportable, ProofType},
+    },
+    utils::{config, constants, helpers},
+    BankaiClient,
+};
 use tokio::sync::mpsc;
 use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::error::DaemonError;
-
 
 pub struct EpochBatchJobProcessor {
     db_manager: Arc<DatabaseManager>,
@@ -41,29 +50,30 @@ impl EpochBatchJobProcessor {
                     "[EPOCH BATCH UPDATE][{}] Job created successfully. Epochs range from {} to {} | Sync committee involved: {}",
                     job_id, epoch_start, epoch_end, helpers::get_sync_committee_id_by_epoch(epoch_end)
                 );
-      
+
                 Ok(job)
             }
-            Err(e) => return Err(e.into())
+            Err(e) => return Err(e.into()),
         }
     }
 
-    pub async fn process_job(
-        &self,
-        job: Job,
-    ) -> Result<(), DaemonError> {
+    pub async fn process_job(&self, job: Job) -> Result<(), DaemonError> {
         info!(
-            "[BATCH EPOCH JOB][{}] Preparing inputs for program for epochs from {} to {}...", 
-            job.job_id, job.batch_range_begin_epoch.unwrap(), job.batch_range_end_epoch.unwrap()
+            "[BATCH EPOCH JOB][{}] Preparing inputs for program for epochs from {} to {}...",
+            job.job_id,
+            job.batch_range_begin_epoch.unwrap(),
+            job.batch_range_end_epoch.unwrap()
         );
-        
+
         let circuit_inputs = EpochUpdateBatch::new_by_epoch_range(
             &self.bankai,
             self.db_manager.clone(),
             job.batch_range_begin_epoch.unwrap(),
             job.batch_range_end_epoch.unwrap(),
             job.job_id,
-        ).await.map_err(|e| bankai_core::types::proofs::ProofError::EpochBatch(e))?;
+        )
+        .await
+        .map_err(|e| bankai_core::types::proofs::ProofError::EpochBatch(e))?;
 
         let name = circuit_inputs.name();
 
@@ -73,7 +83,10 @@ impl EpochBatchJobProcessor {
             job.job_id, input_path
         );
 
-        info!("[BATCH EPOCH JOB][{}] Starting trace generation...", job.job_id);
+        info!(
+            "[BATCH EPOCH JOB][{}] Starting trace generation...",
+            job.job_id
+        );
 
         let pie = cairo_runner::generate_epoch_batch_pie(
             circuit_inputs,
@@ -83,14 +96,17 @@ impl EpochBatchJobProcessor {
         )
         .await?;
 
-
         self.db_manager
             .update_job_status(job.job_id, JobStatus::PieGenerated)
             .await?;
 
         info!("[BATCH EPOCH JOB][{}] Uploading PIE and sending proof generation request to Atlantic...", job.job_id);
 
-        let batch_id = self.bankai.atlantic_client.submit_batch(pie, ProofType::EpochBatch, name).await?;
+        let batch_id = self
+            .bankai
+            .atlantic_client
+            .submit_batch(pie, ProofType::EpochBatch, name)
+            .await?;
 
         info!(
             "[BATCH EPOCH JOB][{}] Proof generation batch submitted to Atlantic. QueryID: {}",
@@ -111,5 +127,4 @@ impl EpochBatchJobProcessor {
 
         Ok(())
     }
-
 }

@@ -1,15 +1,10 @@
 use alloy_rpc_types_beacon::events::HeadEvent;
 use bankai_core::types::job::JobStatus;
-use bankai_core::{
-    db::manager::DatabaseManager,
-    BankaiClient,
-    types::job::Job,
-    utils::constants,
-};
+use bankai_core::{db::manager::DatabaseManager, types::job::Job, utils::constants, BankaiClient};
 use dotenv::from_filename;
 use std::{env, sync::Arc};
 use tokio::sync::mpsc;
-use tracing::{info, error, Level};
+use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 use crate::error::DaemonError;
@@ -51,8 +46,9 @@ impl Daemon {
 
         // Create channel for job communication
         let (tx, rx): (mpsc::Sender<Job>, mpsc::Receiver<Job>) = mpsc::channel(32);
-        let (tx_head_event, rx_head_event): (mpsc::Sender<HeadEvent>, mpsc::Receiver<HeadEvent>) = mpsc::channel(32);
-        
+        let (tx_head_event, rx_head_event): (mpsc::Sender<HeadEvent>, mpsc::Receiver<HeadEvent>) =
+            mpsc::channel(32);
+
         // Initialize database connection
         let connection_string = format!(
             "host={} user={} password={} dbname={}",
@@ -74,11 +70,8 @@ impl Daemon {
                 "{}/eth/v1/events?topics=head",
                 env::var("BEACON_RPC_URL").unwrap().as_str()
             );
-            
-            Some(BeaconListener::new(
-                events_endpoint,
-                tx_head_event.clone(),
-            ))
+
+            Some(BeaconListener::new(events_endpoint, tx_head_event.clone()))
         } else {
             None
         };
@@ -96,34 +89,37 @@ impl Daemon {
     }
 
     pub async fn run(&mut self) -> Result<(), DaemonError> {
-        
         // Start beacon listener if enabled
         if let Some(listener) = &self.beacon_listener {
             listener.start().await?;
         }
-        
+
         // Start the job processor and the head event processor
         self.start_job_processor().await;
         self.start_head_event_processor().await;
-        
+
         Ok(())
     }
 
     async fn start_job_processor(&mut self) {
         let processor = self.job_processor.clone();
         let rx = std::mem::replace(&mut self.rx, mpsc::channel(32).1);
-        
+
         tokio::spawn(async move {
             let mut rx = rx;
             while let Some(job) = rx.recv().await {
                 let job_id = job.job_id;
                 let processor_clone = processor.clone();
                 match job.job_status {
-                    JobStatus::OffchainProofRequested | JobStatus::WrapProofRequested | JobStatus::OffchainComputationFinished => {
+                    JobStatus::OffchainProofRequested
+                    | JobStatus::WrapProofRequested
+                    | JobStatus::OffchainComputationFinished => {
                         tokio::spawn(async move {
                             if let Err(e) = processor_clone.process_proof_job(job.clone()).await {
                                 error!("Error processing job {}: {}", job_id, e);
-                                processor_clone.handle_job_error(job_id).await
+                                processor_clone
+                                    .handle_job_error(job_id)
+                                    .await
                                     .map_err(|e| {
                                         error!("Error handling job error: {:?}", e);
                                         e
@@ -134,9 +130,12 @@ impl Daemon {
                     }
                     _ => {
                         tokio::spawn(async move {
-                            if let Err(e) = processor_clone.process_trace_gen_job(job.clone()).await {
+                            if let Err(e) = processor_clone.process_trace_gen_job(job.clone()).await
+                            {
                                 error!("Error processing job {}: {}", job_id, e);
-                                processor_clone.handle_job_error(job_id).await
+                                processor_clone
+                                    .handle_job_error(job_id)
+                                    .await
                                     .map_err(|e| {
                                         error!("Error handling job error: {:?}", e);
                                         e
@@ -146,7 +145,6 @@ impl Daemon {
                         });
                     }
                 }
-
             }
         });
     }
@@ -161,15 +159,24 @@ impl Daemon {
             let mut rx_head_event = rx_head_event;
             while let Some(event) = rx_head_event.recv().await {
                 // Priorities retries
-                let retryable_jobs = db_manager.fetch_retryable_jobs(constants::MAX_JOB_RETRIES_COUNT as i64).await.unwrap();
+                let retryable_jobs = db_manager
+                    .fetch_retryable_jobs(constants::MAX_JOB_RETRIES_COUNT as i64)
+                    .await
+                    .unwrap();
                 for job in retryable_jobs {
                     // we only update the job status here, the job will be requeued in the next iteration
-                    update_job_status_for_retry(tx.clone(), db_manager.clone(), bankai.clone(), job.clone()).await
-                        .map_err(|e| {
-                            error!("Error updating job status for retry: {:?}", e);
-                            e
-                        })
-                        .unwrap();
+                    update_job_status_for_retry(
+                        tx.clone(),
+                        db_manager.clone(),
+                        bankai.clone(),
+                        job.clone(),
+                    )
+                    .await
+                    .map_err(|e| {
+                        error!("Error updating job status for retry: {:?}", e);
+                        e
+                    })
+                    .unwrap();
                 }
 
                 // Every 5 slots, requeue the jobs that are currently proving
@@ -183,30 +190,28 @@ impl Daemon {
                     for job in jobs {
                         let _ = tx.send(job).await;
                     }
-
                 }
                 let db_clone = db_manager.clone();
                 let bankai_clone = bankai.clone();
                 let tx_clone = tx.clone();
-                
+
                 // Inner spawn - Individual head event processor
                 tokio::spawn(async move {
                     let _ = db_clone
                         .update_daemon_state_info(event.slot, event.block)
                         .await;
 
-                    create_new_jobs(&event, db_clone, bankai_clone, tx_clone).await
+                    create_new_jobs(&event, db_clone, bankai_clone, tx_clone)
+                        .await
                         .map_err(|e| {
                             error!("Error creating new jobs: {:?}", e);
                             e
                         })
                         .unwrap();
-
                 });
             }
         });
     }
-
 }
 
 // Checking status of env vars

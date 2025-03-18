@@ -1,5 +1,5 @@
-use starknet::core::types::Felt;
 use super::proofs::ProofError;
+use starknet::core::types::Felt;
 
 /// A trait for the types that can be submitted on-chain
 pub trait Submittable<T> {

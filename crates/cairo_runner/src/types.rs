@@ -1,8 +1,15 @@
+use cairo_vm::{
+    types::relocatable::Relocatable,
+    vm::{
+        errors::{hint_errors::HintError, memory_errors::MemoryError},
+        vm_core::VirtualMachine,
+    },
+    Felt252,
+};
 pub use garaga_zero::types::CairoType;
-use cairo_vm::{types::relocatable::Relocatable, vm::{errors::{hint_errors::HintError, memory_errors::MemoryError}, vm_core::VirtualMachine}, Felt252};
+use hex;
 use num_bigint::BigUint;
 use serde::Deserialize;
-use hex;
 
 #[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 #[serde(try_from = "String")]
@@ -23,13 +30,13 @@ impl Uint256 {
     pub fn to_limbs(&self) -> [Felt252; 2] {
         const LIMB_SIZE: u32 = 128;
         let limb_mask = (BigUint::from(1u128) << LIMB_SIZE) - BigUint::from(1u128);
-        
+
         let lower_limb = &self.0 & &limb_mask;
         let upper_limb = &self.0 >> LIMB_SIZE;
-        
+
         [
             Felt252::from_bytes_be_slice(&lower_limb.to_bytes_be()),
-            Felt252::from_bytes_be_slice(&upper_limb.to_bytes_be())
+            Felt252::from_bytes_be_slice(&upper_limb.to_bytes_be()),
         ]
     }
 }
@@ -42,7 +49,11 @@ impl CairoType for Uint256 {
         Ok(Self(bigint))
     }
 
-    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, HintError> {
+    fn to_memory(
+        &self,
+        vm: &mut VirtualMachine,
+        address: Relocatable,
+    ) -> Result<Relocatable, HintError> {
         let limbs = self.to_limbs();
         vm.insert_value((address + 0)?, &limbs[0])?;
         vm.insert_value((address + 1)?, &limbs[1])?;
@@ -73,13 +84,15 @@ impl Uint256Bits32 {
     pub fn to_limbs(&self) -> [Felt252; 8] {
         const LIMB_SIZE: u32 = 32;
         let limb_mask = (BigUint::from(1u64) << LIMB_SIZE) - BigUint::from(1u64);
-        
-        let limbs = (0..8).map(|i| {
-            let shift = (7 - i) * LIMB_SIZE;
-            let limb = (&self.0 >> shift) & &limb_mask;
-            Felt252::from_bytes_be_slice(&limb.to_bytes_be())
-        }).collect::<Vec<_>>();
-        
+
+        let limbs = (0..8)
+            .map(|i| {
+                let shift = (7 - i) * LIMB_SIZE;
+                let limb = (&self.0 >> shift) & &limb_mask;
+                Felt252::from_bytes_be_slice(&limb.to_bytes_be())
+            })
+            .collect::<Vec<_>>();
+
         limbs.try_into().unwrap()
     }
 }
@@ -87,22 +100,26 @@ impl Uint256Bits32 {
 impl CairoType for Uint256Bits32 {
     fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, HintError> {
         let mut bigint = BigUint::from(0u32);
-        
+
         for i in (0..8).rev() {
             let value = BigUint::from_bytes_be(&vm.get_integer((address + i)?)?.to_bytes_be());
             bigint = (bigint << 32) | value;
         }
-        
+
         Ok(Self(bigint))
     }
 
-    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, HintError> {
+    fn to_memory(
+        &self,
+        vm: &mut VirtualMachine,
+        address: Relocatable,
+    ) -> Result<Relocatable, HintError> {
         let limbs = self.to_limbs();
-        
+
         for i in 0..8 {
             vm.insert_value((address + i)?, &limbs[i])?;
         }
-        
+
         Ok((address + 8)?)
     }
 
@@ -155,7 +172,11 @@ impl CairoType for UInt384 {
         Ok(Self(bigint))
     }
 
-    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, HintError> {
+    fn to_memory(
+        &self,
+        vm: &mut VirtualMachine,
+        address: Relocatable,
+    ) -> Result<Relocatable, HintError> {
         let limbs = self.to_limbs();
 
         vm.insert_value((address + 0)?, &limbs[0])?;
@@ -180,7 +201,11 @@ impl CairoType for Felt {
         Ok(Self(*value))
     }
 
-    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, HintError> {
+    fn to_memory(
+        &self,
+        vm: &mut VirtualMachine,
+        address: Relocatable,
+    ) -> Result<Relocatable, HintError> {
         vm.insert_value((address + 0)?, &self.0)?;
         Ok((address + 1)?)
     }
@@ -191,7 +216,7 @@ impl CairoType for Felt {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct G1CircuitPoint{
+pub struct G1CircuitPoint {
     x: UInt384,
     y: UInt384,
 }
@@ -200,10 +225,14 @@ impl CairoType for G1CircuitPoint {
     fn from_memory(vm: &VirtualMachine, address: Relocatable) -> Result<Self, HintError> {
         let x = UInt384::from_memory(vm, address)?;
         let y = UInt384::from_memory(vm, (address + 4)?)?;
-        Ok(Self{x, y})
+        Ok(Self { x, y })
     }
 
-    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, HintError> {
+    fn to_memory(
+        &self,
+        vm: &mut VirtualMachine,
+        address: Relocatable,
+    ) -> Result<Relocatable, HintError> {
         self.x.to_memory(vm, address)?;
         self.y.to_memory(vm, (address + 4)?)?;
         Ok((address + 8)?)
@@ -215,7 +244,7 @@ impl CairoType for G1CircuitPoint {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct G2CircuitPoint{
+pub struct G2CircuitPoint {
     x0: UInt384,
     x1: UInt384,
     y0: UInt384,
@@ -228,16 +257,19 @@ impl CairoType for G2CircuitPoint {
         let x1 = UInt384::from_memory(vm, (address + 4)?)?;
         let y0 = UInt384::from_memory(vm, (address + 8)?)?;
         let y1 = UInt384::from_memory(vm, (address + 12)?)?;
-        Ok(Self{x0, x1, y0, y1})
+        Ok(Self { x0, x1, y0, y1 })
     }
 
-    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, HintError> {
+    fn to_memory(
+        &self,
+        vm: &mut VirtualMachine,
+        address: Relocatable,
+    ) -> Result<Relocatable, HintError> {
         self.x0.to_memory(vm, address)?;
         self.x1.to_memory(vm, (address + 4)?)?;
         self.y0.to_memory(vm, (address + 8)?)?;
         self.y1.to_memory(vm, (address + 12)?)?;
         Ok((address + 16)?)
-
     }
 
     fn n_fields() -> usize {
@@ -256,11 +288,15 @@ impl TryFrom<String> for Bytes32 {
         let hex_str = value.strip_prefix("0x").unwrap_or(&value);
         let bytes = hex::decode(hex_str)
             .map_err(|e| format!("Invalid hex string: {}, error: {}", value, e))?;
-        
+
         let mut padded = [0u8; 32];
-        let start = if bytes.len() >= 32 { 0 } else { 32 - bytes.len() };
+        let start = if bytes.len() >= 32 {
+            0
+        } else {
+            32 - bytes.len()
+        };
         padded[start..].copy_from_slice(&bytes[..std::cmp::min(bytes.len(), 32)]);
-        
+
         Ok(Bytes32(padded))
     }
 }
@@ -269,33 +305,37 @@ impl Bytes32 {
     pub fn new<T: AsRef<[u8]>>(bytes: T) -> Self {
         let bytes = bytes.as_ref();
         let mut padded = [0u8; 32];
-        let start = if bytes.len() >= 32 { 0 } else { 32 - bytes.len() };
+        let start = if bytes.len() >= 32 {
+            0
+        } else {
+            32 - bytes.len()
+        };
         padded[start..].copy_from_slice(&bytes[..std::cmp::min(bytes.len(), 32)]);
         Bytes32(padded)
     }
-    
+
     pub fn from_u64(value: u64) -> Self {
         let mut bytes = [0u8; 32];
         // Place u64 value in the first 8 bytes (little-endian)
         bytes[0..8].copy_from_slice(&value.to_le_bytes());
         Bytes32(bytes)
     }
-    
+
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }
-    
+
     // Helper to get the high and low limbs for Cairo memory representation
-    fn to_limbs(&self) -> [Felt252; 2] {        
+    fn to_limbs(&self) -> [Felt252; 2] {
         let mut low_limb = [0u8; 16];
         let mut high_limb = [0u8; 16];
-        
+
         low_limb.copy_from_slice(&self.0[16..32]);
         high_limb.copy_from_slice(&self.0[0..16]);
-        
+
         [
             Felt252::from_bytes_be_slice(&low_limb),
-            Felt252::from_bytes_be_slice(&high_limb)
+            Felt252::from_bytes_be_slice(&high_limb),
         ]
     }
 }
@@ -305,30 +345,42 @@ impl CairoType for Bytes32 {
         // Read the two limbs directly
         let low_felt = vm.get_integer((address + 0)?)?;
         let high_felt = vm.get_integer((address + 1)?)?;
-        
+
         // Convert to bytes with proper padding
         let low_bytes = low_felt.to_bytes_be();
         let high_bytes = high_felt.to_bytes_be();
-        
+
         let mut result = [0u8; 32];
-        
+
         // Copy high limb bytes to the first 16 bytes (with padding)
-        let high_start = if high_bytes.len() >= 16 { 0 } else { 16 - high_bytes.len() };
+        let high_start = if high_bytes.len() >= 16 {
+            0
+        } else {
+            16 - high_bytes.len()
+        };
         result[high_start..16].copy_from_slice(&high_bytes[..std::cmp::min(high_bytes.len(), 16)]);
-        
+
         // Copy low limb bytes to the last 16 bytes (with padding)
-        let low_start = if low_bytes.len() >= 16 { 0 } else { 16 + (16 - low_bytes.len()) };
+        let low_start = if low_bytes.len() >= 16 {
+            0
+        } else {
+            16 + (16 - low_bytes.len())
+        };
         result[low_start..32].copy_from_slice(&low_bytes[..std::cmp::min(low_bytes.len(), 16)]);
-        
+
         Ok(Self(result))
     }
 
-    fn to_memory(&self, vm: &mut VirtualMachine, address: Relocatable) -> Result<Relocatable, HintError> {
+    fn to_memory(
+        &self,
+        vm: &mut VirtualMachine,
+        address: Relocatable,
+    ) -> Result<Relocatable, HintError> {
         let limbs = self.to_limbs();
-        
+
         vm.insert_value((address + 0)?, &limbs[0])?;
         vm.insert_value((address + 1)?, &limbs[1])?;
-        
+
         Ok((address + 2)?)
     }
 

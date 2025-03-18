@@ -119,10 +119,7 @@ pub async fn handle_get_committee_hash(
 
 pub async fn handle_get_status(State(state): State<AppState>) -> impl IntoResponse {
     let last_epoch_in_progress = match state.db_manager.get_latest_epoch_in_progress().await {
-        Ok(Some(epoch)) => {
-            
-            epoch.to_u64().unwrap()
-        }
+        Ok(Some(epoch)) => epoch.to_u64().unwrap(),
         Ok(None) => 0,
         Err(_) => 0,
     };

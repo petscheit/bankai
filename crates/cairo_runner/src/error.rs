@@ -1,5 +1,12 @@
 use cairo_vm::{
-    air_public_input::PublicInputError, cairo_run::EncodeTraceError, types::errors::program_errors::ProgramError, vm::errors::{cairo_run_errors::CairoRunError, memory_errors::MemoryError, runner_errors::RunnerError, trace_errors::TraceError, vm_errors::VirtualMachineError}, Felt252
+    air_public_input::PublicInputError,
+    cairo_run::EncodeTraceError,
+    types::errors::program_errors::ProgramError,
+    vm::errors::{
+        cairo_run_errors::CairoRunError, memory_errors::MemoryError, runner_errors::RunnerError,
+        trace_errors::TraceError, vm_errors::VirtualMachineError,
+    },
+    Felt252,
 };
 use thiserror::Error;
 
@@ -32,7 +39,10 @@ pub enum Error {
     #[error("Function expects arguments of size {expected} and received {actual} instead.")]
     ArgumentsSizeMismatch { expected: i16, actual: i16 },
     #[error("Function param {param_index} only partially contains argument {arg_index}.")]
-    ArgumentUnaligned { param_index: usize, arg_index: usize },
+    ArgumentUnaligned {
+        param_index: usize,
+        arg_index: usize,
+    },
     #[error("Only programs returning `Array<Felt252>` can be currently proven. Try serializing the final values before returning them")]
     IlegalReturnValue,
     #[error(

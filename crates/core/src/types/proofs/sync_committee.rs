@@ -1,5 +1,5 @@
 //! Sync Committee Update Processing Implementation
-//! 
+//!
 //! This module handles the verification and processing of sync committee updates on the beacon chain.
 //! It provides functionality to create, manage, and verify sync committee transitions, including
 //! merkle proof generation and verification for committee membership.
@@ -32,7 +32,10 @@ pub struct SyncCommitteeUpdate {
 
 impl SyncCommitteeUpdate {
     pub fn name(&self) -> String {
-        format!("committee_{}", helpers::get_sync_committee_id_by_slot(self.circuit_inputs.beacon_slot) + 1)
+        format!(
+            "committee_{}",
+            helpers::get_sync_committee_id_by_slot(self.circuit_inputs.beacon_slot) + 1
+        )
     }
     /// Creates a new sync committee update for a given slot
     ///
@@ -52,7 +55,7 @@ impl SyncCommitteeUpdate {
             .await?;
         let circuit_inputs = CommitteeCircuitInputs::from(proof);
         let mut expected_circuit_outputs = ExpectedCircuitOutputs::from_inputs(&circuit_inputs);
-        
+
         // ToDo: revamp traits to prevent the pot. wrong root from being written
         let header_res = client.get_header(slot).await?;
         let state_root = header_res.data.header.message.state_root;
@@ -76,7 +79,10 @@ impl SyncCommitteeUpdate {
         T: serde::de::DeserializeOwned,
     {
         let committee_id = helpers::get_sync_committee_id_by_slot(slot) + 1;
-        let path = format!("batches/committee/committee_{}/input_{}.json", committee_id, slot);
+        let path = format!(
+            "batches/committee/committee_{}/input_{}.json",
+            committee_id, slot
+        );
         println!("path: {}", path);
         let json_string: String = fs::read_to_string(path)?;
         let json = serde_json::from_str(&json_string)?;

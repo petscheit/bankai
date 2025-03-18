@@ -1,13 +1,21 @@
 use std::sync::Arc;
 
 use alloy_rpc_types_beacon::events::HeadEvent;
-use bankai_core::{cairo_runner::generate_committee_update_pie, db::manager::DatabaseManager, types::{job::{AtlanticJobType, Job, JobStatus, JobType}, traits::{Exportable, ProofType}}, utils::{config, constants, helpers}, BankaiClient};
+use bankai_core::{
+    cairo_runner::generate_committee_update_pie,
+    db::manager::DatabaseManager,
+    types::{
+        job::{AtlanticJobType, Job, JobStatus, JobType},
+        traits::{Exportable, ProofType},
+    },
+    utils::{config, constants, helpers},
+    BankaiClient,
+};
 use tokio::sync::mpsc;
 use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::error::DaemonError;
-
 
 pub struct SyncCommitteeJobProcessor {
     db_manager: Arc<DatabaseManager>,
@@ -28,8 +36,14 @@ impl SyncCommitteeJobProcessor {
         let lowest_required_committee_update_slot =
             latest_verified_sync_committee_id * constants::SLOTS_PER_SYNC_COMMITTEE;
 
-        println!("lowest_required_committee_update_slot: {}", lowest_required_committee_update_slot);
-        println!("           latest_verified_epoch_slot: {}", latest_verified_epoch_slot);
+        println!(
+            "lowest_required_committee_update_slot: {}",
+            lowest_required_committee_update_slot
+        );
+        println!(
+            "           latest_verified_epoch_slot: {}",
+            latest_verified_epoch_slot
+        );
 
         // Only proceed if we're at or past the required slot
         if latest_verified_epoch_slot < lowest_required_committee_update_slot {
@@ -37,7 +51,8 @@ impl SyncCommitteeJobProcessor {
         }
 
         // The new sync committee is always included in the previous epoch when we decommit it, so we need to increment by 1 here
-        let potential_new_committee_id = helpers::get_sync_committee_id_by_slot(latest_verified_epoch_slot) + 1;
+        let potential_new_committee_id =
+            helpers::get_sync_committee_id_by_slot(latest_verified_epoch_slot) + 1;
         println!("potential_new_committee_id: {}", potential_new_committee_id);
 
         // Get latest committee progress information
@@ -45,17 +60,21 @@ impl SyncCommitteeJobProcessor {
             .get_latest_sync_committee_in_progress()
             .await?
             .unwrap_or(0);
-            
+
         let last_done_sync_committee = db_manager
             .get_latest_done_sync_committee()
             .await?
             .unwrap_or(0);
 
-        println!("last_sync_committee_in_progress: {}", last_sync_committee_in_progress);
+        println!(
+            "last_sync_committee_in_progress: {}",
+            last_sync_committee_in_progress
+        );
         println!("last_done_sync_committee: {}", last_done_sync_committee);
 
-        if potential_new_committee_id > last_sync_committee_in_progress &&
-        potential_new_committee_id > last_done_sync_committee {
+        if potential_new_committee_id > last_sync_committee_in_progress
+            && potential_new_committee_id > last_done_sync_committee
+        {
             let job_id = Uuid::new_v4();
             let job = Job {
                 job_id: job_id.clone(),
@@ -68,23 +87,18 @@ impl SyncCommitteeJobProcessor {
 
             match db_manager.create_job(job.clone()).await {
                 Ok(()) => return Ok(Some(job)),
-                Err(e) => return Err(e.into())
+                Err(e) => return Err(e.into()),
             }
         }
 
         Ok(None)
     }
 
-    pub async fn process_job(
-        &self,
-        job: Job,
-    ) -> Result<(), DaemonError> {
+    pub async fn process_job(&self, job: Job) -> Result<(), DaemonError> {
         if let Some(slot) = job.slot {
             let update_committee_id = helpers::get_sync_committee_id_by_slot(slot);
-            let update = self.bankai
-            .get_sync_committee_update(slot)
-            .await?;
-            
+            let update = self.bankai.get_sync_committee_update(slot).await?;
+
             let name = update.name();
 
             info!(
@@ -97,7 +111,7 @@ impl SyncCommitteeJobProcessor {
                 "[SYNC COMMITTEE JOB][{}] Circuit inputs saved at {:?}",
                 job.job_id, input_path
             );
-                
+
             self.db_manager
                 .update_job_status(job.job_id, JobStatus::ProgramInputsPrepared)
                 .await?;
@@ -107,7 +121,8 @@ impl SyncCommitteeJobProcessor {
                 job.job_id, update_committee_id
             );
 
-            let pie = generate_committee_update_pie(update, &self.bankai.config, None, None).await?;
+            let pie =
+                generate_committee_update_pie(update, &self.bankai.config, None, None).await?;
 
             self.db_manager
                 .update_job_status(job.job_id, JobStatus::PieGenerated)
@@ -121,7 +136,8 @@ impl SyncCommitteeJobProcessor {
             info!("[SYNC COMMITTEE JOB][{}] Sending committee update proof generation query to Atlantic: {}", 
                 job.job_id, update_committee_id);
 
-            let batch_id = self.bankai
+            let batch_id = self
+                .bankai
                 .atlantic_client
                 .submit_batch(pie, ProofType::SyncCommittee, name)
                 .await?;
@@ -143,9 +159,7 @@ impl SyncCommitteeJobProcessor {
                 job.job_id, batch_id
             );
         }
-       
+
         Ok(())
     }
 }
-
-   

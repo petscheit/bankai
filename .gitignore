@@ -1,8 +1,6 @@
 */target
+/target
 .idea
-
-lib
-node_modules
 
 cairo_programs/build
 cairo_programs/deps
@@ -12,19 +10,6 @@ build
 venv
 
 .DS_Store
-
-pie.zip
-*pie.zip
-*.log
-pie.encoded.txt
-
-client/epoch_data.json
-committee_input.json
-epoch_input.json
-epoch_batch_input.json
-nimbus-data
-
-**/*.pyc
 
 **/batches
 

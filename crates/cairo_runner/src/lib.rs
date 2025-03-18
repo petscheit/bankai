@@ -1,18 +1,19 @@
-pub mod hint_processor;
-pub mod error;
 pub mod committee_update;
-pub mod types;
 pub mod epoch_batch;
 pub mod epoch_update;
+pub mod error;
+pub mod hint_processor;
+pub mod types;
 use cairo_vm::{
     cairo_run::{self, cairo_run_program},
-    types::{layout_name::LayoutName, program::Program}, vm::runners::cairo_pie::CairoPie,
+    types::{layout_name::LayoutName, program::Program},
+    vm::runners::cairo_pie::CairoPie,
 };
+use committee_update::CommitteeUpdateCircuit;
 use epoch_batch::EpochUpdateBatchCircuit;
+use epoch_update::EpochUpdateCircuit;
 use error::Error;
 use hint_processor::CustomHintProcessor;
-use committee_update::CommitteeUpdateCircuit;
-use epoch_update::EpochUpdateCircuit;
 
 fn load_program(path: &str) -> Result<Program, Error> {
     let program_file = std::fs::read(path).map_err(Error::IO)?;
@@ -21,7 +22,7 @@ fn load_program(path: &str) -> Result<Program, Error> {
         layout: LayoutName::all_cairo,
         ..Default::default()
     };
-    
+
     let program = Program::from_bytes(&program_file, Some(cairo_run_config.entrypoint))?;
     Ok(program)
 }
@@ -51,7 +52,7 @@ pub fn run_epoch_update(path: &str, update: EpochUpdateCircuit) -> Result<CairoP
     let mut hint_processor = CustomHintProcessor::new(None, Some(update), None);
     let cairo_runner = cairo_run_program(&program, &cairo_run_config, &mut hint_processor)?;
     tracing::info!("{:?}", cairo_runner.get_execution_resources());
-    
+
     let pie = cairo_runner.get_cairo_pie()?;
     Ok(pie)
 }

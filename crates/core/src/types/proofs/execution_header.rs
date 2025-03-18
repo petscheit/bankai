@@ -4,7 +4,9 @@ use crate::clients::beacon_chain::{BeaconError, BeaconRpcClient};
 use alloy_primitives::FixedBytes;
 use beacon_state_proof::state_proof_fetcher::TreeHash;
 use beacon_types::light_client_update::EXECUTION_PAYLOAD_INDEX;
-use beacon_types::{BeaconBlockBody, Error as BeaconStateError, ExecPayload, ExecutionPayloadHeader, MainnetEthSpec};
+use beacon_types::{
+    BeaconBlockBody, Error as BeaconStateError, ExecPayload, ExecutionPayloadHeader, MainnetEthSpec,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -57,7 +59,9 @@ impl ExecutionHeaderProof {
 
         // Generate merkle proof components
         let body_ref = beacon_block_body.to_ref();
-        let path = body_ref.block_body_merkle_proof(EXECUTION_PAYLOAD_INDEX).map_err(|e| ExecutionHeaderError::BeaconState(e))?;
+        let path = body_ref
+            .block_body_merkle_proof(EXECUTION_PAYLOAD_INDEX)
+            .map_err(|e| ExecutionHeaderError::BeaconState(e))?;
         let leafs: Vec<FixedBytes<32>> = body_ref
             .body_merkle_leaves()
             .into_iter()

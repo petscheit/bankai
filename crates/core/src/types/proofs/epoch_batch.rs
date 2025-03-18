@@ -1,20 +1,27 @@
 //! Epoch Batch Processing Implementation
-//! 
+//!
 //! This module handles the batching of epoch updates for efficient processing and verification.
 //! It provides functionality to create, manage, and process batches of epoch updates,
 //! including merkle tree generation and proof verification.
 
 use crate::{
-    cairo_runner::CairoError, clients::ClientError, db::manager::{DatabaseError, DatabaseManager}, types::{
-        job::JobStatus, proofs::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs}, traits::{Exportable, Submittable}
-    }, utils::{
+    cairo_runner::CairoError,
+    clients::ClientError,
+    db::manager::{DatabaseError, DatabaseManager},
+    types::{
+        job::JobStatus,
+        proofs::epoch_update::{EpochUpdate, ExpectedEpochUpdateOutputs},
+        traits::{Exportable, Submittable},
+    },
+    utils::{
         constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE},
         hashing::get_committee_hash,
         helpers::{
             self, get_first_slot_for_epoch, get_sync_committee_id_by_epoch, slot_to_epoch_id,
         },
         merkle::poseidon::{compute_paths, compute_root, hash_path},
-    }, BankaiClient
+    },
+    BankaiClient,
 };
 
 use alloy_primitives::FixedBytes;

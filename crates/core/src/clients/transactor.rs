@@ -1,5 +1,5 @@
 //! Transactor Client Implementation
-//! 
+//!
 //! This module provides a client for interacting with a transaction processing service.
 //! It handles transaction submission, status checking, and polling for transaction completion.
 //! The transactor service provides an abstraction layer for submitting and managing blockchain transactions.
@@ -15,7 +15,7 @@ use tokio::time::{sleep, Duration};
 use tracing::{debug, trace};
 
 /// Client for interacting with the transactor service
-/// 
+///
 /// Provides functionality to submit transactions and monitor their status
 /// through a REST API endpoint with authentication.
 #[derive(Debug)]

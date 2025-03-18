@@ -1,9 +1,6 @@
 use crate::types::AppState;
 use axum::extract::State;
-use bankai_core::{
-    types::job::JobStatus,
-    utils::helpers,
-};
+use bankai_core::{types::job::JobStatus, utils::helpers};
 use num_traits::ToPrimitive;
 
 pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {

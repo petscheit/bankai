@@ -1,5 +1,5 @@
-use thiserror::Error;
 use bankai_core::types::job::Job;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum DaemonError {

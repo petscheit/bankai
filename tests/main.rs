@@ -1,13 +1,13 @@
 use bankai_core::cairo_runner::rust::{generate_epoch_batch_pie, generate_pie};
 use bankai_core::types::proofs::epoch_batch::EpochUpdateBatch;
 use bankai_core::types::proofs::sync_committee::SyncCommitteeUpdate;
+use futures::stream::{self, TryStreamExt};
+use futures::StreamExt;
 use std::env;
 use std::fs;
 use std::path::Path;
 use tokio::process::Command;
 use walkdir;
-use futures::stream::{self, TryStreamExt};
-use futures::StreamExt;
 
 #[tokio::main]
 async fn main() {
@@ -41,7 +41,7 @@ async fn main() {
 async fn run_tracegen_for_fixture() -> Result<(), Box<dyn std::error::Error>> {
     let fixtures = get_fixture_files();
     let current_exe = env::current_exe()?;
-    
+
     // Use try_for_each_concurrent so that a single failure returns an error.
     stream::iter(fixtures)
         .map(Ok)
@@ -64,21 +64,21 @@ async fn run_tracegen_for_fixture() -> Result<(), Box<dyn std::error::Error>> {
                             file_name, e
                         ))
                     })?;
-                
+
                 let status = child.wait().await.map_err(|e| {
                     Box::<dyn std::error::Error>::from(format!(
                         "ERROR: Failed to wait on fixture {}: {:?}",
                         file_name, e
                     ))
                 })?;
-                
+
                 if !status.success() {
                     return Err(Box::<dyn std::error::Error>::from(format!(
                         "ERROR: Fixture {}: Process exited with status: {:?}",
                         file_name, status
                     )));
                 }
-                
+
                 println!(
                     "[SUCCESS] Finished fixture: {} in {:?}",
                     file_name,
@@ -127,13 +127,7 @@ fn get_fixture_files() -> Vec<String> {
     walkdir::WalkDir::new(fixtures_dir)
         .into_iter()
         .filter_map(|entry| entry.ok())
-        .filter(|entry| {
-            entry
-                .path()
-                .extension()
-                .and_then(|ext| ext.to_str())
-                == Some("json")
-        })
+        .filter(|entry| entry.path().extension().and_then(|ext| ext.to_str()) == Some("json"))
         .map(|entry| entry.path().to_str().unwrap().to_owned())
         .collect()
 }
@@ -164,13 +158,7 @@ fn get_committee_fixture_files() -> Vec<String> {
     walkdir::WalkDir::new(fixtures_dir)
         .into_iter()
         .filter_map(|entry| entry.ok())
-        .filter(|entry| {
-            entry
-                .path()
-                .extension()
-                .and_then(|ext| ext.to_str())
-                == Some("json")
-        })
+        .filter(|entry| entry.path().extension().and_then(|ext| ext.to_str()) == Some("json"))
         .map(|entry| entry.path().to_str().unwrap().to_owned())
         .collect()
 }
@@ -184,7 +172,7 @@ async fn run_committee_fixtures() -> Result<(), Box<dyn std::error::Error>> {
             .and_then(|n| n.to_str())
             .unwrap();
         let start = std::time::Instant::now();
-        
+
         let content = fs::read_to_string(fixture.clone())?;
         let batch: SyncCommitteeUpdate = serde_json::from_str(&content).map_err(|e| {
             Box::<dyn std::error::Error>::from(format!(
@@ -204,12 +192,11 @@ async fn run_committee_fixtures() -> Result<(), Box<dyn std::error::Error>> {
                 ))
             })?;
 
-            
         println!(
-                "[SUCCESS] Finished committee fixture: {} in {:?}",
-                file_name,
-                start.elapsed()
-            );
+            "[SUCCESS] Finished committee fixture: {} in {:?}",
+            file_name,
+            start.elapsed()
+        );
     }
     Ok(())
 }

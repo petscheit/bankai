@@ -1,16 +1,15 @@
-pub mod hint_processor;
-pub mod error;
 pub mod committee_update;
-pub mod types;
 pub mod epoch_update;
+pub mod error;
+pub mod hint_processor;
+pub mod types;
 use cairo_vm::{
     cairo_run::{self, cairo_run_program},
     types::{layout_name::LayoutName, program::Program},
 };
+use committee_update::CommitteeUpdate;
 use error::Error;
 use hint_processor::CustomHintProcessor;
-use committee_update::CommitteeUpdate;
-
 
 fn main() -> Result<(), Error> {
     // Init CairoRunConfig
@@ -23,7 +22,7 @@ fn main() -> Result<(), Error> {
     let program_file = std::fs::read("../build/epoch_update.json").map_err(Error::IO)?;
 
     let update = CommitteeUpdate::from_file("committee_update_input.json").unwrap();
-    
+
     // Load the Program
     let program = Program::from_bytes(&program_file, Some(cairo_run_config.entrypoint))?;
 

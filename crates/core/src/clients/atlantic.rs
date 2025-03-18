@@ -1,5 +1,5 @@
 //! Atlantic Client Module
-//! 
+//!
 //! This module provides functionality to interact with the Atlantic API for proof generation
 //! and verification. It handles file uploads, proof submissions, and status polling for
 //! batch processing operations.
@@ -24,7 +24,7 @@ use tracing::{debug, error, info, trace};
 use crate::types::traits::ProofType;
 
 /// Client for interacting with the Atlantic API service.
-/// 
+///
 /// Provides methods for submitting proofs, checking batch statuses,
 /// and retrieving generated proofs from the Atlantic service.
 #[derive(Debug)]
@@ -65,7 +65,7 @@ pub enum AtlanticError {
 
 impl AtlanticClient {
     /// Creates a new Atlantic client instance.
-    /// 
+    ///
     /// # Arguments
     /// * `endpoint` - The base URL for the Atlantic API
     /// * `api_key` - Authentication key for API access
@@ -78,21 +78,26 @@ impl AtlanticClient {
     }
 
     /// Submits a batch for proof generation.
-    /// 
+    ///
     /// Uploads a PIE file to the Atlantic API and initiates proof generation.
     /// Displays progress during file upload.
-    /// 
+    ///
     /// # Arguments
     /// * `pie` - The generate Pie
-    /// 
+    ///
     /// # Returns
     /// * `Result<String, AtlanticError>` - The Atlantic query ID on success
-    pub async fn submit_batch(&self, pie: CairoPie, proof_type: ProofType, name: String) -> Result<String, AtlanticError> {
+    pub async fn submit_batch(
+        &self,
+        pie: CairoPie,
+        proof_type: ProofType,
+        name: String,
+    ) -> Result<String, AtlanticError> {
         let pie_path = std::env::temp_dir().join(format!("{}.zip", name));
         pie.write_zip_file(&pie_path, true)?;
         println!("{}", pie_path.display());
         let file = fs::File::open(pie_path.clone()).await?;
-        
+
         // Get file metadata to determine total size
         let metadata = fs::metadata(&pie_path).await?;
         let total_bytes = metadata.len();
@@ -141,7 +146,7 @@ impl AtlanticClient {
             ProofType::SyncCommittee => "XS",
             ProofType::EpochBatch => "S",
         };
-        
+
         // Build the form with updated API parameters
         let form = Form::new()
             .part("pieFile", file_part)
@@ -180,17 +185,22 @@ impl AtlanticClient {
     }
 
     /// Submits a wrapped proof to the Atlantic API.
-    /// 
+    ///
     /// # Arguments
     /// * `proof` - The STARK proof to be wrapped
-    /// 
+    ///
     /// # Returns
     /// * `Result<String, AtlanticError>` - The Atlantic query ID on success
-    pub async fn submit_wrapped_proof(&self, proof: StarkProof, program_path: String, name: String) -> Result<String, AtlanticError> {
+    pub async fn submit_wrapped_proof(
+        &self,
+        proof: StarkProof,
+        program_path: String,
+        name: String,
+    ) -> Result<String, AtlanticError> {
         info!("Uploading to Atlantic...");
         // Serialize the proof to JSON string
         let proof_json = serde_json::to_string(&proof)?;
-        
+
         let program = fs::read(program_path).await?;
         let program_part = Part::bytes(program)
             .file_name("program.json") // Provide a filename
@@ -241,10 +251,10 @@ impl AtlanticClient {
     }
 
     /// Fetches a generated proof from the proof registry.
-    /// 
+    ///
     /// # Arguments
     /// * `batch_id` - The ID of the batch to fetch the proof for
-    /// 
+    ///
     /// # Returns
     /// * `Result<StarkProof, AtlanticError>` - The generated STARK proof
     pub async fn fetch_proof(&self, batch_id: &str) -> Result<StarkProof, AtlanticError> {
@@ -267,10 +277,10 @@ impl AtlanticClient {
     }
 
     /// Checks the current status of a batch processing request.
-    /// 
+    ///
     /// # Arguments
     /// * `batch_id` - The ID of the batch to check
-    /// 
+    ///
     /// # Returns
     /// * `Result<String, AtlanticError>` - The current status of the batch
     pub async fn check_batch_status(&self, batch_id: &str) -> Result<String, AtlanticError> {
@@ -292,12 +302,12 @@ impl AtlanticClient {
     }
 
     /// Polls the batch status until completion or failure.
-    /// 
+    ///
     /// # Arguments
     /// * `batch_id` - The ID of the batch to poll
     /// * `sleep_duration` - Duration to wait between polling attempts
     /// * `max_retries` - Maximum number of polling attempts
-    /// 
+    ///
     /// # Returns
     /// * `Result<bool, AtlanticError>` - True if batch completed successfully
     pub async fn poll_batch_status_until_done(

@@ -1,5 +1,5 @@
 //! StarkNet Client Implementation
-//! 
+//!
 //! This module provides a high-level client for interacting with the StarkNet blockchain.
 //! It handles contract deployment, transaction submission, and various query operations
 //! through a StarkNet RPC endpoint.
@@ -34,7 +34,7 @@ use crate::{
 use thiserror::Error;
 
 /// Main client struct for interacting with StarkNet
-/// 
+///
 /// Provides high-level access to StarkNet operations through a connected account.
 /// The client handles transaction signing, submission and status tracking.
 #[derive(Debug)]

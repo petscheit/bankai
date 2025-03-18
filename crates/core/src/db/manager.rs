@@ -1,5 +1,5 @@
 //! Database Manager Implementation
-//! 
+//!
 //! This module provides a PostgreSQL database interface for managing jobs, epochs, and sync committees.
 //! It handles all database operations including job tracking, status updates, and verification data storage.
 //! The manager provides a robust interface for tracking the state of various blockchain operations.
@@ -62,7 +62,7 @@ impl TryInto<Job> for JobSchema {
 
     fn try_into(self) -> Result<Job, Self::Error> {
         let slot = i64_to_u64(self.slot)?;
-        
+
         Ok(Job {
             job_id: self.job_uuid,
             job_type: self.job_type,
@@ -224,7 +224,10 @@ impl DatabaseManager {
             .await?;
 
         if rows_affected == 0 {
-            debug!("Epoch {} already exists in verified_epoch table, skipping insertion", epoch_id);
+            debug!(
+                "Epoch {} already exists in verified_epoch table, skipping insertion",
+                epoch_id
+            );
         }
 
         Ok(())
@@ -368,29 +371,57 @@ impl DatabaseManager {
 
     pub async fn fetch_jobs_in_proof_generation(&self) -> Result<Vec<Job>, DatabaseError> {
         let rows = self.client.query("SELECT * FROM jobs WHERE job_status IN ('OFFCHAIN_PROOF_REQUESTED', 'WRAP_PROOF_REQUESTED')", &[]).await?;
-        let jobs = rows.into_iter().map(Self::map_row_to_job).collect::<Result<Vec<_>, _>>()?;
-        Ok(jobs.into_iter().map(|job| job.try_into().unwrap()).collect())
+        let jobs = rows
+            .into_iter()
+            .map(Self::map_row_to_job)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(jobs
+            .into_iter()
+            .map(|job| job.try_into().unwrap())
+            .collect())
     }
 
     pub async fn fetch_jobs_waiting_for_broadcast(&self) -> Result<Vec<Job>, DatabaseError> {
-        let rows = self.client.query("SELECT * FROM jobs WHERE job_status IN ('OFFCHAIN_COMPUTATION_FINISHED')", &[]).await?;
-        let jobs = rows.into_iter().map(Self::map_row_to_job).collect::<Result<Vec<_>, _>>()?;
-        Ok(jobs.into_iter().map(|job| job.try_into().unwrap()).collect())
+        let rows = self
+            .client
+            .query(
+                "SELECT * FROM jobs WHERE job_status IN ('OFFCHAIN_COMPUTATION_FINISHED')",
+                &[],
+            )
+            .await?;
+        let jobs = rows
+            .into_iter()
+            .map(Self::map_row_to_job)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(jobs
+            .into_iter()
+            .map(|job| job.try_into().unwrap())
+            .collect())
     }
 
     pub async fn fetch_retryable_jobs(&self, retry_limit: i64) -> Result<Vec<Job>, DatabaseError> {
-        let rows: Vec<Row> = self.client.query(
-            "SELECT * FROM jobs 
+        let rows: Vec<Row> = self
+            .client
+            .query(
+                "SELECT * FROM jobs 
             WHERE job_status = 'ERROR' 
             AND (retries_count IS NULL OR retries_count < $1)",
-            &[&retry_limit]
-        ).await?;
-        let jobs = rows.into_iter().map(Self::map_row_to_job).collect::<Result<Vec<_>, _>>()?;
-        Ok(jobs.into_iter().map(|job| job.try_into().unwrap()).collect())
+                &[&retry_limit],
+            )
+            .await?;
+        let jobs = rows
+            .into_iter()
+            .map(Self::map_row_to_job)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(jobs
+            .into_iter()
+            .map(|job| job.try_into().unwrap())
+            .collect())
     }
 
     pub async fn fetch_interrupted_jobs(&self) -> Result<Vec<Job>, DatabaseError> {
-        let rows = self.client
+        let rows = self
+            .client
             .query(
                 "SELECT * FROM jobs WHERE job_status NOT IN ($1, $2, $3, $4, $5, $6)",
                 &[
@@ -403,11 +434,16 @@ impl DatabaseManager {
                 ],
             )
             .await?;
-        
-        let jobs = rows.into_iter().map(Self::map_row_to_job).collect::<Result<Vec<_>, _>>()?;
-        Ok(jobs.into_iter().map(|job| job.try_into().unwrap()).collect())
-    }
 
+        let jobs = rows
+            .into_iter()
+            .map(Self::map_row_to_job)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(jobs
+            .into_iter()
+            .map(|job| job.try_into().unwrap())
+            .collect())
+    }
 
     /// Gets the latest epoch that is in progress
     ///
@@ -492,11 +528,13 @@ impl DatabaseManager {
         // Extract and return the slot ID
         if let Some(row) = row_opt {
             let value = row.get::<_, i64>("slot");
-            Ok(Some(helpers::slot_to_sync_committee_id(
-                value
-                    .to_u64()
-                    .ok_or(DatabaseError::IntegerConversion(value.to_string()))?,
-            ) + 1))
+            Ok(Some(
+                helpers::slot_to_sync_committee_id(
+                    value
+                        .to_u64()
+                        .ok_or(DatabaseError::IntegerConversion(value.to_string()))?,
+                ) + 1,
+            ))
         } else {
             Ok(Some(0))
         }
@@ -523,11 +561,13 @@ impl DatabaseManager {
         // Extract and return the slot ID
         if let Some(row) = row_opt {
             let value = row.get::<_, i64>("slot");
-            Ok(Some(helpers::slot_to_sync_committee_id(
-                value
-                    .to_u64()
-                    .ok_or(DatabaseError::IntegerConversion(value.to_string()))?,
-            ) + 1))
+            Ok(Some(
+                helpers::slot_to_sync_committee_id(
+                    value
+                        .to_u64()
+                        .ok_or(DatabaseError::IntegerConversion(value.to_string()))?,
+                ) + 1,
+            ))
         } else {
             Ok(Some(0))
         }
@@ -777,7 +817,11 @@ impl DatabaseManager {
     ///
     /// # Returns
     /// * `Result<(), DatabaseError>` - Success or error
-    pub async fn increase_job_retry_counter(&self, job_id: Uuid, weight: u64) -> Result<(), DatabaseError> {
+    pub async fn increase_job_retry_counter(
+        &self,
+        job_id: Uuid,
+        weight: u64,
+    ) -> Result<(), DatabaseError> {
         self.client
             .execute(
                 "UPDATE jobs SET retries_count = COALESCE(retries_count, 0) + $1, updated_at = NOW() WHERE job_uuid = $2",
