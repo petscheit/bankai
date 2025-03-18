@@ -1,0 +1,10 @@
+/Users/paul/Documents/projects/cairo_ethereum/target/release/deps/libcairo_lang_formatter-7ca30b85fd76daa4.rmeta: /Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/lib.rs /Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/cairo_formatter.rs /Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/formatter_impl.rs /Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/node_properties.rs
+
+/Users/paul/Documents/projects/cairo_ethereum/target/release/deps/libcairo_lang_formatter-7ca30b85fd76daa4.rlib: /Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/lib.rs /Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/cairo_formatter.rs /Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/formatter_impl.rs /Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/node_properties.rs
+
+/Users/paul/Documents/projects/cairo_ethereum/target/release/deps/cairo_lang_formatter-7ca30b85fd76daa4.d: /Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/lib.rs /Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/cairo_formatter.rs /Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/formatter_impl.rs /Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/node_properties.rs
+
+/Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/lib.rs:
+/Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/cairo_formatter.rs:
+/Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/formatter_impl.rs:
+/Users/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cairo-lang-formatter-2.11.0/src/node_properties.rs:
