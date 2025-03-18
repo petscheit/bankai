@@ -33,6 +33,7 @@ pub async fn process_offchain_proof_stage(job: Job, db_manager: Arc<DatabaseMana
                 .check_batch_status(&batch_id)
                 .await?;
 
+        info!("[OFFCHAIN PROOF JOB][{}] Atlantic job status: {}", job.job_id, status);
         if status == "DONE" {
             info!(
                 "[OFFCHAIN PROOF JOB][{}] Proof generation done by Atlantic. QueryID: {}",
@@ -70,6 +71,15 @@ pub async fn process_offchain_proof_stage(job: Job, db_manager: Arc<DatabaseMana
                     AtlanticJobType::ProofWrapping,
                 )
                 .await?;
+        } else if status == "FAILED" {
+            error!("[OFFCHAIN PROOF JOB][{}] Proof wrapping failed by Atlantic. QueryID: {:?}",
+                job.job_id, job_data.atlantic_proof_wrapper_batch_id.unwrap()
+            );
+            return Err(DaemonError::OffchainProofFailed(job.job_id.to_string()));
+        } else {
+            info!("[OFFCHAIN PROOF JOB][{}] Proof wrapping not done by Atlantic yet. QueryID: {:?}",
+                job.job_id, job_data.atlantic_proof_wrapper_batch_id.unwrap()
+            );
         }
     }
     Ok(())
@@ -156,6 +166,11 @@ pub async fn process_committee_wrapping_stage(job: Job, db_manager: Arc<Database
                     sync_committee_hash_str,
                 )
                 .await?;
+        }  else if status == "FAILED" {
+            error!("[SYNC COMMITTEE JOB][{}] Proof wrapping failed by Atlantic. QueryID: {:?}",
+                job.job_id, job_data.atlantic_proof_wrapper_batch_id.unwrap()
+            );
+            return Err(DaemonError::ProofWrappingFailed(job.job_id.to_string()));
         } else {
             info!("[SYNC COMMITTEE JOB][{}] Proof wrapping not done by Atlantic yet. QueryID: {:?}",
                 job.job_id, job_data.atlantic_proof_wrapper_batch_id.unwrap()
@@ -182,65 +197,16 @@ pub async fn process_epoch_batch_wrapping_stage(job: Job, db_manager: Arc<Databa
                 .update_job_status(job.job_id, JobStatus::WrappedProofDone)
                 .await?;
 
-            let update = EpochUpdateBatch::from_json::<EpochUpdateBatch>(
-                job.batch_range_begin_epoch.unwrap(), 
-                job.batch_range_end_epoch.unwrap()
-            ).map_err(|e| bankai_core::types::proofs::ProofError::EpochBatch(e))?;
-
             info!(
                 "[EPOCH BATCH JOB][{}] Proof wrapping done by Atlantic. QueryID: {:?}",
                 job.job_id, job_data.atlantic_proof_wrapper_batch_id.unwrap()
             );
 
-            // Acquire the semaphore permit before submitting the update
-            let _permit = get_semaphore().acquire().await.expect("Failed to acquire semaphore");
-            info!("[EPOCH BATCH JOB][{}] Acquired submission permit, proceeding with on-chain update", job.job_id);
-            
-            let tx_hash = bankai
-                .starknet_client
-                .submit_update(
-                    update.expected_circuit_outputs.clone(),
-                    &bankai.config,
-                )
-                .await?;
-    
-            info!("[EPOCH BATCH JOB][{}] Successfully called epoch batch update onchain, transaction confirmed, txhash: {}", 
-                job.job_id, tx_hash);
-
-            db_manager.set_job_txhash(job.job_id, tx_hash).await?;
-
-            bankai.starknet_client.wait_for_confirmation(tx_hash).await?;
-            
-            // Permit is automatically released when _permit goes out of scope
-            
-            info!("[EPOCH BATCH JOB][{}] Transaction is confirmed on-chain!", job.job_id);
-            db_manager
-                .update_job_status(job.job_id, JobStatus::Done)
-                .await?;
-
-            let batch_root = update.expected_circuit_outputs.batch_root;
-            for (index, epoch) in update.circuit_inputs.epochs.iter().enumerate() {
-                {
-                    info!(
-                        "[EPOCH BATCH JOB][{}] Inserting epoch data to DB: Index in batch: {}: {:?}",
-                        job.job_id, index, epoch.expected_circuit_outputs
-                    );
-                    db_manager
-                        .insert_verified_epoch_decommitment_data(
-                            helpers::slot_to_epoch_id(epoch.expected_circuit_outputs.slot), //index.to_u64().unwrap(),
-                            epoch.expected_circuit_outputs.beacon_header_root,
-                            epoch.expected_circuit_outputs.beacon_state_root,
-                            epoch.expected_circuit_outputs.slot,
-                            epoch.expected_circuit_outputs.committee_hash,
-                            epoch.expected_circuit_outputs.n_signers,
-                            epoch.expected_circuit_outputs.execution_header_hash,
-                            epoch.expected_circuit_outputs.execution_header_height,
-                            index,
-                            batch_root,
-                        )
-                        .await?;
-                }
-            }
+        } else if status == "FAILED" {
+            error!("[EPOCH BATCH JOB][{}] Proof wrapping failed by Atlantic. QueryID: {:?}",
+                job.job_id, job_data.atlantic_proof_wrapper_batch_id.unwrap()
+            );
+            return Err(DaemonError::ProofWrappingFailed(job.job_id.to_string()));
         } else {
             info!("[EPOCH BATCH JOB][{}] Proof wrapping not done by Atlantic yet. QueryID: {:?}",
                 job.job_id, job_data.atlantic_proof_wrapper_batch_id.unwrap()

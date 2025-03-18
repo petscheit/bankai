@@ -23,4 +23,8 @@ pub enum DaemonError {
     Send(#[from] tokio::sync::mpsc::error::SendError<Job>),
     #[error("Transactor error: {0}")]
     Transactor(#[from] bankai_core::clients::transactor::TransactorError),
+    #[error("Proof wrapping failed: {0}")]
+    ProofWrappingFailed(String),
+    #[error("Offchain proof job failed: {0}")]
+    OffchainProofFailed(String),
 }
