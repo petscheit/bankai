@@ -55,8 +55,8 @@ impl CairoType for Uint256 {
         address: Relocatable,
     ) -> Result<Relocatable, HintError> {
         let limbs = self.to_limbs();
-        vm.insert_value((address + 0)?, &limbs[0])?;
-        vm.insert_value((address + 1)?, &limbs[1])?;
+        vm.insert_value((address + 0)?, limbs[0])?;
+        vm.insert_value((address + 1)?, limbs[1])?;
         Ok((address + 2)?)
     }
 
@@ -116,8 +116,8 @@ impl CairoType for Uint256Bits32 {
     ) -> Result<Relocatable, HintError> {
         let limbs = self.to_limbs();
 
-        for i in 0..8 {
-            vm.insert_value((address + i)?, &limbs[i])?;
+        for (i, limb) in limbs.iter().enumerate() {
+            vm.insert_value((address + i)?, *limb)?;
         }
 
         Ok((address + 8)?)
@@ -179,10 +179,10 @@ impl CairoType for UInt384 {
     ) -> Result<Relocatable, HintError> {
         let limbs = self.to_limbs();
 
-        vm.insert_value((address + 0)?, &limbs[0])?;
-        vm.insert_value((address + 1)?, &limbs[1])?;
-        vm.insert_value((address + 2)?, &limbs[2])?;
-        vm.insert_value((address + 3)?, &limbs[3])?;
+        vm.insert_value((address + 0)?, limbs[0])?;
+        vm.insert_value((address + 1)?, limbs[1])?;
+        vm.insert_value((address + 2)?, limbs[2])?;
+        vm.insert_value((address + 3)?, limbs[3])?;
 
         Ok((address + 4)?)
     }
@@ -206,7 +206,7 @@ impl CairoType for Felt {
         vm: &mut VirtualMachine,
         address: Relocatable,
     ) -> Result<Relocatable, HintError> {
-        vm.insert_value((address + 0)?, &self.0)?;
+        vm.insert_value((address + 0)?, self.0)?;
         Ok((address + 1)?)
     }
 
@@ -378,8 +378,8 @@ impl CairoType for Bytes32 {
     ) -> Result<Relocatable, HintError> {
         let limbs = self.to_limbs();
 
-        vm.insert_value((address + 0)?, &limbs[0])?;
-        vm.insert_value((address + 1)?, &limbs[1])?;
+        vm.insert_value((address + 0)?, limbs[0])?;
+        vm.insert_value((address + 1)?, limbs[1])?;
 
         Ok((address + 2)?)
     }

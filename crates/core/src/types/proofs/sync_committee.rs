@@ -98,7 +98,7 @@ impl Exportable for SyncCommitteeUpdate {
     fn export(&self) -> Result<String, ProofError> {
         let json = serde_json::to_string_pretty(&self).unwrap();
         let dir_path = format!("batches/committee/{}", self.name());
-        let _ = fs::create_dir_all(&dir_path).map_err(SyncCommitteeError::Io)?;
+        fs::create_dir_all(&dir_path).map_err(SyncCommitteeError::Io)?;
 
         let path = format!(
             "{}/input_{}.json",

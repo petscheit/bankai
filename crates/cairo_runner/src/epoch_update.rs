@@ -220,7 +220,7 @@ pub fn hint_check_fork_version(
     // Store the fork value in the Cairo program
     let fork =
         get_relocatable_from_var_name("fork", vm, &hint_data.ids_data, &hint_data.ap_tracking)?;
-    vm.insert_value(fork, &Felt252::from(latest_fork))?;
+    vm.insert_value(fork, Felt252::from(latest_fork))?;
 
     Ok(())
 }
@@ -314,7 +314,7 @@ fn write_signer_data(
 
     // Create segment for non-signers and store its pointer
     let non_signers_segment = vm.add_memory_segment();
-    vm.insert_value(ptr, &non_signers_segment)?;
+    vm.insert_value(ptr, non_signers_segment)?;
 
     // Write all non-signers to the segment
     let mut segment_ptr = non_signers_segment;
@@ -323,7 +323,7 @@ fn write_signer_data(
     }
 
     // Store the length of non-signers
-    vm.insert_value((ptr + 1)?, &Felt252::from(circuit_inputs.non_signers.len()))?;
+    vm.insert_value((ptr + 1)?, Felt252::from(circuit_inputs.non_signers.len()))?;
 
     Ok((ptr + 2)?)
 }
@@ -338,14 +338,14 @@ fn write_execution_header_proof(
 
     // Create and write path segment
     let path_segment = vm.add_memory_segment();
-    vm.insert_value(ptr, &path_segment)?;
+    vm.insert_value(ptr, path_segment)?;
     ptr = (ptr + 1)?;
 
     // Write each path element
     let mut path_ptr = path_segment;
     for path_element in &proof.path {
         let element_segment = vm.add_memory_segment();
-        vm.insert_value(path_ptr, &element_segment)?;
+        vm.insert_value(path_ptr, element_segment)?;
         path_ptr = (path_ptr + 1)?;
 
         path_element.to_memory(vm, element_segment)?;
@@ -357,7 +357,7 @@ fn write_execution_header_proof(
 
     // Create and write payload fields segment
     let payload_fields_segment = vm.add_memory_segment();
-    vm.insert_value(ptr, &payload_fields_segment)?;
+    vm.insert_value(ptr, payload_fields_segment)?;
 
     // Write each payload field
     let mut payload_fields_ptr = payload_fields_segment;

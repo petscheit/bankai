@@ -38,6 +38,7 @@ pub(crate) mod sha256 {
         value
     }
 
+    #[allow(dead_code)]
     pub fn generate_path(
         leaves: Vec<FixedBytes<32>>,
         leaf_index: usize,

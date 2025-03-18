@@ -190,6 +190,7 @@ impl DatabaseManager {
     ///
     /// # Returns
     /// * `Result<(), DatabaseError>` - Success or error
+    #[allow(clippy::too_many_arguments)]
     pub async fn insert_verified_epoch_decommitment_data(
         &self,
         epoch_id: u64,

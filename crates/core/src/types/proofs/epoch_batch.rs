@@ -17,7 +17,7 @@ use crate::{
         constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE},
         hashing::get_committee_hash,
         helpers::{
-            self, get_first_slot_for_epoch, get_sync_committee_id_by_epoch, slot_to_epoch_id,
+            self, get_first_slot_for_epoch, slot_to_epoch_id,
         },
         merkle::poseidon::{compute_paths, compute_root, hash_path},
     },
@@ -202,17 +202,8 @@ impl EpochUpdateBatch {
         let mut epochs = vec![];
 
         // Fetch epochs sequentially from start_slot to end_slot, incrementing by 32 each time
-        let calculated_batch_size = end_epoch - start_epoch + 1;
         let mut current_epoch = start_epoch;
         while current_epoch <= end_epoch {
-            // info!(
-            //     "Getting data for Epoch: {} (SyncCommittee: {}) First slot for this epoch: {} | Epochs batch position {}/{}",
-            //     current_epoch,
-            //     get_sync_committee_id_by_epoch(current_epoch),
-            //     get_first_slot_for_epoch(current_epoch),
-            //     epochs.len()+1,
-            //     calculated_batch_size
-            // );
             let epoch_update =
                 EpochUpdate::new(&bankai.client, get_first_slot_for_epoch(current_epoch)).await?;
 
@@ -334,12 +325,12 @@ impl Exportable for EpochUpdateBatch {
             .slot;
         let last_epoch = helpers::slot_to_epoch_id(last_slot);
         let dir_path = format!("batches/epoch_batch/{}_to_{}", first_epoch, last_epoch);
-        let _ = fs::create_dir_all(dir_path.clone()).map_err(EpochBatchError::Io)?;
+        fs::create_dir_all(dir_path.clone()).map_err(EpochBatchError::Io)?;
         let path = format!(
             "{}/input_batch_{}_to_{}.json",
             dir_path, first_epoch, last_epoch
         );
-        let _ = fs::write(path.clone(), json).map_err(EpochBatchError::Io)?;
+        fs::write(path.clone(), json).map_err(EpochBatchError::Io)?;
         Ok(path)
     }
 }

@@ -1,4 +1,3 @@
-use std::env;
 
 use crate::utils::constants::{
     EPOCHS_PER_SYNC_COMMITTEE, SLOTS_PER_EPOCH, SLOTS_PER_SYNC_COMMITTEE, TARGET_BATCH_SIZE,
@@ -14,7 +13,7 @@ pub fn slot_to_sync_committee_id(slot: u64) -> u64 {
 }
 
 pub fn calculate_slots_range_for_batch(first_slot: u64) -> (u64, u64) {
-    let start_slot = (u64::try_from(first_slot).unwrap() / 32) * 32 + 32;
+    let start_slot = (first_slot / 32) * 32 + 32;
     let term = start_slot / 0x2000;
     let mut end_slot = (term + 1) * 0x2000 - 32;
 

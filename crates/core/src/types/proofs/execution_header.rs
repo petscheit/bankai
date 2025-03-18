@@ -61,7 +61,7 @@ impl ExecutionHeaderProof {
         let body_ref = beacon_block_body.to_ref();
         let path = body_ref
             .block_body_merkle_proof(EXECUTION_PAYLOAD_INDEX)
-            .map_err(|e| ExecutionHeaderError::BeaconState(e))?;
+            .map_err(ExecutionHeaderError::BeaconState)?;
         let leafs: Vec<FixedBytes<32>> = body_ref
             .body_merkle_leaves()
             .into_iter()

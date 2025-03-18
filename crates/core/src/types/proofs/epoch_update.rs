@@ -143,12 +143,12 @@ impl Exportable for EpochUpdate {
     fn export(&self) -> Result<String, ProofError> {
         let json = serde_json::to_string_pretty(&self).unwrap();
         let dir_path = format!("batches/epoch/{}", self.circuit_inputs.header.slot);
-        let _ = fs::create_dir_all(dir_path.clone()).map_err(EpochUpdateError::Io)?;
+        fs::create_dir_all(dir_path.clone()).map_err(EpochUpdateError::Io)?;
         let path = format!(
             "{}/input_{}.json",
             dir_path, self.circuit_inputs.header.slot
         );
-        let _ = fs::write(path.clone(), json).map_err(EpochUpdateError::Io)?;
+        fs::write(path.clone(), json).map_err(EpochUpdateError::Io)?;
         Ok(path)
     }
 }
