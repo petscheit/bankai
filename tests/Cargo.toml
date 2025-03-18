@@ -7,8 +7,6 @@ edition = "2021"
 name = "bankai-tests"
 path = "main.rs"
 
-[workspace]
-
 [dependencies]
 bankai-core = { path = "../crates/core" }
 tokio = { version = "1.0", features = ["full"] }

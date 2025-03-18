@@ -1,1 +1,0 @@
-{"rustc":16090279689546867032,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[14835761409290646895,"build_script_build",false,5978032843789902199]],"local":[{"RerunIfChanged":{"output":"release/build/genco-macros-7edc86b1c273ff0e/output","paths":["build.rs"]}}],"rustflags":[],"config":0,"compile_kind":0}
