@@ -74,6 +74,9 @@ pub async fn broadcast_epoch_batch(
             .submit_update(update.expected_circuit_outputs.clone(), &bankai.config)
             .await?;
 
+        // Add a small delay after submission before checking status
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
         info!("[EPOCH BATCH JOB][{}] Successfully called epoch batch update onchain, transaction confirmed, txhash: {}", 
             job.job_id, tx_hash);
 

@@ -105,7 +105,7 @@ impl CustomHintProcessor {
             {
                 let branch_segment = vm.add_memory_segment();
                 branch.to_memory(vm, branch_segment)?;
-                vm.insert_value((path_ptr + i)?, &branch_segment)?;
+                vm.insert_value((path_ptr + i)?, branch_segment)?;
             }
 
             let path_len_ptr = get_relocatable_from_var_name(
@@ -121,7 +121,7 @@ impl CustomHintProcessor {
                     .next_sync_committee_branch
                     .len(),
             );
-            vm.insert_value(path_len_ptr, &path_len)?;
+            vm.insert_value(path_len_ptr, path_len)?;
 
             Ok(())
         } else {
@@ -177,7 +177,7 @@ impl CustomHintProcessor {
             &hint_data.ap_tracking,
         )?;
         let committee_hash = Uint256::from_memory(vm, committee_hash_ptr)?;
-        if &committee_hash != &expected_outputs.committee_hash {
+        if committee_hash != expected_outputs.committee_hash {
             return Err(HintError::AssertionFailed(
                 format!(
                     "Invalid committee hash: {:?} != {:?}",

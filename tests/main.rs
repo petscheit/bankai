@@ -1,4 +1,4 @@
-use bankai_core::cairo_runner::rust::{generate_epoch_batch_pie, generate_pie};
+use bankai_core::cairo_runner::{generate_committee_update_pie, generate_epoch_batch_pie};
 use bankai_core::types::proofs::epoch_batch::EpochUpdateBatch;
 use bankai_core::types::proofs::sync_committee::SyncCommitteeUpdate;
 use futures::stream::{self, TryStreamExt};
@@ -7,7 +7,6 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use tokio::process::Command;
-use walkdir;
 
 #[tokio::main]
 async fn main() {
@@ -183,7 +182,7 @@ async fn run_committee_fixtures() -> Result<(), Box<dyn std::error::Error>> {
         let config = bankai_core::utils::config::BankaiConfig::test_config();
 
         // Run the cryptographic operation.
-        generate_pie(batch, &config, None, None)
+        generate_committee_update_pie(batch, &config, None, None)
             .await
             .map_err(|e| {
                 Box::<dyn std::error::Error>::from(format!(

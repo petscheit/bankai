@@ -11,6 +11,7 @@ members = [
     "crates/daemon",
     "crates/cairo_runner",
 ]
+exclude = ["tests"]
 
 [workspace.dependencies]
 # Serialization
