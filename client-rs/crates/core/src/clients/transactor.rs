@@ -206,7 +206,7 @@ impl TransactorClient {
                     .iter()
                     .map(|felt| felt.to_hex_string())
                     .collect(),
-                method_selector: "".to_string(),
+                method_selector: update.get_contract_selector().to_hex_string(),
                 contract_address: config.contract_address.clone().to_hex_string(),
             }],
         };

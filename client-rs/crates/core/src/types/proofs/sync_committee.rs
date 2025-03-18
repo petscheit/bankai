@@ -9,7 +9,7 @@ use std::fs;
 use crate::{
     clients::beacon_chain::{BeaconError, BeaconRpcClient},
     types::traits::{Exportable, Submittable},
-    utils::{hashing::get_committee_hash, merkle},
+    utils::{hashing::get_committee_hash, helpers, merkle},
 };
 use alloy_primitives::FixedBytes;
 use beacon_state_proof::state_proof_fetcher::{StateProofFetcher, SyncCommitteeProof, TreeHash};
@@ -31,6 +31,9 @@ pub struct SyncCommitteeUpdate {
 }
 
 impl SyncCommitteeUpdate {
+    pub fn name(&self) -> String {
+        format!("committee_{}", helpers::get_sync_committee_id_by_slot(self.circuit_inputs.beacon_slot))
+    }
     /// Creates a new sync committee update for a given slot
     ///
     /// # Arguments
@@ -72,7 +75,8 @@ impl SyncCommitteeUpdate {
     where
         T: serde::de::DeserializeOwned,
     {
-        let path = format!("batches/committee/{}/input_{}.json", slot, slot);
+        let committee_id = helpers::get_sync_committee_id_by_slot(slot);
+        let path = format!("batches/committee/committee_{}/input_{}.json", committee_id, slot);
         let json_string: String = fs::read_to_string(path)?;
         let json = serde_json::from_str(&json_string)?;
         Ok(json)
@@ -86,7 +90,7 @@ impl Exportable for SyncCommitteeUpdate {
     /// * `Result<String, ProofError>` - Path to the exported file or error
     fn export(&self) -> Result<String, ProofError> {
         let json = serde_json::to_string_pretty(&self).unwrap();
-        let dir_path = format!("batches/committee/{}", self.circuit_inputs.beacon_slot);
+        let dir_path = format!("batches/committee/{}", self.name());
         let _ = fs::create_dir_all(&dir_path).map_err(SyncCommitteeError::Io)?;
 
         let path = format!(

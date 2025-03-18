@@ -87,8 +87,8 @@ impl AtlanticClient {
     /// 
     /// # Returns
     /// * `Result<String, AtlanticError>` - The Atlantic query ID on success
-    pub async fn submit_batch(&self, pie: CairoPie, proof_type: ProofType) -> Result<String, AtlanticError> {
-        let pie_path = std::env::temp_dir().join("pie.zip");
+    pub async fn submit_batch(&self, pie: CairoPie, proof_type: ProofType, name: String) -> Result<String, AtlanticError> {
+        let pie_path = std::env::temp_dir().join(format!("{}.zip", name));
         pie.write_zip_file(&pie_path, true)?;
         println!("{}", pie_path.display());
         let file = fs::File::open(pie_path.clone()).await?;
@@ -136,15 +136,6 @@ impl AtlanticClient {
             )
             .mime_str("application/zip")?;
 
-        let external_id = format!(
-            "update_{}",
-            match proof_type {
-                ProofType::Epoch => "epoch",
-                ProofType::SyncCommittee => "sync_committee",
-                ProofType::EpochBatch => "epoch_batch",
-            }
-        );
-
         let job_size = match proof_type {
             ProofType::Epoch => "XS",
             ProofType::SyncCommittee => "XS",
@@ -159,7 +150,7 @@ impl AtlanticClient {
             .text("cairoVm", "rust")
             .text("cairoVersion", "cairo0")
             .text("result", "PROOF_GENERATION")
-            .text("externalId", external_id);
+            .text("externalId", name);
 
         // Send the request to the updated endpoint
         let response = self
@@ -195,7 +186,7 @@ impl AtlanticClient {
     /// 
     /// # Returns
     /// * `Result<String, AtlanticError>` - The Atlantic query ID on success
-    pub async fn submit_wrapped_proof(&self, proof: StarkProof, program_path: String) -> Result<String, AtlanticError> {
+    pub async fn submit_wrapped_proof(&self, proof: StarkProof, program_path: String, name: String) -> Result<String, AtlanticError> {
         info!("Uploading to Atlantic...");
         // Serialize the proof to JSON string
         let proof_json = serde_json::to_string(&proof)?;
@@ -220,7 +211,7 @@ impl AtlanticClient {
             .text("layout", "recursive_with_poseidon")
             .text("result", "PROOF_VERIFICATION_ON_L2")
             .text("mockFactHash", "false")
-            .text("externalId", "proof_wrapper");
+            .text("externalId", format!("wrap_{}", name));
 
         // Send the request to the updated endpoint
         let response = self

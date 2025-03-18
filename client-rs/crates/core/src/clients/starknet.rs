@@ -210,7 +210,6 @@ impl StarknetClient {
                 BlockId::Tag(BlockTag::Latest),
             )
             .await?;
-        println!("committee_hash: {:?}", committee_hash);
         Ok(committee_hash)
     }
 
@@ -239,7 +238,6 @@ impl StarknetClient {
                 BlockId::Tag(BlockTag::Latest),
             )
             .await?;
-        println!("epoch_proof: {:?}", epoch_proof);
         Ok(EpochProof::from_contract_return_value(epoch_proof).unwrap())
     }
 

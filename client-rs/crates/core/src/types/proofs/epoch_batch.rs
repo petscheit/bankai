@@ -61,6 +61,27 @@ pub struct ExpectedEpochBatchOutputs {
 }
 
 impl EpochUpdateBatch {
+    pub fn name(&self) -> String {
+        let first_slot = self
+            .circuit_inputs
+            .epochs
+            .first()
+            .unwrap()
+            .circuit_inputs
+            .header
+            .slot;
+        let first_epoch = helpers::slot_to_epoch_id(first_slot);
+        let last_slot = self
+            .circuit_inputs
+            .epochs
+            .last()
+            .unwrap()
+            .circuit_inputs
+            .header
+            .slot;
+        let last_epoch = helpers::slot_to_epoch_id(last_slot);
+        format!("batch_{}_to_{}", first_epoch, last_epoch)
+    }
     /// Creates a new epoch update batch
     ///
     /// Fetches epoch data from the start slot to end slot and creates a batch
@@ -153,7 +174,7 @@ impl EpochUpdateBatch {
     ///
     /// # Returns
     /// * `Result<EpochUpdateBatch, EpochBatchError>` - New batch or error
-    pub(crate) async fn new_by_epoch_range(
+    pub async fn new_by_epoch_range(
         bankai: &BankaiClient,
         db_manager: Arc<DatabaseManager>,
         start_epoch: u64,
@@ -177,14 +198,14 @@ impl EpochUpdateBatch {
         let calculated_batch_size = end_epoch - start_epoch + 1;
         let mut current_epoch = start_epoch;
         while current_epoch <= end_epoch {
-            info!(
-                "Getting data for Epoch: {} (SyncCommittee: {}) First slot for this epoch: {} | Epochs batch position {}/{}",
-                current_epoch,
-                get_sync_committee_id_by_epoch(current_epoch),
-                get_first_slot_for_epoch(current_epoch),
-                epochs.len()+1,
-                calculated_batch_size
-            );
+            // info!(
+            //     "Getting data for Epoch: {} (SyncCommittee: {}) First slot for this epoch: {} | Epochs batch position {}/{}",
+            //     current_epoch,
+            //     get_sync_committee_id_by_epoch(current_epoch),
+            //     get_first_slot_for_epoch(current_epoch),
+            //     epochs.len()+1,
+            //     calculated_batch_size
+            // );
             let epoch_update =
                 EpochUpdate::new(&bankai.client, get_first_slot_for_epoch(current_epoch)).await?;
 
