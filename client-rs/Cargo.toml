@@ -8,6 +8,7 @@ members = [
     "crates/core",
     "crates/cli",
     "crates/api",
+    "crates/daemon",
 ]
 
 [workspace.dependencies]
@@ -60,9 +61,12 @@ tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["trace", "timeout"] }
 chrono = { version = "0.4.39", features = ["serde"] }
 tokio-util = "0.7.13"
+async-tungstenite = { version = "0.22", features = ["tokio-runtime"] }
+futures-util = "0.3.31"
 
 garaga-zero-hints = { path = "../cairo/packages/garaga-zero/hints/rust-vm" }
 bankai-core = { path = "crates/core" }
 bankai-cli = { path = "crates/cli" }
 bankai-api = { path = "crates/api" }
+bankai-deamon = { path = "crates/daemon" }
 bankai-runner = { path = "../cairo/cairo_runner" }

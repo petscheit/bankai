@@ -1,0 +1,24 @@
+[package]
+name = "daemon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bankai-core.workspace = true
+beacon-state-proof.workspace = true
+starknet.workspace = true
+tokio.workspace = true
+axum.workspace = true
+dotenv.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+postgres-types.workspace = true
+uuid.workspace = true
+reqwest.workspace = true
+tokio-stream.workspace = true
+alloy-rpc-types-beacon.workspace = true
+serde_json.workspace = true
+async-tungstenite.workspace = true
+futures-util.workspace = true
+num-traits.workspace = true
+thiserror.workspace = true
