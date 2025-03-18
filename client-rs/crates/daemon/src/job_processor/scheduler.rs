@@ -11,7 +11,6 @@ use num_traits::ToPrimitive;
 use crate::error::DaemonError;
 use crate::job_processor::epoch_batch::EpochBatchJobProcessor;
 use crate::job_processor::sync_committee::SyncCommitteeJobProcessor;
-
 use super::JobProcessor;
 
 pub(crate) async fn create_new_jobs(
@@ -35,6 +34,7 @@ pub(crate) async fn create_new_jobs(
         .await?
         .to_u64()
         .unwrap();
+    println!("latest_verified_sync_committee_id: {}", latest_verified_sync_committee_id);
 
     let sync_committee_update_job = SyncCommitteeJobProcessor::create_job_from_event(
         db_manager.clone(),
@@ -43,7 +43,6 @@ pub(crate) async fn create_new_jobs(
         latest_verified_epoch_slot,
     ).await?;
 
-    println!("Sync Committee Update Job: {:?}", sync_committee_update_job);
     if let Some(job) = sync_committee_update_job {
         tx.send(job).await?;
     }
@@ -51,7 +50,6 @@ pub(crate) async fn create_new_jobs(
     let jobs_in_progress = db_manager.count_jobs_in_progress().await?;
     if jobs_in_progress.unwrap() >= constants::MAX_CONCURRENT_JOBS_IN_PROGRESS {
         info!("Max concurrent jobs in progress limit reached, skipping epoch batch creation");
-        
         return Ok(());
     }
     
@@ -71,9 +69,7 @@ pub(crate) async fn create_new_jobs(
         // we need to make sure that each batch is completed within the same sync committee
         let last_epoch_in_sync_committee = helpers::get_last_epoch_for_sync_committee(current_sync_committee_id);
         
-        let end_epoch = cmp::min(latest_epoch + constants::TARGET_BATCH_SIZE, last_epoch_in_sync_committee);
-        info!("Creating epoch batch job for epochs {} to {}", start_epoch, end_epoch);
-        
+        let end_epoch = cmp::min(latest_epoch + constants::TARGET_BATCH_SIZE, last_epoch_in_sync_committee);        
        
         let epoch_batch = EpochBatchJobProcessor::create_job(db_manager.clone(), parsed_event.slot, start_epoch, end_epoch).await?;
         tx.send(epoch_batch).await?;

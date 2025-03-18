@@ -26,6 +26,6 @@ nimbus-data
 
 **/*.pyc
 
-client-rs/batches
+**/batches
 
 **/.env*

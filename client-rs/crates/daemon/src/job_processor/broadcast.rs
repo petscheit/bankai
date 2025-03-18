@@ -91,3 +91,74 @@ pub async fn broadcast_epoch_batch(job: Job, db_manager: Arc<DatabaseManager>, b
 
     Ok(())
 }
+
+pub async fn broadcast_sync_committee(job: Job, db_manager: Arc<DatabaseManager>, bankai: Arc<BankaiClient>) -> Result<(), DaemonError> {
+    let job_data = db_manager.get_job_by_id(job.job_id).await?;
+    
+    if let Some(job_data) = job_data {
+        let slot = job_data.slot.to_u64().unwrap();
+        let sync_committee_id = helpers::slot_to_sync_committee_id(slot);
+
+        let update = SyncCommitteeUpdate::from_json::<SyncCommitteeUpdate>(job.slot.unwrap()).map_err(|e| bankai_core::types::proofs::ProofError::SyncCommittee(e))?;
+
+        // Acquire the semaphore permit before submitting the update
+        let _permit = get_semaphore().acquire().await.expect("Failed to acquire semaphore");
+        info!("[SYNC COMMITTEE JOB][{}] Acquired submission permit, proceeding with on-chain update", job.job_id);
+        
+        let tx_hash = bankai
+            .starknet_client
+            .submit_update(
+                update.expected_circuit_outputs,
+                &bankai.config,
+            )
+            .await?;
+
+        info!("[SYNC COMMITTEE JOB][{}] Successfully called sync committee ID {} update onchain, transaction confirmed, txhash: {}", 
+            job.job_id, sync_committee_id, tx_hash);
+
+        db_manager.set_job_txhash(job.job_id, tx_hash).await?;
+
+        bankai.starknet_client.wait_for_confirmation(tx_hash).await?;
+        
+        // Permit is automatically released when _permit goes out of scope
+        
+        info!("[SYNC COMMITTEE JOB][{}] Transaction is confirmed on-chain!", job.job_id);
+        db_manager
+            .update_job_status(job.job_id, JobStatus::OffchainProofRetrieved)
+            .await?;
+
+        // Insert data to DB after successful onchain sync committee verification
+        //let sync_committee_hash = update.expected_circuit_outputs.committee_hash;
+        let sync_committee_hash = match bankai
+            .starknet_client
+            .get_committee_hash(slot, &bankai.config)
+            .await
+        {
+            Ok(sync_committee_hash) => sync_committee_hash,
+            Err(e) => {
+                // Handle the error
+                return Err(e.into());
+            }
+        };
+
+        let sync_committee_hash_str = sync_committee_hash
+            .iter()
+            .map(|felt| felt.to_hex_string())
+            .collect::<Vec<_>>()
+            .join("");
+
+        db_manager
+            .insert_verified_sync_committee(
+                slot,
+                sync_committee_hash_str,
+            )
+            .await?;
+        db_manager
+            .update_job_status(job.job_id, JobStatus::Done)
+            .await?;
+
+        info!("[SYNC COMMITTEE JOB][{}] Sync committee verified onchain, job is done", job.job_id);
+    }
+
+    Ok(())
+}       

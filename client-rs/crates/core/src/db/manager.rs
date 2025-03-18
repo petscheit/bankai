@@ -203,10 +203,11 @@ impl DatabaseManager {
         epoch_index: usize,
         batch_root: Felt,
     ) -> Result<(), DatabaseError> {
-        self.client
+        let rows_affected = self.client
             .execute(
                 "INSERT INTO verified_epoch (epoch_id, beacon_header_root, beacon_state_root, slot, committee_hash, n_signers, execution_header_hash, execution_header_height, epoch_index, batch_root)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                 ON CONFLICT (epoch_id) DO NOTHING",
                 &[
                     &epoch_id.to_i64(),
                     &beacon_header_root.encode_hex_with_prefix(),
@@ -221,6 +222,10 @@ impl DatabaseManager {
                 ],
             )
             .await?;
+
+        if rows_affected == 0 {
+            debug!("Epoch {} already exists in verified_epoch table, skipping insertion", epoch_id);
+        }
 
         Ok(())
     }
@@ -367,6 +372,43 @@ impl DatabaseManager {
         Ok(jobs.into_iter().map(|job| job.try_into().unwrap()).collect())
     }
 
+    pub async fn fetch_jobs_waiting_for_broadcast(&self) -> Result<Vec<Job>, DatabaseError> {
+        let rows = self.client.query("SELECT * FROM jobs WHERE job_status IN ('OFFCHAIN_COMPUTATION_FINISHED')", &[]).await?;
+        let jobs = rows.into_iter().map(Self::map_row_to_job).collect::<Result<Vec<_>, _>>()?;
+        Ok(jobs.into_iter().map(|job| job.try_into().unwrap()).collect())
+    }
+
+    pub async fn fetch_retryable_jobs(&self, retry_limit: i64) -> Result<Vec<Job>, DatabaseError> {
+        let rows: Vec<Row> = self.client.query(
+            "SELECT * FROM jobs 
+            WHERE job_status = 'ERROR' 
+            AND (retries_count IS NULL OR retries_count < $1)",
+            &[&retry_limit]
+        ).await?;
+        let jobs = rows.into_iter().map(Self::map_row_to_job).collect::<Result<Vec<_>, _>>()?;
+        Ok(jobs.into_iter().map(|job| job.try_into().unwrap()).collect())
+    }
+
+    pub async fn fetch_interrupted_jobs(&self) -> Result<Vec<Job>, DatabaseError> {
+        let rows = self.client
+            .query(
+                "SELECT * FROM jobs WHERE job_status NOT IN ($1, $2, $3, $4, $5, $6)",
+                &[
+                    &JobStatus::OffchainProofRequested.to_string(),
+                    &JobStatus::WrapProofRequested.to_string(),
+                    &JobStatus::OffchainComputationFinished.to_string(),
+                    &JobStatus::ProofVerifyCalledOnchain.to_string(),
+                    &JobStatus::Error.to_string(),
+                    &JobStatus::Done.to_string(),
+                ],
+            )
+            .await?;
+        
+        let jobs = rows.into_iter().map(Self::map_row_to_job).collect::<Result<Vec<_>, _>>()?;
+        Ok(jobs.into_iter().map(|job| job.try_into().unwrap()).collect())
+    }
+
+
     /// Gets the latest epoch that is in progress
     ///
     /// # Returns
@@ -454,7 +496,7 @@ impl DatabaseManager {
                 value
                     .to_u64()
                     .ok_or(DatabaseError::IntegerConversion(value.to_string()))?,
-            )))
+            ) + 1))
         } else {
             Ok(Some(0))
         }
@@ -485,7 +527,7 @@ impl DatabaseManager {
                 value
                     .to_u64()
                     .ok_or(DatabaseError::IntegerConversion(value.to_string()))?,
-            )))
+            ) + 1))
         } else {
             Ok(Some(0))
         }
@@ -707,143 +749,6 @@ impl DatabaseManager {
                 &[&failed_at_step.to_string(), &job_id],
             )
             .await?;
-        Ok(())
-    }
-
-    /// Counts epoch jobs waiting for sync committee update
-    ///
-    /// # Arguments
-    /// * `latest_verified_sync_committee` - Latest verified sync committee ID
-    ///
-    /// # Returns
-    /// * `Result<u64, DatabaseError>` - Count of waiting jobs or error
-    pub async fn count_epoch_jobs_waiting_for_sync_committe_update(
-        &self,
-        latest_verified_sync_committee: u64,
-    ) -> Result<u64, DatabaseError> {
-        let epoch_to_start_check_from =
-            helpers::get_last_epoch_for_sync_committee(latest_verified_sync_committee) + 1; // So we getting first epoch number from latest unverified committee
-        let row = self
-            .client
-            .query_one(
-                "SELECT COUNT(*) as count FROM jobs WHERE batch_range_begin_epoch >= $1
-                 AND job_status = 'OFFCHAIN_COMPUTATION_FINISHED'",
-                &[&epoch_to_start_check_from.to_i64()],
-            )
-            .await?;
-
-        Ok(row.get::<_, i64>("count").to_u64().unwrap_or(0))
-    }
-
-    /// Sets batch epochs as ready to broadcast
-    ///
-    /// # Arguments
-    /// * `first_epoch` - First epoch in range
-    /// * `last_epoch` - Last epoch in range
-    ///
-    /// # Returns
-    /// * `Result<(), DatabaseError>` - Success or error
-    pub async fn set_ready_to_broadcast_for_batch_epochs(
-        &self,
-        first_epoch: u64,
-        last_epoch: u64,
-    ) -> Result<(), DatabaseError> {
-        let rows_affected = self.client
-            .execute(
-                "UPDATE jobs
-                SET job_status = 'READY_TO_BROADCAST_ONCHAIN', updated_at = NOW()
-                WHERE batch_range_begin_epoch >= $1 AND batch_range_end_epoch <= $2 AND type = 'EPOCH_BATCH_UPDATE'
-                      AND job_status = 'OFFCHAIN_COMPUTATION_FINISHED'",
-                &[&first_epoch.to_i64(), &last_epoch.to_i64()],
-            )
-            .await?;
-
-        if rows_affected > 0 {
-            info!(
-                "{} EPOCH_BATCH_UPDATE jobs changed state to READY_TO_BROADCAST_ONCHAIN",
-                rows_affected
-            );
-        }
-        Ok(())
-    }
-
-    /// Sets batch epochs as ready to broadcast up to a specific epoch
-    ///
-    /// # Arguments
-    /// * `to_epoch` - Upper bound epoch
-    ///
-    /// # Returns
-    /// * `Result<(), DatabaseError>` - Success or error
-    pub async fn set_ready_to_broadcast_for_batch_epochs_to(
-        &self,
-        to_epoch: u64,
-    ) -> Result<(), DatabaseError> {
-        let rows_affected = self
-            .client
-            .execute(
-                "UPDATE jobs
-                SET job_status = 'READY_TO_BROADCAST_ONCHAIN', updated_at = NOW()
-                WHERE batch_range_end_epoch <= $1 AND type = 'EPOCH_BATCH_UPDATE'
-                      AND job_status = 'OFFCHAIN_COMPUTATION_FINISHED'",
-                &[&to_epoch.to_i64()],
-            )
-            .await?;
-
-        if rows_affected > 0 {
-            info!(
-                "{} EPOCH_BATCH_UPDATE jobs changed state to READY_TO_BROADCAST_ONCHAIN",
-                rows_affected
-            );
-        }
-        Ok(())
-    }
-
-    /// Sets sync committee as ready to broadcast
-    ///
-    /// # Arguments
-    /// * `sync_committee_id` - ID of the sync committee
-    ///
-    /// # Returns
-    /// * `Result<(), DatabaseError>` - Success or error
-    pub async fn set_ready_to_broadcast_for_sync_committee(
-        &self,
-        sync_committee_id: u64,
-    ) -> Result<(), DatabaseError> {
-        let sync_commite_first_slot = helpers::get_first_slot_for_sync_committee(sync_committee_id);
-        let sync_commite_last_slot = helpers::get_last_slot_for_sync_committee(sync_committee_id);
-
-        debug!(
-            "Setting syn committee between slots {} and {} to READY_TO_BROADCAST_ONCHAIN",
-            sync_commite_first_slot, sync_commite_last_slot
-        );
-
-        let rows_affected = self
-            .client
-            .execute(
-                "UPDATE jobs
-                SET job_status = 'READY_TO_BROADCAST_ONCHAIN', updated_at = NOW()
-                WHERE type = 'SYNC_COMMITTEE_UPDATE'
-                AND job_status = 'OFFCHAIN_COMPUTATION_FINISHED'
-                AND slot BETWEEN $1 AND $2
-                ",
-                &[
-                    &sync_commite_first_slot.to_i64(),
-                    &sync_commite_last_slot.to_i64(),
-                ],
-            )
-            .await?;
-
-        if rows_affected == 1 {
-            info!(
-                "{} SYNC_COMMITTEE_UPDATE jobs changed state to READY_TO_BROADCAST_ONCHAIN",
-                rows_affected
-            );
-        } else if rows_affected > 1 {
-            warn!(
-                "{} SYNC_COMMITTEE_UPDATE jobs changed state to READY_TO_BROADCAST_ONCHAIN in one query, something may be wrong!",
-                rows_affected
-            );
-        }
         Ok(())
     }
 

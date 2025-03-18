@@ -28,10 +28,17 @@ impl SyncCommitteeJobProcessor {
         let lowest_required_committee_update_slot =
             latest_verified_sync_committee_id * constants::SLOTS_PER_SYNC_COMMITTEE;
 
+        println!("lowest_required_committee_update_slot: {}", lowest_required_committee_update_slot);
+        println!("           latest_verified_epoch_slot: {}", latest_verified_epoch_slot);
+
         // Only proceed if we're at or past the required slot
-        if latest_verified_epoch_slot <= lowest_required_committee_update_slot {
+        if latest_verified_epoch_slot < lowest_required_committee_update_slot {
             return Ok(None);
         }
+
+        // The new sync committee is always included in the previous epoch when we decommit it, so we need to increment by 1 here
+        let potential_new_committee_id = helpers::get_sync_committee_id_by_slot(latest_verified_epoch_slot) + 1;
+        println!("potential_new_committee_id: {}", potential_new_committee_id);
 
         // Get latest committee progress information
         let last_sync_committee_in_progress = db_manager
@@ -44,15 +51,11 @@ impl SyncCommitteeJobProcessor {
             .await?
             .unwrap_or(0);
 
-        println!("latest_verified_sync_committee_id: {}", latest_verified_sync_committee_id);
         println!("last_sync_committee_in_progress: {}", last_sync_committee_in_progress);
         println!("last_done_sync_committee: {}", last_done_sync_committee);
 
-        // Only create a new job if:
-        // 1. The latest verified committee is newer than what's in progress
-        // 2. The latest verified committee is newer than what's already done
-        if latest_verified_sync_committee_id > last_sync_committee_in_progress &&
-        latest_verified_sync_committee_id > last_done_sync_committee {
+        if potential_new_committee_id > last_sync_committee_in_progress &&
+        potential_new_committee_id > last_done_sync_committee {
             let job_id = Uuid::new_v4();
             let job = Job {
                 job_id: job_id.clone(),

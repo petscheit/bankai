@@ -73,12 +73,12 @@ pub async fn process_offchain_proof_stage(job: Job, db_manager: Arc<DatabaseMana
                 .await?;
         } else if status == "FAILED" {
             error!("[OFFCHAIN PROOF JOB][{}] Proof wrapping failed by Atlantic. QueryID: {:?}",
-                job.job_id, job_data.atlantic_proof_wrapper_batch_id.unwrap()
+                job.job_id, batch_id
             );
             return Err(DaemonError::OffchainProofFailed(job.job_id.to_string()));
         } else {
             info!("[OFFCHAIN PROOF JOB][{}] Proof wrapping not done by Atlantic yet. QueryID: {:?}",
-                job.job_id, job_data.atlantic_proof_wrapper_batch_id.unwrap()
+                job.job_id, batch_id
             );
         }
     }
@@ -94,9 +94,7 @@ pub async fn process_committee_wrapping_stage(job: Job, db_manager: Arc<Database
             "[SYNC COMMITTEE JOB][{}] Checking completion of Atlantic proof wrapping job. QueryID: {:?}",
             job.job_id, job_data.atlantic_proof_wrapper_batch_id
         );
-    
-        let sync_commite_id = helpers::slot_to_sync_committee_id(slot);
-    
+        
         let status = bankai
             .atlantic_client
                 .check_batch_status(job_data.atlantic_proof_wrapper_batch_id.clone().unwrap().as_str())
@@ -107,65 +105,16 @@ pub async fn process_committee_wrapping_stage(job: Job, db_manager: Arc<Database
                 .update_job_status(job.job_id, JobStatus::WrappedProofDone)
                 .await?;
 
-            let update = SyncCommitteeUpdate::from_json::<SyncCommitteeUpdate>(job.slot.unwrap()).map_err(|e| bankai_core::types::proofs::ProofError::SyncCommittee(e))?;
-
             info!(
                 "[SYNC COMMITTEE JOB][{}] Proof wrapping done by Atlantic. QueryID: {:?}",
                 job.job_id, job_data.atlantic_proof_wrapper_batch_id.unwrap()
             );
     
-            // Acquire the semaphore permit before submitting the update
-            let _permit = get_semaphore().acquire().await.expect("Failed to acquire semaphore");
-            info!("[SYNC COMMITTEE JOB][{}] Acquired submission permit, proceeding with on-chain update", job.job_id);
-            
-            let tx_hash = bankai
-                .starknet_client
-                .submit_update(
-                    update.expected_circuit_outputs,
-                    &bankai.config,
-                )
-                .await?;
-    
-            info!("[SYNC COMMITTEE JOB][{}] Successfully called sync committee ID {} update onchain, transaction confirmed, txhash: {}", 
-                job.job_id, sync_commite_id, tx_hash);
-    
-            db_manager.set_job_txhash(job.job_id, tx_hash).await?;
-    
-            bankai.starknet_client.wait_for_confirmation(tx_hash).await?;
-            
-            // Permit is automatically released when _permit goes out of scope
-            
-            info!("[SYNC COMMITTEE JOB][{}] Transaction is confirmed on-chain!", job.job_id);
             db_manager
-                .update_job_status(job.job_id, JobStatus::Done)
+                .update_job_status(job.job_id, JobStatus::OffchainComputationFinished)
                 .await?;
 
-            // Insert data to DB after successful onchain sync committee verification
-            //let sync_committee_hash = update.expected_circuit_outputs.committee_hash;
-            let sync_committee_hash = match bankai
-                .starknet_client
-                .get_committee_hash(slot, &bankai.config)
-                .await
-            {
-                Ok(sync_committee_hash) => sync_committee_hash,
-                Err(e) => {
-                    // Handle the error
-                    return Err(e.into());
-                }
-            };
-
-            let sync_committee_hash_str = sync_committee_hash
-                .iter()
-                .map(|felt| felt.to_hex_string())
-                .collect::<Vec<_>>()
-                .join("");
-
-            db_manager
-                .insert_verified_sync_committee(
-                    slot,
-                    sync_committee_hash_str,
-                )
-                .await?;
+           
         }  else if status == "FAILED" {
             error!("[SYNC COMMITTEE JOB][{}] Proof wrapping failed by Atlantic. QueryID: {:?}",
                 job.job_id, job_data.atlantic_proof_wrapper_batch_id.unwrap()
@@ -177,7 +126,6 @@ pub async fn process_committee_wrapping_stage(job: Job, db_manager: Arc<Database
             );
         }
     }
-
 
     Ok(())
 }
@@ -201,6 +149,10 @@ pub async fn process_epoch_batch_wrapping_stage(job: Job, db_manager: Arc<Databa
                 "[EPOCH BATCH JOB][{}] Proof wrapping done by Atlantic. QueryID: {:?}",
                 job.job_id, job_data.atlantic_proof_wrapper_batch_id.unwrap()
             );
+
+            db_manager
+                .update_job_status(job.job_id, JobStatus::OffchainComputationFinished)
+                .await?;
 
         } else if status == "FAILED" {
             error!("[EPOCH BATCH JOB][{}] Proof wrapping failed by Atlantic. QueryID: {:?}",

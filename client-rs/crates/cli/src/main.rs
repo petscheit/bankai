@@ -215,10 +215,11 @@ async fn main() -> Result<(), BankaiCliError> {
                 let update: SyncCommitteeUpdate = bankai
                     .get_sync_committee_update(latest_epoch_slot.try_into().unwrap())
                     .await?;
+                let name = update.name();
                 let pie = generate_committee_update_pie(update, &bankai.config, None, None).await?;
                 let batch_id = bankai
                     .atlantic_client
-                    .submit_batch(pie, ProofType::SyncCommittee)
+                    .submit_batch(pie, ProofType::SyncCommittee, name)
                     .await?;
                 println!("Batch Submitted: {}", batch_id);
             }
@@ -234,13 +235,14 @@ async fn main() -> Result<(), BankaiCliError> {
                 let epoch_update = EpochUpdate::new(&bankai.client, next_epoch)
                     .await
                     .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
+                
                 let export_path = epoch_update.export()?;
                 println!("Update exported to {}", export_path);
                 let pie =
                     generate_epoch_update_pie(epoch_update, &bankai.config, None, None).await?;
                 let batch_id = bankai
                     .atlantic_client
-                    .submit_batch(pie, ProofType::Epoch)
+                    .submit_batch(pie, ProofType::Epoch, format!("epoch_{}", next_epoch))
                     .await?;
                 println!("Batch Submitted: {}", batch_id);
             }
@@ -248,13 +250,14 @@ async fn main() -> Result<(), BankaiCliError> {
                 let epoch_update = EpochUpdateBatch::new(&bankai)
                     .await
                     .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
+                let name = epoch_update.name();
                 let export_path = epoch_update.export()?;
                 println!("Update exported to {}", export_path);
                 let pie =
                     generate_epoch_batch_pie(epoch_update, &bankai.config, None, None).await?;
                 let batch_id = bankai
                     .atlantic_client
-                    .submit_batch(pie, ProofType::EpochBatch)
+                    .submit_batch(pie, ProofType::EpochBatch, name)
                     .await?;
                 println!("Batch Submitted: {}", batch_id);
             }
@@ -268,12 +271,13 @@ async fn main() -> Result<(), BankaiCliError> {
                 let update = bankai
                     .get_sync_committee_update(slot.try_into().unwrap())
                     .await?;
+                let name = update.name();
                 let export_path = update.export()?;
                 println!("Update exported to {}", export_path);
                 let pie = generate_committee_update_pie(update, &bankai.config, None, None).await?;
                 let batch_id = bankai
                     .atlantic_client
-                    .submit_batch(pie, ProofType::SyncCommittee)
+                    .submit_batch(pie, ProofType::SyncCommittee, name)
                     .await?;
                 println!("Batch Submitted: {}", batch_id);
             }
@@ -289,7 +293,7 @@ async fn main() -> Result<(), BankaiCliError> {
                         .await?;
                     let batch_id = bankai
                         .atlantic_client
-                        .submit_wrapped_proof(proof, bankai.config.cairo_verifier_path)
+                        .submit_wrapped_proof(proof, bankai.config.cairo_verifier_path, format!("wrap_{}", batch_id))
                         .await?;
                     println!("Batch Submitted: {}", batch_id);
                 } else {

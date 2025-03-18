@@ -11,7 +11,7 @@ use uuid::Uuid;
 // use crate::job_processor::epoch_batch::process_epoch_batch_job;
 
 use crate::error::DaemonError;
-
+use super::broadcast::{broadcast_epoch_batch, broadcast_sync_committee};
 use super::epoch_batch::EpochBatchJobProcessor;
 use super::proof::{process_committee_wrapping_stage, process_epoch_batch_wrapping_stage, process_offchain_proof_stage};
 use super::sync_committee::SyncCommitteeJobProcessor;
@@ -80,6 +80,25 @@ impl JobProcessor {
                             return Err(e);
                         }
                     },
+                }
+            },
+            JobStatus::OffchainComputationFinished => {
+                match job.job_type {
+                    JobType::EpochBatchUpdate => {
+                        if let Err(e) = broadcast_epoch_batch(job.clone(), self.db_manager.clone(), self.bankai.clone()).await {
+                            self.handle_job_error(job.job_id).await?;
+                            error!("Error processing epoch bacth broadcast stage: {:?}", e);
+                            return Err(e);
+                        }
+                    },
+                    JobType::SyncCommitteeUpdate => {
+                        if let Err(e) = broadcast_sync_committee(job.clone(), self.db_manager.clone(), self.bankai.clone()).await {
+                            self.handle_job_error(job.job_id).await?;
+                            error!("Error processing sync committee broadcast stage: {:?}", e);
+                            return Err(e);
+                        }
+                    },
+                    _ => ()
                 }
             },
             _ => unimplemented!()

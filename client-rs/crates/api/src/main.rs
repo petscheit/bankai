@@ -531,8 +531,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 //             JobStatus::ProgramInputsPrepared,
 //             JobStatus::StartedTraceGeneration,
 //             JobStatus::PieGenerated,
-//             JobStatus::AtlanticProofRequested,
-//             JobStatus::AtlanticProofRetrieved,
+//             JobStatus::OffchainProofRequested,
+//             JobStatus::OffchainProofRetrieved,
 //             JobStatus::WrapProofRequested,
 //             JobStatus::WrappedProofDone,
 //         ])
@@ -1002,7 +1002,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 //                             .await?;
 
 //                         db_manager
-//                             .update_job_status(job.job_id, JobStatus::AtlanticProofRequested)
+//                             .update_job_status(job.job_id, JobStatus::OffchainProofRequested)
 //                             .await?;
 //                         db_manager
 //                             .set_atlantic_job_queryid(
@@ -1015,9 +1015,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 //                         info!( "[SYNC COMMITTEE JOB] Proof generation batch submitted to atlantic. QueryID: {}",
 //                             batch_id );
 
-//                         current_status = JobStatus::AtlanticProofRequested;
+//                         current_status = JobStatus::OffchainProofRequested;
 //                     }
-//                     JobStatus::AtlanticProofRequested | JobStatus::AtlanticProofRetrieved => {
+//                     JobStatus::OffchainProofRequested | JobStatus::OffchainProofRetrieved => {
 //                         // Pool for Atlantic execution done
 //                         info!(
 //                         "[SYNC COMMITTEE JOB] Waiting for completion of Atlantic job. QueryID: {}",
@@ -1048,7 +1048,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 //                         );
 
 //                         db_manager
-//                             .update_job_status(job.job_id, JobStatus::AtlanticProofRetrieved)
+//                             .update_job_status(job.job_id, JobStatus::OffchainProofRetrieved)
 //                             .await?;
 
 //                         // Submit wrapped proof request
@@ -1091,7 +1091,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 //                         if let Err(Error::AtlanticProcessingError(msg)) = &result {
 //                             error!("Atlantic processing failed: {}", msg);
 //                             db_manager
-//                                 .update_job_status(job.job_id, JobStatus::AtlanticProofRetrieved)
+//                                 .update_job_status(job.job_id, JobStatus::OffchainProofRetrieved)
 //                                 .await?; // Go back to state before Atlantic proof wrapping query to send it again
 //                             continue;
 //                         } else if let Err(Error::AtlanticPoolingTimeout(msg)) = &result {
@@ -1179,7 +1179,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 //                         );
 
 //                         db_manager
-//                             .update_job_status(job.job_id, JobStatus::AtlanticProofRequested)
+//                             .update_job_status(job.job_id, JobStatus::OffchainProofRequested)
 //                             .await?;
 //                         db_manager
 //                             .set_atlantic_job_queryid(
@@ -1189,9 +1189,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 //                             )
 //                             .await?;
 
-//                         current_status = JobStatus::AtlanticProofRequested;
+//                         current_status = JobStatus::OffchainProofRequested;
 //                     }
-//                     JobStatus::AtlanticProofRequested | JobStatus::AtlanticProofRetrieved => {
+//                     JobStatus::OffchainProofRequested | JobStatus::OffchainProofRetrieved => {
 //                         // Pool for Atlantic execution done
 //                         info!(
 //                         "[BATCH EPOCH JOB] Waiting for completion of Atlantic proof generation job. QueryID: {}",
@@ -1223,7 +1223,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 //                         );
 
 //                         db_manager
-//                             .update_job_status(job.job_id, JobStatus::AtlanticProofRetrieved)
+//                             .update_job_status(job.job_id, JobStatus::OffchainProofRetrieved)
 //                             .await?;
 
 //                         // 5) Submit wrapped proof request
@@ -1270,9 +1270,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 //                         if let Err(Error::AtlanticProcessingError(msg)) = &result {
 //                             error!("Atlantic processing failed: {}", msg);
 //                             db_manager
-//                                 .update_job_status(job.job_id, JobStatus::AtlanticProofRetrieved)
+//                                 .update_job_status(job.job_id, JobStatus::OffchainProofRetrieved)
 //                                 .await?; // Go back to state before Atlantic proof wrapping query to send it again
-//                             current_status = JobStatus::AtlanticProofRetrieved;
+//                             current_status = JobStatus::OffchainProofRetrieved;
 //                             continue;
 //                         } else if let Err(Error::AtlanticPoolingTimeout(msg)) = &result {
 //                             error!("Batch polling timed out: {}", msg);

@@ -32,7 +32,7 @@ pub struct SyncCommitteeUpdate {
 
 impl SyncCommitteeUpdate {
     pub fn name(&self) -> String {
-        format!("committee_{}", helpers::get_sync_committee_id_by_slot(self.circuit_inputs.beacon_slot))
+        format!("committee_{}", helpers::get_sync_committee_id_by_slot(self.circuit_inputs.beacon_slot) + 1)
     }
     /// Creates a new sync committee update for a given slot
     ///
@@ -75,8 +75,9 @@ impl SyncCommitteeUpdate {
     where
         T: serde::de::DeserializeOwned,
     {
-        let committee_id = helpers::get_sync_committee_id_by_slot(slot);
+        let committee_id = helpers::get_sync_committee_id_by_slot(slot) + 1;
         let path = format!("batches/committee/committee_{}/input_{}.json", committee_id, slot);
+        println!("path: {}", path);
         let json_string: String = fs::read_to_string(path)?;
         let json = serde_json::from_str(&json_string)?;
         Ok(json)
