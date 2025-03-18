@@ -777,11 +777,11 @@ impl DatabaseManager {
     ///
     /// # Returns
     /// * `Result<(), DatabaseError>` - Success or error
-    pub async fn increment_job_retry_counter(&self, job_id: Uuid) -> Result<(), DatabaseError> {
+    pub async fn increase_job_retry_counter(&self, job_id: Uuid, weight: u64) -> Result<(), DatabaseError> {
         self.client
             .execute(
-                "UPDATE jobs SET retries_count = COALESCE(retries_count, 0) + 1, updated_at = NOW() WHERE job_uuid = $1",
-                &[ &job_id],
+                "UPDATE jobs SET retries_count = COALESCE(retries_count, 0) + $1, updated_at = NOW() WHERE job_uuid = $2",
+                &[&weight.to_i64(), &job_id],
             )
             .await?;
         Ok(())

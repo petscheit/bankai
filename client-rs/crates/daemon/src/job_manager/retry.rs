@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bankai_core::db::manager::DatabaseManager;
-use bankai_core::types::job::{Job, JobStatus};
+use bankai_core::types::job::{Job, JobStatus, JobType};
 use bankai_core::BankaiClient;
 use tokio::sync::mpsc;
 use tracing::info;
@@ -31,8 +31,18 @@ pub async fn update_job_status_for_retry(tx: mpsc::Sender<Job>, db_manager: Arc<
         };
 
         info!("[RETRY][{}] New status: {}", job.job_id, new_status);
+        let weight = match job_data.job_type {
+            JobType::SyncCommitteeUpdate => 1,
+            JobType::EpochBatchUpdate => match new_status {
+                JobStatus::Created => 2,
+                JobStatus::OffchainProofRequested => 4,
+                JobStatus::OffchainComputationFinished => 1,
+                _ => 1,
+            },
+            _ => 1,
+        };
+        db_manager.increase_job_retry_counter(job.job_id, weight).await?;
         db_manager.update_job_status(job.job_id, new_status).await?;
-        db_manager.increment_job_retry_counter(job.job_id).await?;
         let job = db_manager.get_job_by_id(job.job_id).await?.unwrap().try_into().unwrap();
         
         tx.send(job).await?;
