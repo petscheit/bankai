@@ -12,7 +12,7 @@ async fn main() -> Result<(), error::DaemonError> {
     let mut daemon = Daemon::new().await?;
 
     // Run the daemon
-    let daemon_handle = tokio::spawn(async move {
+    let _daemon_handle = tokio::spawn(async move {
         if let Err(e) = daemon.run().await {
             eprintln!("Daemon error: {:?}", e);
         }
@@ -22,7 +22,7 @@ async fn main() -> Result<(), error::DaemonError> {
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
 
     // Handle ctrl-c signal
-    let ctrl_c_handle = tokio::spawn(async move {
+    let _ctrl_c_handle = tokio::spawn(async move {
         if let Err(e) = tokio::signal::ctrl_c().await {
             eprintln!("Failed to listen for ctrl-c: {:?}", e);
         }

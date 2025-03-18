@@ -6,9 +6,8 @@ use num_traits::ToPrimitive;
 use std::cmp;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tracing::{debug, error, info, warn};
+use tracing::info;
 
-use super::JobProcessor;
 use crate::error::DaemonError;
 use crate::job_processor::epoch_batch::EpochBatchJobProcessor;
 use crate::job_processor::sync_committee::SyncCommitteeJobProcessor;
@@ -40,7 +39,6 @@ pub(crate) async fn create_new_jobs(
 
     let sync_committee_update_job = SyncCommitteeJobProcessor::create_job_from_event(
         db_manager.clone(),
-        &parsed_event,
         latest_verified_sync_committee_id,
         latest_verified_epoch_slot,
     )

@@ -12,6 +12,7 @@ members = [
     "crates/cairo_runner",
 ]
 exclude = ["tests"]
+resolver = "2"
 
 [workspace.dependencies]
 # Serialization
@@ -75,5 +76,5 @@ garaga-zero-hints = { path = "../cairo/packages/garaga-zero/hints/rust-vm" }
 bankai-core = { path = "crates/core" }
 bankai-cli = { path = "crates/cli" }
 bankai-api = { path = "crates/api" }
-bankai-deamon = { path = "crates/daemon" }
+bankai-daemon = { path = "crates/daemon" }
 bankai-runner = { path = "crates/cairo_runner" }

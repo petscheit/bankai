@@ -268,9 +268,7 @@ async fn main() -> Result<(), BankaiCliError> {
                     .await?;
                 let lowest_committee_update_slot = (latest_committee_id) * Felt::from(0x2000);
                 println!("Min Slot Required: {}", lowest_committee_update_slot);
-                let update = bankai
-                    .get_sync_committee_update(slot.try_into().unwrap())
-                    .await?;
+                let update = bankai.get_sync_committee_update(slot).await?;
                 let name = update.name();
                 let export_path = update.export()?;
                 println!("Update exported to {}", export_path);

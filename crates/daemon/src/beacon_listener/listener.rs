@@ -1,9 +1,7 @@
 use crate::error::DaemonError;
 use alloy_rpc_types_beacon::events::HeadEvent;
-use bankai_core::types::job::Job;
 use bankai_core::utils::helpers;
 use reqwest;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::time::{timeout, Duration};
 use tokio_stream::StreamExt;

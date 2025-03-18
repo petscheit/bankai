@@ -1,7 +1,11 @@
 [package]
-name = "daemon"
+name = "bankai-daemon"
 version = "0.1.0"
 edition = "2021"
+
+[[bin]]
+name = "daemon"
+path = "src/main.rs"
 
 [dependencies]
 bankai-core.workspace = true

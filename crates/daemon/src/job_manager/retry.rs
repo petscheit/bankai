@@ -50,7 +50,6 @@ pub async fn update_job_status_for_retry(
                 JobStatus::OffchainComputationFinished => 1,
                 _ => 1,
             },
-            _ => 1,
         };
         db_manager
             .increase_job_retry_counter(job.job_id, weight)

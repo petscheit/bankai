@@ -1,14 +1,8 @@
-use bankai_core::db::manager::{DatabaseManager, JobSchema};
+use bankai_core::db::manager::DatabaseManager;
 use bankai_core::types::job::{Job, JobStatus, JobType};
-use bankai_core::types::proofs::epoch_batch::{
-    EpochUpdateBatch, EpochUpdateBatchInputs, ExpectedEpochBatchOutputs,
-};
-use bankai_core::types::proofs::epoch_update::EpochUpdate;
-use bankai_core::types::proofs::sync_committee::SyncCommitteeUpdate;
 use bankai_core::BankaiClient;
-use num_traits::ToPrimitive;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::error;
 use uuid::Uuid;
 // use crate::job_processor::epoch_batch::process_epoch_batch_job;
 
@@ -144,7 +138,6 @@ impl JobProcessor {
                         return Err(e);
                     }
                 }
-                _ => (),
             },
             _ => unimplemented!(),
         }

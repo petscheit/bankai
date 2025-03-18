@@ -1,9 +1,6 @@
 use cairo_vm::{
     types::relocatable::Relocatable,
-    vm::{
-        errors::hint_errors::HintError,
-        vm_core::VirtualMachine,
-    },
+    vm::{errors::hint_errors::HintError, vm_core::VirtualMachine},
     Felt252,
 };
 pub use garaga_zero::types::CairoType;

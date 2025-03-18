@@ -49,6 +49,7 @@ pub async fn handle_get_latest_verified_committee(
     }
 }
 
+#[allow(dead_code)]
 pub async fn handle_get_job_status(
     Path(job_id): Path<u64>,
     State(state): State<AppState>,

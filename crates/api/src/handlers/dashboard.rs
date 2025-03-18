@@ -164,6 +164,7 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_ascii_dashboard(
     latest_beacon_slot: u64,
     latest_verified_slot: u64,

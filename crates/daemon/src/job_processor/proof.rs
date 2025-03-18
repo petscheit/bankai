@@ -1,31 +1,13 @@
 use std::sync::Arc;
 
-use alloy_rpc_types_beacon::events::HeadEvent;
+use crate::error::DaemonError;
 use bankai_core::{
-    cairo_runner::generate_committee_update_pie,
-    db::manager::{DatabaseManager, JobSchema},
-    types::{
-        job::{AtlanticJobType, Job, JobStatus, JobType},
-        proofs::{epoch_batch::EpochUpdateBatch, sync_committee::SyncCommitteeUpdate},
-        traits::{Exportable, ProofType},
-    },
-    utils::{config, constants, helpers},
+    db::manager::DatabaseManager,
+    types::job::{AtlanticJobType, Job, JobStatus},
+    utils::config,
     BankaiClient,
 };
-use num_traits::ToPrimitive;
-use std::sync::OnceLock;
-use tokio::sync::{mpsc, Semaphore};
 use tracing::{error, info};
-use uuid::Uuid;
-
-use crate::error::DaemonError;
-
-// Add a static semaphore to limit concurrent submissions
-static SUBMISSION_SEMAPHORE: OnceLock<Semaphore> = OnceLock::new();
-
-fn get_semaphore() -> &'static Semaphore {
-    SUBMISSION_SEMAPHORE.get_or_init(|| Semaphore::new(1))
-}
 
 pub async fn process_offchain_proof_stage(
     job: Job,
@@ -119,7 +101,6 @@ pub async fn process_committee_wrapping_stage(
     let job_data = db_manager.get_job_by_id(job.job_id).await?;
 
     if let Some(job_data) = job_data {
-        let slot = job_data.slot.to_u64().unwrap();
         info!(
             "[SYNC COMMITTEE JOB][{}] Checking completion of Atlantic proof wrapping job. QueryID: {:?}",
             job.job_id, job_data.atlantic_proof_wrapper_batch_id

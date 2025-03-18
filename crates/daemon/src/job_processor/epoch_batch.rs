@@ -1,19 +1,17 @@
 use std::sync::Arc;
 
-use alloy_rpc_types_beacon::events::HeadEvent;
 use bankai_core::{
-    cairo_runner::{self, generate_committee_update_pie},
+    cairo_runner::{self},
     db::manager::DatabaseManager,
     types::{
         job::{AtlanticJobType, Job, JobStatus, JobType},
         proofs::epoch_batch::EpochUpdateBatch,
         traits::{Exportable, ProofType},
     },
-    utils::{config, constants, helpers},
+    utils::helpers,
     BankaiClient,
 };
-use tokio::sync::mpsc;
-use tracing::{error, info};
+use tracing::info;
 use uuid::Uuid;
 
 use crate::error::DaemonError;
@@ -36,7 +34,7 @@ impl EpochBatchJobProcessor {
     ) -> Result<Job, DaemonError> {
         let job_id = Uuid::new_v4();
         let job = Job {
-            job_id: job_id.clone(),
+            job_id,
             job_type: JobType::EpochBatchUpdate,
             job_status: JobStatus::Created,
             slot: Some(slot),
@@ -53,7 +51,7 @@ impl EpochBatchJobProcessor {
 
                 Ok(job)
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -73,7 +71,7 @@ impl EpochBatchJobProcessor {
             job.job_id,
         )
         .await
-        .map_err(|e| bankai_core::types::proofs::ProofError::EpochBatch(e))?;
+        .map_err(bankai_core::types::proofs::ProofError::EpochBatch)?;
 
         let name = circuit_inputs.name();
 

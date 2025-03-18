@@ -1,6 +1,3 @@
-use std::sync::Arc;
-
-use alloy_rpc_types_beacon::events::HeadEvent;
 use bankai_core::{
     cairo_runner::generate_committee_update_pie,
     db::manager::DatabaseManager,
@@ -8,11 +5,11 @@ use bankai_core::{
         job::{AtlanticJobType, Job, JobStatus, JobType},
         traits::{Exportable, ProofType},
     },
-    utils::{config, constants, helpers},
+    utils::{constants, helpers},
     BankaiClient,
 };
-use tokio::sync::mpsc;
-use tracing::{error, info};
+use std::sync::Arc;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::error::DaemonError;
@@ -29,7 +26,6 @@ impl SyncCommitteeJobProcessor {
 
     pub async fn create_job_from_event(
         db_manager: Arc<DatabaseManager>,
-        event: &HeadEvent,
         latest_verified_sync_committee_id: u64,
         latest_verified_epoch_slot: u64,
     ) -> Result<Option<Job>, DaemonError> {
@@ -77,7 +73,7 @@ impl SyncCommitteeJobProcessor {
         {
             let job_id = Uuid::new_v4();
             let job = Job {
-                job_id: job_id.clone(),
+                job_id,
                 job_type: JobType::SyncCommitteeUpdate,
                 job_status: JobStatus::Created,
                 slot: Some(latest_verified_epoch_slot),

@@ -16,9 +16,7 @@ use crate::{
     utils::{
         constants::{SLOTS_PER_EPOCH, TARGET_BATCH_SIZE},
         hashing::get_committee_hash,
-        helpers::{
-            self, get_first_slot_for_epoch, slot_to_epoch_id,
-        },
+        helpers::{self, get_first_slot_for_epoch, slot_to_epoch_id},
         merkle::poseidon::{compute_paths, compute_root, hash_path},
     },
     BankaiClient,
