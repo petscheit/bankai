@@ -46,7 +46,7 @@ impl EpochBatchJobProcessor {
             Ok(()) => {
                 info!(
                     job_id = %job_id,
-                    job_type = "EPOCH_BATCH_JOB",
+                    job_type = %job.job_type,
                     epoch_start = epoch_start,
                     epoch_end = epoch_end,
                     sync_committee_id = helpers::get_sync_committee_id_by_epoch(epoch_end),
@@ -62,7 +62,7 @@ impl EpochBatchJobProcessor {
     pub async fn process_job(&self, job: Job) -> Result<(), DaemonError> {
         info!(
             job_id = %job.job_id,
-            job_type = "EPOCH_BATCH_JOB",
+            job_type = %job.job_type,
             epoch_start = job.batch_range_begin_epoch.unwrap(),
             epoch_end = job.batch_range_end_epoch.unwrap(),
             "Preparing inputs for program for epochs"
@@ -83,14 +83,14 @@ impl EpochBatchJobProcessor {
         let input_path = circuit_inputs.export()?;
         info!(
             job_id = %job.job_id,
-            job_type = "EPOCH_BATCH_JOB",
+            job_type = %job.job_type,
             input_path = ?input_path,
             "Circuit inputs saved"
         );
 
         info!(
             job_id = %job.job_id,
-            job_type = "EPOCH_BATCH_JOB",
+            job_type = %job.job_type,
             "Starting trace generation"
         );
 
@@ -108,7 +108,7 @@ impl EpochBatchJobProcessor {
 
         info!(
             job_id = %job.job_id,
-            job_type = "EPOCH_BATCH_JOB",
+            job_type = %job.job_type,
             "Uploading PIE and sending proof generation request to Atlantic"
         );
 
@@ -120,7 +120,7 @@ impl EpochBatchJobProcessor {
 
         info!(
             job_id = %job.job_id,
-            job_type = "EPOCH_BATCH_JOB",
+            job_type = %job.job_type,
             atlantic_query_id = %batch_id,
             "Proof generation batch submitted to Atlantic"
         );

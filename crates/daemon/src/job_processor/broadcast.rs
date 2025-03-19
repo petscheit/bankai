@@ -47,7 +47,7 @@ pub async fn broadcast_epoch_batch(
     if required_sync_committee_id > latest_verified_committee_id {
         info!(
             job_id = %job.job_id,
-            job_type = "EPOCH_BATCH_JOB",
+            job_type = %job.job_type,
             required_committee_id = %required_sync_committee_id,
             latest_committee_id = %latest_verified_committee_id,
             "Waiting for sync committee update"
@@ -63,7 +63,7 @@ pub async fn broadcast_epoch_batch(
     
     info!(
         job_id = %job.job_id,
-        job_type = "EPOCH_BATCH_JOB",
+        job_type = %job.job_type,
         "Acquired submission permit, proceeding with on-chain update"
     );
 
@@ -77,7 +77,7 @@ pub async fn broadcast_epoch_batch(
 
     info!(
         job_id = %job.job_id,
-        job_type = "EPOCH_BATCH_JOB",
+        job_type = %job.job_type,
         tx_hash = %tx_hash,
         "Successfully called epoch batch update onchain, transaction confirmed"
     );
@@ -93,7 +93,7 @@ pub async fn broadcast_epoch_batch(
 
     info!(
         job_id = %job.job_id,
-        job_type = "EPOCH_BATCH_JOB",
+        job_type = %job.job_type,
         "Transaction is confirmed on-chain"
     );
     
@@ -106,7 +106,7 @@ pub async fn broadcast_epoch_batch(
         {
             info!(
                 job_id = %job.job_id,
-                job_type = "EPOCH_BATCH_JOB",
+                job_type = %job.job_type,
                 batch_index = index,
                 epoch_data = ?epoch.expected_circuit_outputs,
                 "Inserting epoch data to DB"
@@ -154,7 +154,7 @@ pub async fn broadcast_sync_committee(
             
         info!(
             job_id = %job.job_id,
-            job_type = "SYNC_COMMITTEE_JOB",
+            job_type = %job.job_type,
             "Acquired submission permit, proceeding with on-chain update"
         );
 
@@ -165,7 +165,7 @@ pub async fn broadcast_sync_committee(
 
         info!(
             job_id = %job.job_id,
-            job_type = "SYNC_COMMITTEE_JOB",
+            job_type =  %job.job_type,
             committee_id = sync_committee_id,
             tx_hash = %tx_hash,
             "Successfully called sync committee update onchain, transaction confirmed"
@@ -182,7 +182,7 @@ pub async fn broadcast_sync_committee(
 
         info!(
             job_id = %job.job_id,
-            job_type = "SYNC_COMMITTEE_JOB",
+            job_type =  %job.job_type,
             "Transaction is confirmed on-chain"
         );
         
@@ -220,7 +220,7 @@ pub async fn broadcast_sync_committee(
 
         info!(
             job_id = %job.job_id,
-            job_type = "SYNC_COMMITTEE_JOB",
+            job_type =  %job.job_type,
             "Sync committee verified onchain, job is done"
         );
     }

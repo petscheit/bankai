@@ -82,7 +82,7 @@ impl SyncCommitteeJobProcessor {
 
             info!(
                 job_id = %job.job_id,
-                job_type = "SYNC_COMMITTEE_JOB",
+                job_type = %job.job_type,
                 committee_id = update_committee_id,
                 "Sync committee update program inputs generated"
             );
@@ -90,7 +90,7 @@ impl SyncCommitteeJobProcessor {
             let input_path = update.export()?;
             info!(
                 job_id = %job.job_id,
-                job_type = "SYNC_COMMITTEE_JOB",
+                job_type = %job.job_type,
                 input_path = ?input_path,
                 "Circuit inputs saved"
             );
@@ -101,7 +101,7 @@ impl SyncCommitteeJobProcessor {
 
             info!(
                 job_id = %job.job_id,
-                job_type = "SYNC_COMMITTEE_JOB",
+                job_type = %job.job_type,
                 committee_id = update_committee_id,
                 "Starting Cairo execution and PIE generation"
             );
@@ -115,14 +115,14 @@ impl SyncCommitteeJobProcessor {
 
             info!(
                 job_id = %job.job_id,
-                job_type = "SYNC_COMMITTEE_JOB",
+                job_type = %job.job_type,
                 committee_id = update_committee_id,
                 "PIE generated successfully"
             );
 
             info!(
                 job_id = %job.job_id,
-                job_type = "SYNC_COMMITTEE_JOB",
+                job_type = %job.job_type,
                 committee_id = update_committee_id,
                 "Sending committee update proof generation query to Atlantic"
             );
@@ -147,7 +147,7 @@ impl SyncCommitteeJobProcessor {
 
             info!(
                 job_id = %job.job_id,
-                job_type = "SYNC_COMMITTEE_JOB",
+                job_type = %job.job_type,
                 atlantic_query_id = %batch_id,
                 "Proof generation batch submitted to Atlantic"
             );

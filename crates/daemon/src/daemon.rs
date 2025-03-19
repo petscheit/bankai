@@ -117,8 +117,8 @@ impl Daemon {
                             if let Err(e) = processor_clone.process_proof_job(job.clone()).await {
                                 error!(
                                     job_id = %job_id,
-                                    job_type = ?job.job_type,
-                                    job_status = ?job.job_status,
+                                    job_type = job.job_type.to_string(),
+                                    job_status = job.job_status.to_string(),
                                     error = %e,
                                     error_type = ?std::any::type_name_of_val(&e),
                                     "Error processing proof job"
@@ -144,8 +144,8 @@ impl Daemon {
                             if let Err(e) = processor_clone.process_trace_gen_job(job.clone()).await {
                                 error!(
                                     job_id = %job_id,
-                                    job_type = ?job.job_type,
-                                    job_status = ?job.job_status,
+                                    job_type = job.job_type.to_string(),
+                                    job_status = job.job_status.to_string(),
                                     error = %e,
                                     error_type = ?std::any::type_name_of_val(&e),
                                     "Error processing trace generation job"
@@ -197,8 +197,8 @@ impl Daemon {
                     .map_err(|e| {
                         error!(
                             job_id = %job.job_id,
-                            job_type = ?job.job_type,
-                            job_status = ?job.job_status,
+                            job_type = job.job_type.to_string(),
+                            job_status = job.job_status.to_string(),
                             error = %e,
                             error_type = ?std::any::type_name_of_val(&e),
                             "Error updating job status for retry"

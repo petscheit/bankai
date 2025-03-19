@@ -50,7 +50,7 @@ impl JobProcessor {
                     self.handle_job_error(job.job_id).await?;
                     error!(
                         job_id = %job.job_id,
-                        job_type = "SYNC_COMMITTEE_JOB",
+                        job_type = %job.job_type,
                         error = %e,
                         error_type = ?std::any::type_name_of_val(&e),
                         "Error processing sync committee update job"
@@ -67,7 +67,7 @@ impl JobProcessor {
                     self.handle_job_error(job.job_id).await?;
                     error!(
                         job_id = %job.job_id,
-                        job_type = "EPOCH_BATCH_JOB",
+                        job_type = %job.job_type,
                         error = %e,
                         error_type = ?std::any::type_name_of_val(&e),
                         "Error processing epoch batch update job"
@@ -114,7 +114,7 @@ impl JobProcessor {
                         self.handle_job_error(job.job_id).await?;
                         error!(
                             job_id = %job.job_id,
-                            job_type = "SYNC_COMMITTEE_JOB",
+                            job_type = %job.job_type,
                             job_status = ?job.job_status,
                             error = %e,
                             error_type = ?std::any::type_name_of_val(&e),
@@ -134,7 +134,7 @@ impl JobProcessor {
                         self.handle_job_error(job.job_id).await?;
                         error!(
                             job_id = %job.job_id,
-                            job_type = "EPOCH_BATCH_JOB",
+                            job_type = %job.job_type,
                             job_status = ?job.job_status,
                             error = %e,
                             error_type = ?std::any::type_name_of_val(&e),
@@ -156,7 +156,7 @@ impl JobProcessor {
                         self.handle_job_error(job.job_id).await?;
                         error!(
                             job_id = %job.job_id,
-                            job_type = "EPOCH_BATCH_JOB",
+                            job_type = %job.job_type,
                             job_status = ?job.job_status,
                             error = %e,
                             error_type = ?std::any::type_name_of_val(&e),
@@ -176,7 +176,7 @@ impl JobProcessor {
                         self.handle_job_error(job.job_id).await?;
                         error!(
                             job_id = %job.job_id,
-                            job_type = "SYNC_COMMITTEE_JOB",
+                            job_type = %job.job_type,
                             job_status = ?job.job_status,
                             error = %e,
                             error_type = ?std::any::type_name_of_val(&e),

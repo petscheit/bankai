@@ -61,7 +61,7 @@ pub async fn process_offchain_proof_stage(
 
             info!(
                 job_id = %job.job_id,
-                job_type = "OFFCHAIN_PROOF_JOB",
+                job_type = "WRAP_PROOF_JOB",
                 "Sending proof wrapping query to Atlantic"
             );
             
@@ -76,7 +76,7 @@ pub async fn process_offchain_proof_stage(
                 
             info!(
                 job_id = %job.job_id,
-                job_type = "OFFCHAIN_PROOF_JOB",
+                job_type = "WRAP_PROOF_JOB",
                 atlantic_query_id = %batch_id,
                 wrapping_query_id = %wrapping_batch_id,
                 "Proof wrapping query submitted to Atlantic"
@@ -124,7 +124,7 @@ pub async fn process_committee_wrapping_stage(
         
         info!(
             job_id = %job.job_id,
-            job_type = "SYNC_COMMITTEE_JOB",
+            job_type = %job.job_type,
             atlantic_query_id = %batch_id,
             "Checking completion of Atlantic proof wrapping job"
         );
@@ -147,7 +147,7 @@ pub async fn process_committee_wrapping_stage(
 
             info!(
                 job_id = %job.job_id,
-                job_type = "SYNC_COMMITTEE_JOB",
+                job_type = %job.job_type,
                 atlantic_query_id = %batch_id,
                 "Proof wrapping done by Atlantic"
             );
@@ -158,7 +158,7 @@ pub async fn process_committee_wrapping_stage(
         } else if status == "FAILED" {
             error!(
                 job_id = %job.job_id,
-                job_type = "SYNC_COMMITTEE_JOB",
+                job_type = %job.job_type,
                 atlantic_query_id = %batch_id,
                 "Proof wrapping failed by Atlantic"
             );
@@ -166,7 +166,7 @@ pub async fn process_committee_wrapping_stage(
         } else {
             info!(
                 job_id = %job.job_id,
-                job_type = "SYNC_COMMITTEE_JOB",
+                job_type = %job.job_type,
                 atlantic_query_id = %batch_id,
                 "Proof wrapping not done by Atlantic yet"
             );
@@ -198,7 +198,7 @@ pub async fn process_epoch_batch_wrapping_stage(
 
             info!(
                 job_id = %job.job_id,
-                job_type = "EPOCH_BATCH_JOB",
+                job_type = %job.job_type,
                 atlantic_query_id = %batch_id,
                 "Proof wrapping done by Atlantic"
             );
@@ -209,7 +209,7 @@ pub async fn process_epoch_batch_wrapping_stage(
         } else if status == "FAILED" {
             error!(
                 job_id = %job.job_id,
-                job_type = "EPOCH_BATCH_JOB",
+                job_type = %job.job_type,
                 atlantic_query_id = %batch_id,
                 "Proof wrapping failed by Atlantic"
             );
@@ -217,7 +217,7 @@ pub async fn process_epoch_batch_wrapping_stage(
         } else {
             info!(
                 job_id = %job.job_id,
-                job_type = "EPOCH_BATCH_JOB",
+                job_type = %job.job_type,
                 atlantic_query_id = %batch_id,
                 "Proof wrapping not done by Atlantic yet"
             );
