@@ -48,7 +48,13 @@ impl JobProcessor {
                     .await
                 {
                     self.handle_job_error(job.job_id).await?;
-                    error!("Error processing sync committee update job: {:?}", e);
+                    error!(
+                        job_id = %job.job_id,
+                        job_type = "SYNC_COMMITTEE_JOB",
+                        error = %e,
+                        error_type = ?std::any::type_name_of_val(&e),
+                        "Error processing sync committee update job"
+                    );
                     return Err(e);
                 }
             }
@@ -59,7 +65,13 @@ impl JobProcessor {
                     .await
                 {
                     self.handle_job_error(job.job_id).await?;
-                    error!("Error processing epoch batch update job: {:?}", e);
+                    error!(
+                        job_id = %job.job_id,
+                        job_type = "EPOCH_BATCH_JOB",
+                        error = %e,
+                        error_type = ?std::any::type_name_of_val(&e),
+                        "Error processing epoch batch update job"
+                    );
                     return Err(e);
                 }
             }
@@ -79,7 +91,14 @@ impl JobProcessor {
                 .await
                 {
                     self.handle_job_error(job.job_id).await?;
-                    error!("Error processing offchain proof stage: {:?}", e);
+                    error!(
+                        job_id = %job.job_id,
+                        job_type = %job.job_type,
+                        job_status = ?job.job_status,
+                        error = %e,
+                        error_type = ?std::any::type_name_of_val(&e),
+                        "Error processing offchain proof stage"
+                    );
                     return Err(e);
                 }
             }
@@ -93,7 +112,14 @@ impl JobProcessor {
                     .await
                     {
                         self.handle_job_error(job.job_id).await?;
-                        error!("Error processing committee wrapping stage: {:?}", e);
+                        error!(
+                            job_id = %job.job_id,
+                            job_type = "SYNC_COMMITTEE_JOB",
+                            job_status = ?job.job_status,
+                            error = %e,
+                            error_type = ?std::any::type_name_of_val(&e),
+                            "Error processing committee wrapping stage"
+                        );
                         return Err(e);
                     }
                 }
@@ -106,7 +132,14 @@ impl JobProcessor {
                     .await
                     {
                         self.handle_job_error(job.job_id).await?;
-                        error!("Error processing epoch batch wrapping stage: {:?}", e);
+                        error!(
+                            job_id = %job.job_id,
+                            job_type = "EPOCH_BATCH_JOB",
+                            job_status = ?job.job_status,
+                            error = %e,
+                            error_type = ?std::any::type_name_of_val(&e),
+                            "Error processing epoch batch wrapping stage"
+                        );
                         return Err(e);
                     }
                 }
@@ -121,7 +154,14 @@ impl JobProcessor {
                     .await
                     {
                         self.handle_job_error(job.job_id).await?;
-                        error!("Error processing epoch bacth broadcast stage: {:?}", e);
+                        error!(
+                            job_id = %job.job_id,
+                            job_type = "EPOCH_BATCH_JOB",
+                            job_status = ?job.job_status,
+                            error = %e,
+                            error_type = ?std::any::type_name_of_val(&e),
+                            "Error processing epoch batch broadcast stage"
+                        );
                         return Err(e);
                     }
                 }
@@ -134,7 +174,14 @@ impl JobProcessor {
                     .await
                     {
                         self.handle_job_error(job.job_id).await?;
-                        error!("Error processing sync committee broadcast stage: {:?}", e);
+                        error!(
+                            job_id = %job.job_id,
+                            job_type = "SYNC_COMMITTEE_JOB",
+                            job_status = ?job.job_status,
+                            error = %e,
+                            error_type = ?std::any::type_name_of_val(&e),
+                            "Error processing sync committee broadcast stage"
+                        );
                         return Err(e);
                     }
                 }
@@ -147,6 +194,13 @@ impl JobProcessor {
 
     pub async fn handle_job_error(&self, job_id: Uuid) -> Result<(), DaemonError> {
         let job_data = self.db_manager.get_job_by_id(job_id).await?.unwrap();
+        
+        error!(
+            job_id = %job_id,
+            previous_status = ?job_data.job_status,
+            "Setting job status to ERROR"
+        );
+        
         self.db_manager
             .set_failure_info(job_id, job_data.job_status)
             .await?;

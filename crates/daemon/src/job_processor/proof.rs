@@ -17,8 +17,10 @@ pub async fn process_offchain_proof_stage(
 
     if let Some(job_data) = job_data {
         info!(
-            "[OFFCHAIN PROOF JOB][{}] Waiting for completion of Atlantic job. QueryID: {:?}",
-            job.job_id, job_data.atlantic_proof_generate_batch_id
+            job_id = %job.job_id,
+            job_type = "OFFCHAIN_PROOF_JOB",
+            atlantic_query_id = ?job_data.atlantic_proof_generate_batch_id,
+            "Waiting for completion of Atlantic job"
         );
 
         let batch_id = job_data.atlantic_proof_generate_batch_id.unwrap();
@@ -26,13 +28,19 @@ pub async fn process_offchain_proof_stage(
         let status = bankai.atlantic_client.check_batch_status(&batch_id).await?;
 
         info!(
-            "[OFFCHAIN PROOF JOB][{}] Atlantic job status: {}",
-            job.job_id, status
+            job_id = %job.job_id,
+            job_type = "OFFCHAIN_PROOF_JOB",
+            atlantic_query_id = %batch_id,
+            status = %status,
+            "Atlantic job status received"
         );
+        
         if status == "DONE" {
             info!(
-                "[OFFCHAIN PROOF JOB][{}] Proof generation done by Atlantic. QueryID: {}",
-                job.job_id, batch_id
+                job_id = %job.job_id,
+                job_type = "OFFCHAIN_PROOF_JOB",
+                atlantic_query_id = %batch_id,
+                "Proof generation done by Atlantic"
             );
 
             let proof = bankai
@@ -41,8 +49,10 @@ pub async fn process_offchain_proof_stage(
                 .await?;
 
             info!(
-                "[OFFCHAIN PROOF JOB][{}] Proof retrieved from Atlantic. QueryID: {}",
-                job.job_id, batch_id
+                job_id = %job.job_id,
+                job_type = "OFFCHAIN_PROOF_JOB",
+                atlantic_query_id = %batch_id,
+                "Proof retrieved from Atlantic"
             );
 
             db_manager
@@ -50,20 +60,26 @@ pub async fn process_offchain_proof_stage(
                 .await?;
 
             info!(
-                "[OFFCHAIN PROOF JOB][{}] Sending proof wrapping query to Atlantic..",
-                job.job_id
+                job_id = %job.job_id,
+                job_type = "OFFCHAIN_PROOF_JOB",
+                "Sending proof wrapping query to Atlantic"
             );
+            
             let wrapping_batch_id = bankai
                 .atlantic_client
                 .submit_wrapped_proof(
                     proof,
                     bankai.config.cairo_verifier_path.clone(),
-                    batch_id,
+                    batch_id.clone(),
                 )
                 .await?;
+                
             info!(
-                "[OFFCHAIN PROOF JOB][{}] Proof wrapping query submitted to Atlantic. Wrapping QueryID: {}",
-                job.job_id, wrapping_batch_id
+                job_id = %job.job_id,
+                job_type = "OFFCHAIN_PROOF_JOB",
+                atlantic_query_id = %batch_id,
+                wrapping_query_id = %wrapping_batch_id,
+                "Proof wrapping query submitted to Atlantic"
             );
 
             db_manager
@@ -78,14 +94,18 @@ pub async fn process_offchain_proof_stage(
                 .await?;
         } else if status == "FAILED" {
             error!(
-                "[OFFCHAIN PROOF JOB][{}] Proof wrapping failed by Atlantic. QueryID: {:?}",
-                job.job_id, batch_id
+                job_id = %job.job_id,
+                job_type = "OFFCHAIN_PROOF_JOB",
+                atlantic_query_id = %batch_id,
+                "Proof wrapping failed by Atlantic"
             );
             return Err(DaemonError::OffchainProofFailed(job.job_id.to_string()));
         } else {
             info!(
-                "[OFFCHAIN PROOF JOB][{}] Proof wrapping not done by Atlantic yet. QueryID: {:?}",
-                job.job_id, batch_id
+                job_id = %job.job_id,
+                job_type = "OFFCHAIN_PROOF_JOB",
+                atlantic_query_id = %batch_id,
+                "Proof wrapping not done by Atlantic yet"
             );
         }
     }
@@ -100,9 +120,13 @@ pub async fn process_committee_wrapping_stage(
     let job_data = db_manager.get_job_by_id(job.job_id).await?;
 
     if let Some(job_data) = job_data {
+        let batch_id = job_data.atlantic_proof_wrapper_batch_id.clone().unwrap();
+        
         info!(
-            "[SYNC COMMITTEE JOB][{}] Checking completion of Atlantic proof wrapping job. QueryID: {:?}",
-            job.job_id, job_data.atlantic_proof_wrapper_batch_id
+            job_id = %job.job_id,
+            job_type = "SYNC_COMMITTEE_JOB",
+            atlantic_query_id = %batch_id,
+            "Checking completion of Atlantic proof wrapping job"
         );
 
         let status = bankai
@@ -122,9 +146,10 @@ pub async fn process_committee_wrapping_stage(
                 .await?;
 
             info!(
-                "[SYNC COMMITTEE JOB][{}] Proof wrapping done by Atlantic. QueryID: {:?}",
-                job.job_id,
-                job_data.atlantic_proof_wrapper_batch_id.unwrap()
+                job_id = %job.job_id,
+                job_type = "SYNC_COMMITTEE_JOB",
+                atlantic_query_id = %batch_id,
+                "Proof wrapping done by Atlantic"
             );
 
             db_manager
@@ -132,16 +157,18 @@ pub async fn process_committee_wrapping_stage(
                 .await?;
         } else if status == "FAILED" {
             error!(
-                "[SYNC COMMITTEE JOB][{}] Proof wrapping failed by Atlantic. QueryID: {:?}",
-                job.job_id,
-                job_data.atlantic_proof_wrapper_batch_id.unwrap()
+                job_id = %job.job_id,
+                job_type = "SYNC_COMMITTEE_JOB",
+                atlantic_query_id = %batch_id,
+                "Proof wrapping failed by Atlantic"
             );
             return Err(DaemonError::ProofWrappingFailed(job.job_id.to_string()));
         } else {
             info!(
-                "[SYNC COMMITTEE JOB][{}] Proof wrapping not done by Atlantic yet. QueryID: {:?}",
-                job.job_id,
-                job_data.atlantic_proof_wrapper_batch_id.unwrap()
+                job_id = %job.job_id,
+                job_type = "SYNC_COMMITTEE_JOB",
+                atlantic_query_id = %batch_id,
+                "Proof wrapping not done by Atlantic yet"
             );
         }
     }
@@ -157,15 +184,11 @@ pub async fn process_epoch_batch_wrapping_stage(
     let job_data = db_manager.get_job_by_id(job.job_id).await?;
 
     if let Some(job_data) = job_data {
+        let batch_id = job_data.atlantic_proof_wrapper_batch_id.clone().unwrap();
+        
         let status = bankai
             .atlantic_client
-            .check_batch_status(
-                job_data
-                    .atlantic_proof_wrapper_batch_id
-                    .clone()
-                    .unwrap()
-                    .as_str(),
-            )
+            .check_batch_status(batch_id.as_str())
             .await?;
 
         if status == "DONE" {
@@ -174,9 +197,10 @@ pub async fn process_epoch_batch_wrapping_stage(
                 .await?;
 
             info!(
-                "[EPOCH BATCH JOB][{}] Proof wrapping done by Atlantic. QueryID: {:?}",
-                job.job_id,
-                job_data.atlantic_proof_wrapper_batch_id.unwrap()
+                job_id = %job.job_id,
+                job_type = "EPOCH_BATCH_JOB",
+                atlantic_query_id = %batch_id,
+                "Proof wrapping done by Atlantic"
             );
 
             db_manager
@@ -184,16 +208,18 @@ pub async fn process_epoch_batch_wrapping_stage(
                 .await?;
         } else if status == "FAILED" {
             error!(
-                "[EPOCH BATCH JOB][{}] Proof wrapping failed by Atlantic. QueryID: {:?}",
-                job.job_id,
-                job_data.atlantic_proof_wrapper_batch_id.unwrap()
+                job_id = %job.job_id,
+                job_type = "EPOCH_BATCH_JOB",
+                atlantic_query_id = %batch_id,
+                "Proof wrapping failed by Atlantic"
             );
             return Err(DaemonError::ProofWrappingFailed(job.job_id.to_string()));
         } else {
             info!(
-                "[EPOCH BATCH JOB][{}] Proof wrapping not done by Atlantic yet. QueryID: {:?}",
-                job.job_id,
-                job_data.atlantic_proof_wrapper_batch_id.unwrap()
+                job_id = %job.job_id,
+                job_type = "EPOCH_BATCH_JOB",
+                atlantic_query_id = %batch_id,
+                "Proof wrapping not done by Atlantic yet"
             );
         }
     }

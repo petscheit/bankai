@@ -34,10 +34,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     //let (tx, mut rx) = mpsc::channel(32);
     let connection_string = format!(
         "host={} user={} password={} dbname={}",
-        env::var("POSTGRESQL_HOST").unwrap().as_str(),
-        env::var("POSTGRESQL_USER").unwrap().as_str(),
-        env::var("POSTGRESQL_PASSWORD").unwrap().as_str(),
-        env::var("POSTGRESQL_DB_NAME").unwrap().as_str()
+        env::var("POSTGRES_HOST").unwrap().as_str(),
+        env::var("POSTGRES_USER").unwrap().as_str(),
+        env::var("POSTGRES_PASSWORD").unwrap().as_str(),
+        env::var("POSTGRES_DB").unwrap().as_str()
     );
 
     // Create a new DatabaseManager

@@ -32,15 +32,6 @@ impl SyncCommitteeJobProcessor {
         let lowest_required_committee_update_slot =
             latest_verified_sync_committee_id * constants::SLOTS_PER_SYNC_COMMITTEE;
 
-        println!(
-            "lowest_required_committee_update_slot: {}",
-            lowest_required_committee_update_slot
-        );
-        println!(
-            "           latest_verified_epoch_slot: {}",
-            latest_verified_epoch_slot
-        );
-
         // Only proceed if we're at or past the required slot
         if latest_verified_epoch_slot < lowest_required_committee_update_slot {
             return Ok(None);
@@ -49,7 +40,6 @@ impl SyncCommitteeJobProcessor {
         // The new sync committee is always included in the previous epoch when we decommit it, so we need to increment by 1 here
         let potential_new_committee_id =
             helpers::get_sync_committee_id_by_slot(latest_verified_epoch_slot) + 1;
-        println!("potential_new_committee_id: {}", potential_new_committee_id);
 
         // Get latest committee progress information
         let last_sync_committee_in_progress = db_manager
@@ -61,12 +51,6 @@ impl SyncCommitteeJobProcessor {
             .get_latest_done_sync_committee()
             .await?
             .unwrap_or(0);
-
-        println!(
-            "last_sync_committee_in_progress: {}",
-            last_sync_committee_in_progress
-        );
-        println!("last_done_sync_committee: {}", last_done_sync_committee);
 
         if potential_new_committee_id > last_sync_committee_in_progress
             && potential_new_committee_id > last_done_sync_committee
@@ -86,7 +70,6 @@ impl SyncCommitteeJobProcessor {
                 Err(e) => return Err(e.into()),
             }
         }
-
         Ok(None)
     }
 
@@ -98,14 +81,18 @@ impl SyncCommitteeJobProcessor {
             let name = update.name();
 
             info!(
-                "[SYNC COMMITTEE JOB][{}] Sync committee update program inputs generated: {:?}",
-                job.job_id, update_committee_id
+                job_id = %job.job_id,
+                job_type = "SYNC_COMMITTEE_JOB",
+                committee_id = update_committee_id,
+                "Sync committee update program inputs generated"
             );
 
             let input_path = update.export()?;
             info!(
-                "[SYNC COMMITTEE JOB][{}] Circuit inputs saved at {:?}",
-                job.job_id, input_path
+                job_id = %job.job_id,
+                job_type = "SYNC_COMMITTEE_JOB",
+                input_path = ?input_path,
+                "Circuit inputs saved"
             );
 
             self.db_manager
@@ -113,8 +100,10 @@ impl SyncCommitteeJobProcessor {
                 .await?;
 
             info!(
-                "[SYNC COMMITTEE JOB][{}] Starting Cairo execution and PIE generation for Sync Committee: {}...",
-                job.job_id, update_committee_id
+                job_id = %job.job_id,
+                job_type = "SYNC_COMMITTEE_JOB",
+                committee_id = update_committee_id,
+                "Starting Cairo execution and PIE generation"
             );
 
             let pie =
@@ -125,12 +114,18 @@ impl SyncCommitteeJobProcessor {
                 .await?;
 
             info!(
-                "[SYNC COMMITTEE JOB][{}] Pie generated successfully for Sync Committee: {}...",
-                job.job_id, update_committee_id
+                job_id = %job.job_id,
+                job_type = "SYNC_COMMITTEE_JOB",
+                committee_id = update_committee_id,
+                "PIE generated successfully"
             );
 
-            info!("[SYNC COMMITTEE JOB][{}] Sending committee update proof generation query to Atlantic: {}", 
-                job.job_id, update_committee_id);
+            info!(
+                job_id = %job.job_id,
+                job_type = "SYNC_COMMITTEE_JOB",
+                committee_id = update_committee_id,
+                "Sending committee update proof generation query to Atlantic"
+            );
 
             let batch_id = self
                 .bankai
@@ -151,8 +146,10 @@ impl SyncCommitteeJobProcessor {
                 .await?;
 
             info!(
-                "[SYNC COMMITTEE JOB][{}] Proof generation batch submitted to atlantic. QueryID: {}",
-                job.job_id, batch_id
+                job_id = %job.job_id,
+                job_type = "SYNC_COMMITTEE_JOB",
+                atlantic_query_id = %batch_id,
+                "Proof generation batch submitted to Atlantic"
             );
         }
 

@@ -45,8 +45,12 @@ impl EpochBatchJobProcessor {
         match db_manager.create_job(job.clone()).await {
             Ok(()) => {
                 info!(
-                    "[EPOCH BATCH UPDATE][{}] Job created successfully. Epochs range from {} to {} | Sync committee involved: {}",
-                    job_id, epoch_start, epoch_end, helpers::get_sync_committee_id_by_epoch(epoch_end)
+                    job_id = %job_id,
+                    job_type = "EPOCH_BATCH_JOB",
+                    epoch_start = epoch_start,
+                    epoch_end = epoch_end,
+                    sync_committee_id = helpers::get_sync_committee_id_by_epoch(epoch_end),
+                    "Job created successfully"
                 );
 
                 Ok(job)
@@ -57,10 +61,11 @@ impl EpochBatchJobProcessor {
 
     pub async fn process_job(&self, job: Job) -> Result<(), DaemonError> {
         info!(
-            "[BATCH EPOCH JOB][{}] Preparing inputs for program for epochs from {} to {}...",
-            job.job_id,
-            job.batch_range_begin_epoch.unwrap(),
-            job.batch_range_end_epoch.unwrap()
+            job_id = %job.job_id,
+            job_type = "EPOCH_BATCH_JOB",
+            epoch_start = job.batch_range_begin_epoch.unwrap(),
+            epoch_end = job.batch_range_end_epoch.unwrap(),
+            "Preparing inputs for program for epochs"
         );
 
         let circuit_inputs = EpochUpdateBatch::new_by_epoch_range(
@@ -77,13 +82,16 @@ impl EpochBatchJobProcessor {
 
         let input_path = circuit_inputs.export()?;
         info!(
-            "[BATCH EPOCH JOB][{}] Circuit inputs saved at {:?}",
-            job.job_id, input_path
+            job_id = %job.job_id,
+            job_type = "EPOCH_BATCH_JOB",
+            input_path = ?input_path,
+            "Circuit inputs saved"
         );
 
         info!(
-            "[BATCH EPOCH JOB][{}] Starting trace generation...",
-            job.job_id
+            job_id = %job.job_id,
+            job_type = "EPOCH_BATCH_JOB",
+            "Starting trace generation"
         );
 
         let pie = cairo_runner::generate_epoch_batch_pie(
@@ -98,7 +106,11 @@ impl EpochBatchJobProcessor {
             .update_job_status(job.job_id, JobStatus::PieGenerated)
             .await?;
 
-        info!("[BATCH EPOCH JOB][{}] Uploading PIE and sending proof generation request to Atlantic...", job.job_id);
+        info!(
+            job_id = %job.job_id,
+            job_type = "EPOCH_BATCH_JOB",
+            "Uploading PIE and sending proof generation request to Atlantic"
+        );
 
         let batch_id = self
             .bankai
@@ -107,8 +119,10 @@ impl EpochBatchJobProcessor {
             .await?;
 
         info!(
-            "[BATCH EPOCH JOB][{}] Proof generation batch submitted to Atlantic. QueryID: {}",
-            job.job_id, batch_id
+            job_id = %job.job_id,
+            job_type = "EPOCH_BATCH_JOB",
+            atlantic_query_id = %batch_id,
+            "Proof generation batch submitted to Atlantic"
         );
 
         self.db_manager

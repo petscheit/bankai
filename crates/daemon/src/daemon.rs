@@ -5,7 +5,6 @@ use dotenv::from_filename;
 use std::{env, sync::Arc};
 use tokio::sync::mpsc;
 use tracing::{error, info, Level};
-use tracing_subscriber::FmtSubscriber;
 
 use crate::error::DaemonError;
 use crate::job_manager::resume::update_job_status_for_resume;
@@ -29,7 +28,9 @@ impl Daemon {
         // Load .env.sepolia file
         from_filename(".env.sepolia").ok();
 
-        let subscriber = FmtSubscriber::builder()
+        // Replace the current subscriber setup with JSON formatting
+        let subscriber = tracing_subscriber::fmt()
+            .json()
             .with_max_level(Level::INFO)
             .finish();
 
@@ -52,10 +53,10 @@ impl Daemon {
         // Initialize database connection
         let connection_string = format!(
             "host={} user={} password={} dbname={}",
-            env::var("POSTGRESQL_HOST").unwrap().as_str(),
-            env::var("POSTGRESQL_USER").unwrap().as_str(),
-            env::var("POSTGRESQL_PASSWORD").unwrap().as_str(),
-            env::var("POSTGRESQL_DB_NAME").unwrap().as_str()
+            env::var("POSTGRES_HOST").unwrap().as_str(),
+            env::var("POSTGRES_USER").unwrap().as_str(),
+            env::var("POSTGRES_PASSWORD").unwrap().as_str(),
+            env::var("POSTGRES_DB").unwrap().as_str()
         );
 
         // Create a new DatabaseManager
@@ -114,12 +115,24 @@ impl Daemon {
                     | JobStatus::OffchainComputationFinished => {
                         tokio::spawn(async move {
                             if let Err(e) = processor_clone.process_proof_job(job.clone()).await {
-                                error!("Error processing job {}: {}", job_id, e);
+                                error!(
+                                    job_id = %job_id,
+                                    job_type = ?job.job_type,
+                                    job_status = ?job.job_status,
+                                    error = %e,
+                                    error_type = ?std::any::type_name_of_val(&e),
+                                    "Error processing proof job"
+                                );
                                 processor_clone
                                     .handle_job_error(job_id)
                                     .await
                                     .map_err(|e| {
-                                        error!("Error handling job error: {:?}", e);
+                                        error!(
+                                            job_id = %job_id,
+                                            error = %e,
+                                            error_type = ?std::any::type_name_of_val(&e),
+                                            "Error handling job error"
+                                        );
                                         e
                                     })
                                     .unwrap();
@@ -128,14 +141,25 @@ impl Daemon {
                     }
                     _ => {
                         tokio::spawn(async move {
-                            if let Err(e) = processor_clone.process_trace_gen_job(job.clone()).await
-                            {
-                                error!("Error processing job {}: {}", job_id, e);
+                            if let Err(e) = processor_clone.process_trace_gen_job(job.clone()).await {
+                                error!(
+                                    job_id = %job_id,
+                                    job_type = ?job.job_type,
+                                    job_status = ?job.job_status,
+                                    error = %e,
+                                    error_type = ?std::any::type_name_of_val(&e),
+                                    "Error processing trace generation job"
+                                );
                                 processor_clone
                                     .handle_job_error(job_id)
                                     .await
                                     .map_err(|e| {
-                                        error!("Error handling job error: {:?}", e);
+                                        error!(
+                                            job_id = %job_id,
+                                            error = %e,
+                                            error_type = ?std::any::type_name_of_val(&e),
+                                            "Error handling job error"
+                                        );
                                         e
                                     })
                                     .unwrap();
@@ -171,7 +195,14 @@ impl Daemon {
                     )
                     .await
                     .map_err(|e| {
-                        error!("Error updating job status for retry: {:?}", e);
+                        error!(
+                            job_id = %job.job_id,
+                            job_type = ?job.job_type,
+                            job_status = ?job.job_status,
+                            error = %e,
+                            error_type = ?std::any::type_name_of_val(&e),
+                            "Error updating job status for retry"
+                        );
                         e
                     })
                     .unwrap();
@@ -206,7 +237,13 @@ impl Daemon {
                 )
                 .await
                 .map_err(|e| {
-                    error!("Error creating new jobs: {:?}", e);
+                    error!(
+                        event_slot = event.slot,
+                        event_block = %event.block,
+                        error = %e,
+                        error_type = ?std::any::type_name_of_val(&e),
+                        "Error creating new jobs"
+                    );
                     e
                 })
                 .unwrap();
@@ -224,10 +261,10 @@ pub fn check_env_vars() -> Result<(), String> {
         "STARKNET_PRIVATE_KEY",
         "ATLANTIC_API_KEY",
         "PROOF_REGISTRY",
-        "POSTGRESQL_HOST",
-        "POSTGRESQL_USER",
-        "POSTGRESQL_PASSWORD",
-        "POSTGRESQL_DB_NAME",
+        "POSTGRES_HOST",
+        "POSTGRES_USER",
+        "POSTGRES_PASSWORD",
+        "POSTGRES_DB",
         "TRANSACTOR_API_KEY",
     ];
 

@@ -32,10 +32,6 @@ pub(crate) async fn create_new_jobs(
         .await?
         .to_u64()
         .unwrap();
-    println!(
-        "latest_verified_sync_committee_id: {}",
-        latest_verified_sync_committee_id
-    );
 
     let sync_committee_update_job = SyncCommitteeJobProcessor::create_job_from_event(
         db_manager.clone(),
@@ -81,8 +77,6 @@ pub(crate) async fn create_new_jobs(
         )
         .await?;
         tx.send(epoch_batch).await?;
-    } else {
-        info!("Epoch gap is less than target batch size, skipping epoch batch creation");
     }
 
     Ok(())

@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.docker
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - batches_data:/app/batches
+    # Send container logs to stdout, which Docker captures
+    # So that Promtail can scrape them, or you can use Docker logging driver
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGTERM
+
+  db:
+    image: postgres:15-alpine
+    env_file:
+      - .env.docker
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/POSTGRES/data
+      - ./db_structure.sql:/docker-entrypoint-initdb.d/db_structure.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # -- Loki service --
+  loki:
+    image: grafana/loki:2.7.1
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/config.yaml:/etc/loki/config.yaml:ro
+      # If you want to persist data across restarts:
+      - loki_data:/loki
+    command: -config.file=/etc/loki/config.yaml
+    restart: unless-stopped
+
+  # -- Promtail service --
+  promtail:
+    image: grafana/promtail:2.7.1
+    container_name: promtail
+    # We mount the Docker socket so promtail can discover containers
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./promtail/config.yaml:/etc/promtail/config.yaml:ro
+      - promtail_positions:/tmp
+    command: -config.file=/etc/promtail/config.yaml
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  # -- Grafana service --
+  grafana:
+    image: grafana/grafana-oss:9.5.2
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - loki
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=secret
+    # If you'd like to persist dashboards etc:
+    # volumes:
+    #   - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    name: postgres_data
+  batches_data:
+    name: batches_data
+  # For Loki data, if you want persistence:
+  loki_data:
+    name: loki_data
+  promtail_positions:
+    name: promtail_positions
+  # grafana_data:
+  #   name: grafana_data

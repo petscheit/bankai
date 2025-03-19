@@ -1,0 +1,60 @@
+auth_enabled: false
+
+server:
+  # Loki's main API port:
+  http_listen_port: 3100
+
+ingester:
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+  chunk_idle_period: 5m
+  max_chunk_age: 1h
+  chunk_retain_period: 30s
+  wal:
+    enabled: true
+    dir: /loki/wal
+
+limits_config:
+  # Adjust these to your needs:
+  ingestion_rate_mb: 4
+  ingestion_burst_size_mb: 6
+  max_concurrent_tail_requests: 20
+
+schema_config:
+  configs:
+    - from: 2022-01-01
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+storage_config:
+  boltdb_shipper:
+    active_index_directory: /loki/index
+    shared_store: filesystem
+    cache_location: /loki/boltdb-cache
+  filesystem:
+    directory: /loki/chunks
+
+compactor:
+  working_directory: /loki/compactor
+  shared_store: filesystem
+
+table_manager:
+  retention_deletes_enabled: false
+  retention_period: 0s
+
+distributor:
+  ring:
+    kvstore:
+      store: inmemory
+
+# Add common configuration
+common:
+  replication_factor: 1

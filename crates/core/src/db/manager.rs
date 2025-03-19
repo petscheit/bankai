@@ -1,6 +1,6 @@
 //! Database Manager Implementation
 //!
-//! This module provides a PostgreSQL database interface for managing jobs, epochs, and sync committees.
+//! This module provides a POSTGRES database interface for managing jobs, epochs, and sync committees.
 //! It handles all database operations including job tracking, status updates, and verification data storage.
 //! The manager provides a robust interface for tracking the state of various blockchain operations.
 
@@ -10,7 +10,7 @@ use chrono::NaiveDateTime;
 use num_traits::ToPrimitive;
 use thiserror::Error;
 use tokio_postgres::{Client, Row};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use alloy_primitives::{
@@ -110,7 +110,7 @@ pub struct JobStatusCount {
 /// Main database manager for handling all database operations
 #[derive(Debug)]
 pub struct DatabaseManager {
-    /// PostgreSQL client connection
+    /// POSTGRES client connection
     client: Client,
 }
 
@@ -118,7 +118,7 @@ impl DatabaseManager {
     /// Creates a new database manager instance
     ///
     /// # Arguments
-    /// * `db_url` - PostgreSQL connection URL
+    /// * `db_url` - POSTGRES connection URL
     ///
     /// # Returns
     /// * `Self` - New database manager instance
@@ -847,17 +847,13 @@ impl DatabaseManager {
         path_index: u64,
         path: String,
     ) -> Result<(), DatabaseError> {
-        let rows_affected =self.client
+        let _rows_affected =self.client
             .execute(
                 "INSERT INTO epoch_merkle_paths (epoch_id, path_index, merkle_path) VALUES ($1, $2, $3)
                  ON CONFLICT (epoch_id, path_index) DO NOTHING",
                 &[&epoch.to_i64(), &path_index.to_i64(), &path],
             )
             .await?;
-
-        if rows_affected == 0 {
-            warn!("Combination of epoch_id and path_index already exists, skipping insertion of epoch merkle patch for epoch {} and index {}", epoch, path_index);
-        }
         Ok(())
     }
 
@@ -1222,7 +1218,7 @@ impl DatabaseManager {
 /// Possible errors that can occur during database operations
 #[derive(Debug, Error)]
 pub enum DatabaseError {
-    /// PostgreSQL connection or query error
+    /// POSTGRES connection or query error
     #[error("Database connection error: {0}")]
     Postgres(#[from] tokio_postgres::Error),
     /// Error mapping database row to job

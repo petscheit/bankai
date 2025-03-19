@@ -46,8 +46,11 @@ pub async fn broadcast_epoch_batch(
 
     if required_sync_committee_id > latest_verified_committee_id {
         info!(
-            "[EPOCH BATCH JOB][{}] Waiting for sync committee update. Required: {}, Latest: {}",
-            job.job_id, required_sync_committee_id, latest_verified_committee_id
+            job_id = %job.job_id,
+            job_type = "EPOCH_BATCH_JOB",
+            required_committee_id = %required_sync_committee_id,
+            latest_committee_id = %latest_verified_committee_id,
+            "Waiting for sync committee update"
         );
         return Ok(());
     }
@@ -57,9 +60,11 @@ pub async fn broadcast_epoch_batch(
         .acquire()
         .await
         .expect("Failed to acquire semaphore");
+    
     info!(
-        "[EPOCH BATCH JOB][{}] Acquired submission permit, proceeding with on-chain update",
-        job.job_id
+        job_id = %job.job_id,
+        job_type = "EPOCH_BATCH_JOB",
+        "Acquired submission permit, proceeding with on-chain update"
     );
 
     let tx_hash = bankai
@@ -70,8 +75,12 @@ pub async fn broadcast_epoch_batch(
     // Add a small delay after submission before checking status
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
-    info!("[EPOCH BATCH JOB][{}] Successfully called epoch batch update onchain, transaction confirmed, txhash: {}", 
-        job.job_id, tx_hash);
+    info!(
+        job_id = %job.job_id,
+        job_type = "EPOCH_BATCH_JOB",
+        tx_hash = %tx_hash,
+        "Successfully called epoch batch update onchain, transaction confirmed"
+    );
 
     db_manager.set_job_txhash(job.job_id, tx_hash).await?;
 
@@ -83,9 +92,11 @@ pub async fn broadcast_epoch_batch(
     // Permit is automatically released when _permit goes out of scope
 
     info!(
-        "[EPOCH BATCH JOB][{}] Transaction is confirmed on-chain!",
-        job.job_id
+        job_id = %job.job_id,
+        job_type = "EPOCH_BATCH_JOB",
+        "Transaction is confirmed on-chain"
     );
+    
     db_manager
         .update_job_status(job.job_id, JobStatus::Done)
         .await?;
@@ -94,9 +105,13 @@ pub async fn broadcast_epoch_batch(
     for (index, epoch) in update.circuit_inputs.epochs.iter().enumerate() {
         {
             info!(
-                "[EPOCH BATCH JOB][{}] Inserting epoch data to DB: Index in batch: {}: {:?}",
-                job.job_id, index, epoch.expected_circuit_outputs
+                job_id = %job.job_id,
+                job_type = "EPOCH_BATCH_JOB",
+                batch_index = index,
+                epoch_data = ?epoch.expected_circuit_outputs,
+                "Inserting epoch data to DB"
             );
+            
             db_manager
                 .insert_verified_epoch_decommitment_data(
                     helpers::slot_to_epoch_id(epoch.expected_circuit_outputs.slot), //index.to_u64().unwrap(),
@@ -136,9 +151,11 @@ pub async fn broadcast_sync_committee(
             .acquire()
             .await
             .expect("Failed to acquire semaphore");
+            
         info!(
-            "[SYNC COMMITTEE JOB][{}] Acquired submission permit, proceeding with on-chain update",
-            job.job_id
+            job_id = %job.job_id,
+            job_type = "SYNC_COMMITTEE_JOB",
+            "Acquired submission permit, proceeding with on-chain update"
         );
 
         let tx_hash = bankai
@@ -146,8 +163,13 @@ pub async fn broadcast_sync_committee(
             .submit_update(update.expected_circuit_outputs, &bankai.config)
             .await?;
 
-        info!("[SYNC COMMITTEE JOB][{}] Successfully called sync committee ID {} update onchain, transaction confirmed, txhash: {}", 
-            job.job_id, sync_committee_id, tx_hash);
+        info!(
+            job_id = %job.job_id,
+            job_type = "SYNC_COMMITTEE_JOB",
+            committee_id = sync_committee_id,
+            tx_hash = %tx_hash,
+            "Successfully called sync committee update onchain, transaction confirmed"
+        );
 
         db_manager.set_job_txhash(job.job_id, tx_hash).await?;
 
@@ -159,9 +181,11 @@ pub async fn broadcast_sync_committee(
         // Permit is automatically released when _permit goes out of scope
 
         info!(
-            "[SYNC COMMITTEE JOB][{}] Transaction is confirmed on-chain!",
-            job.job_id
+            job_id = %job.job_id,
+            job_type = "SYNC_COMMITTEE_JOB",
+            "Transaction is confirmed on-chain"
         );
+        
         db_manager
             .update_job_status(job.job_id, JobStatus::OffchainProofRetrieved)
             .await?;
@@ -189,13 +213,15 @@ pub async fn broadcast_sync_committee(
         db_manager
             .insert_verified_sync_committee(slot, sync_committee_hash_str)
             .await?;
+            
         db_manager
             .update_job_status(job.job_id, JobStatus::Done)
             .await?;
 
         info!(
-            "[SYNC COMMITTEE JOB][{}] Sync committee verified onchain, job is done",
-            job.job_id
+            job_id = %job.job_id,
+            job_type = "SYNC_COMMITTEE_JOB",
+            "Sync committee verified onchain, job is done"
         );
     }
 

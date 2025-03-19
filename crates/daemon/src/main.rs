@@ -21,11 +21,34 @@ async fn main() -> Result<(), error::DaemonError> {
     // Create a channel to listen for shutdown signals
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
 
-    // Handle ctrl-c signal
-    let _ctrl_c_handle = tokio::spawn(async move {
-        if let Err(e) = tokio::signal::ctrl_c().await {
-            eprintln!("Failed to listen for ctrl-c: {:?}", e);
+    // Spawn a task to listen for shutdown signals
+    let _shutdown_handle = tokio::spawn(async move {
+        #[cfg(unix)]
+        {
+            use tokio::signal::unix::{signal, SignalKind};
+            // Create a stream for SIGTERM
+            let mut sigterm = signal(SignalKind::terminate())
+                .expect("Failed to install SIGTERM handler");
+
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {
+                    println!("Received Ctrl+C signal, shutting down...");
+                },
+                _ = sigterm.recv() => {
+                    println!("Received SIGTERM signal, shutting down...");
+                },
+            }
         }
+
+        #[cfg(not(unix))]
+        {
+            // On non-Unix platforms, fallback to handling Ctrl+C only.
+            tokio::signal::ctrl_c()
+                .await
+                .expect("Failed to listen for Ctrl+C");
+            println!("Received Ctrl+C signal, shutting down...");
+        }
+        // Send shutdown signal to the main thread
         let _ = shutdown_tx.send(());
     });
 
