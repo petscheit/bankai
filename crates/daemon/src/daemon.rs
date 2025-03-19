@@ -8,6 +8,7 @@ use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 use crate::error::DaemonError;
+use crate::job_manager::resume::update_job_status_for_resume;
 use crate::job_manager::retry::update_job_status_for_retry;
 use crate::job_processor::scheduler::create_new_jobs;
 
@@ -17,8 +18,7 @@ pub struct Daemon {
     db_manager: Arc<DatabaseManager>,
     bankai: Arc<BankaiClient>,
     job_processor: JobProcessor,
-    // job_manager: JobManager,
-    beacon_listener: Option<BeaconListener>,
+    beacon_listener: BeaconListener,
     tx: mpsc::Sender<Job>,
     rx: mpsc::Receiver<Job>,
     rx_head_event: mpsc::Receiver<HeadEvent>,
@@ -60,27 +60,21 @@ impl Daemon {
 
         // Create a new DatabaseManager
         let db_manager = Arc::new(DatabaseManager::new(&connection_string).await);
-        let bankai = Arc::new(BankaiClient::new().await);
+        let bankai = Arc::new(BankaiClient::new(true).await);
 
         // Initialize components
         let job_processor = JobProcessor::new(db_manager.clone(), bankai.clone());
-        // Initialize beacon listener if enabled
-        let beacon_listener = if constants::BEACON_CHAIN_LISTENER_ENABLED {
-            let events_endpoint = format!(
-                "{}/eth/v1/events?topics=head",
-                env::var("BEACON_RPC_URL").unwrap().as_str()
-            );
 
-            Some(BeaconListener::new(events_endpoint, tx_head_event.clone()))
-        } else {
-            None
-        };
+        let events_endpoint = format!(
+            "{}/eth/v1/events?topics=head",
+            env::var("BEACON_RPC_URL").unwrap().as_str()
+        );
+        let beacon_listener = BeaconListener::new(events_endpoint, tx_head_event.clone());
 
         Ok(Self {
             db_manager,
             bankai,
             job_processor,
-            // job_manager,
             beacon_listener,
             tx,
             rx,
@@ -89,9 +83,13 @@ impl Daemon {
     }
 
     pub async fn run(&mut self) -> Result<(), DaemonError> {
-        // Start beacon listener if enabled
-        if let Some(listener) = &self.beacon_listener {
-            listener.start().await?;
+        // Start beacon listener
+        self.beacon_listener.start().await?;
+
+        // when we start, we want to make sure we resume the jobs that were interrupted
+        let interupted_jobs = self.db_manager.fetch_interrupted_jobs().await?;
+        for job in interupted_jobs {
+            update_job_status_for_resume(self.tx.clone(), self.db_manager.clone(), job).await?;
         }
 
         // Start the job processor and the head event processor
@@ -230,8 +228,6 @@ pub fn check_env_vars() -> Result<(), String> {
         "POSTGRESQL_USER",
         "POSTGRESQL_PASSWORD",
         "POSTGRESQL_DB_NAME",
-        "RPC_LISTEN_HOST",
-        "RPC_LISTEN_PORT",
         "TRANSACTOR_API_KEY",
     ];
 

@@ -25,23 +25,25 @@ pub async fn update_job_status_for_resume(
             | JobStatus::StartedFetchingInputs
             | JobStatus::StartedTraceGeneration
             | JobStatus::PieGenerated => JobStatus::Created,
-            JobStatus::OffchainProofRetrieved => JobStatus::WrapProofRequested,
-            JobStatus::WrappedProofDone => JobStatus::ReadyToBroadcastOnchain,
+            JobStatus::OffchainProofRetrieved => JobStatus::OffchainProofRequested,
+            JobStatus::WrappedProofDone => JobStatus::OffchainComputationFinished,
             JobStatus::ProofVerifyCalledOnchain => JobStatus::Done,
             _ => return Ok(()),
         };
 
         info!("[RETRY][{}] New status: {}", job.job_id, new_status);
-        db_manager.update_job_status(job.job_id, new_status).await?;
+        db_manager.update_job_status(job.job_id, new_status.clone()).await?;
 
-        let job = db_manager
-            .get_job_by_id(job.job_id)
-            .await?
-            .unwrap()
-            .try_into()
-            .unwrap();
-
-        tx.send(job).await?;
+        if new_status == JobStatus::Created {
+            let job = db_manager
+                .get_job_by_id(job.job_id)
+                .await?
+                .unwrap()
+                .try_into()
+                .unwrap();
+    
+            tx.send(job).await?;
+        }
     }
 
     Ok(())

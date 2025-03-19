@@ -4,7 +4,6 @@ use crate::error::DaemonError;
 use bankai_core::{
     db::manager::DatabaseManager,
     types::job::{AtlanticJobType, Job, JobStatus},
-    utils::config,
     BankaiClient,
 };
 use tracing::{error, info};
@@ -58,7 +57,7 @@ pub async fn process_offchain_proof_stage(
                 .atlantic_client
                 .submit_wrapped_proof(
                     proof,
-                    config::BankaiConfig::default().cairo_verifier_path,
+                    bankai.config.cairo_verifier_path.clone(),
                     batch_id,
                 )
                 .await?;

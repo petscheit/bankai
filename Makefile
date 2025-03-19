@@ -1,6 +1,10 @@
 setup:
 	./scripts/setup.sh
 
+activate:
+	@echo "Please source the virtual environment activation script:"
+	@echo "  source scripts/activate.sh"
+
 venv:
 	source venv/bin/activate
 

@@ -29,9 +29,14 @@ pub struct BankaiClient {
 }
 
 impl BankaiClient {
-    pub async fn new() -> Self {
-        from_filename(".env.sepolia").ok();
-        let config = BankaiConfig::default();
+    pub async fn new(is_docker: bool) -> Self {
+        let config = if is_docker {
+            BankaiConfig::docker_config()
+        } else {
+            from_filename(".env.sepolia").ok();
+            BankaiConfig::default()
+        };
+
         Self {
             client: BeaconRpcClient::new(env::var("BEACON_RPC_URL").unwrap()),
             starknet_client: StarknetClient::new(

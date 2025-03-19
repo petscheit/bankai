@@ -193,7 +193,7 @@ async fn main() -> Result<(), BankaiCliError> {
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     let cli = Cli::parse();
-    let bankai = BankaiClient::new().await;
+    let bankai = BankaiClient::new(false).await;
 
     match cli.command {
         Commands::Prove(cmd) => match cmd {

@@ -95,41 +95,11 @@ impl AtlanticClient {
     ) -> Result<String, AtlanticError> {
         let pie_path = std::env::temp_dir().join(format!("{}.zip", name));
         pie.write_zip_file(&pie_path, true)?;
-        println!("{}", pie_path.display());
         let file = fs::File::open(pie_path.clone()).await?;
 
         // Get file metadata to determine total size
-        let metadata = fs::metadata(&pie_path).await?;
-        let total_bytes = metadata.len();
-
         let stream = ReaderStream::new(file);
-
-        let progress_stream = stream.scan(
-            (0_u64, 10_u64),
-            move |(uploaded, next_threshold), chunk_result| {
-                match chunk_result {
-                    Ok(chunk) => {
-                        *uploaded += chunk.len() as u64;
-                        let percent = (*uploaded as f64 / total_bytes as f64) * 100.0;
-
-                        if percent >= *next_threshold as f64 && *next_threshold <= 100 {
-                            info!(
-                                "Uploaded {}% of the PIE file to Atlantic API...",
-                                *next_threshold
-                            );
-                            *next_threshold += 10;
-                        }
-
-                        // Pass the chunk further down the stream
-                        futures::future::ready(Some(Ok(chunk)))
-                    }
-                    Err(e) => {
-                        // Forward the error
-                        futures::future::ready(Some(Err(e)))
-                    }
-                }
-            },
-        );
+        let progress_stream = stream.map(|chunk| chunk);  // Simply pass through the chunks
 
         let file_part = Part::stream(Body::wrap_stream(progress_stream))
             .file_name(
@@ -200,7 +170,7 @@ impl AtlanticClient {
         info!("Uploading to Atlantic...");
         // Serialize the proof to JSON string
         let proof_json = serde_json::to_string(&proof)?;
-
+        println!("program_path: {}", program_path);
         let program = fs::read(program_path).await?;
         let program_part = Part::bytes(program)
             .file_name("program.json") // Provide a filename
