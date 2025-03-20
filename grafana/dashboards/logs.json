@@ -1,0 +1,171 @@
+{
+    "annotations": {
+        "list": [
+            {
+                "builtIn": 1,
+                "datasource": {
+                    "type": "grafana",
+                    "uid": "-- Grafana --"
+                },
+                "enable": true,
+                "hide": true,
+                "iconColor": "rgba(0, 211, 255, 1)",
+                "name": "Annotations & Alerts",
+                "type": "dashboard"
+            }
+        ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": 1,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+        {
+            "datasource": {
+                "type": "loki",
+                "uid": "b63075aa-d910-40b5-b142-e4ba10a5c744"
+            },
+            "gridPos": {
+                "h": 22,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            },
+            "id": 1,
+            "options": {
+                "dedupStrategy": "none",
+                "enableLogDetails": true,
+                "prettifyLogMessage": true,
+                "showCommonLabels": false,
+                "showLabels": false,
+                "showTime": false,
+                "sortOrder": "Descending",
+                "wrapLogMessage": false
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "loki",
+                        "uid": "b63075aa-d910-40b5-b142-e4ba10a5c744"
+                    },
+                    "editorMode": "code",
+                    "expr": "{service=\"daemon\", job_type=~\"$job_type\", level=~\"$level\", job_id=~\"$job_id\"}",
+                    "queryType": "range",
+                    "refId": "A"
+                }
+            ],
+            "title": "Daemon Logs",
+            "type": "logs"
+        }
+    ],
+    "refresh": "",
+    "schemaVersion": 38,
+    "style": "dark",
+    "tags": [],
+    "templating": {
+        "list": [
+            {
+                "allValue": ".*",
+                "current": {
+                    "selected": false,
+                    "text": "All",
+                    "value": "$__all"
+                },
+                "datasource": {
+                    "type": "loki",
+                    "uid": "b63075aa-d910-40b5-b142-e4ba10a5c744"
+                },
+                "definition": "",
+                "hide": 0,
+                "includeAll": true,
+                "label": "Job Id",
+                "multi": false,
+                "name": "job_id",
+                "options": [],
+                "query": {
+                    "label": "job_id",
+                    "refId": "LokiVariableQueryEditor-VariableQuery",
+                    "stream": "",
+                    "type": 1
+                },
+                "refresh": 1,
+                "regex": "",
+                "skipUrlSync": false,
+                "sort": 0,
+                "type": "query"
+            },
+            {
+                "allValue": ".*",
+                "current": {
+                    "selected": false,
+                    "text": "All",
+                    "value": "$__all"
+                },
+                "datasource": {
+                    "type": "loki",
+                    "uid": "b63075aa-d910-40b5-b142-e4ba10a5c744"
+                },
+                "definition": "",
+                "hide": 0,
+                "includeAll": true,
+                "label": "Job Type",
+                "multi": false,
+                "name": "job_type",
+                "options": [],
+                "query": {
+                    "label": "job_type",
+                    "refId": "LokiVariableQueryEditor-VariableQuery",
+                    "stream": "",
+                    "type": 1
+                },
+                "refresh": 1,
+                "regex": "",
+                "skipUrlSync": false,
+                "sort": 0,
+                "type": "query"
+            },
+            {
+                "allValue": ".*",
+                "current": {
+                    "selected": false,
+                    "text": "ERROR",
+                    "value": "ERROR"
+                },
+                "datasource": {
+                    "type": "loki",
+                    "uid": "b63075aa-d910-40b5-b142-e4ba10a5c744"
+                },
+                "definition": "",
+                "hide": 0,
+                "includeAll": true,
+                "label": "Level",
+                "multi": false,
+                "name": "level",
+                "options": [],
+                "query": {
+                    "label": "level",
+                    "refId": "LokiVariableQueryEditor-VariableQuery",
+                    "stream": "",
+                    "type": 1
+                },
+                "refresh": 1,
+                "regex": "",
+                "skipUrlSync": false,
+                "sort": 0,
+                "type": "query"
+            }
+        ]
+    },
+    "time": {
+        "from": "now-6h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "Logs",
+    "uid": "da922587-6095-4659-8cc8-0af6331e971f",
+    "version": 6,
+    "weekStart": ""
+}

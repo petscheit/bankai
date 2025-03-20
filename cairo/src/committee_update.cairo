@@ -8,12 +8,13 @@ from starkware.cairo.common.uint256 import Uint256
 from starkware.cairo.common.memcpy import memcpy
 from starkware.cairo.common.memset import memset
 from definitions import UInt384
-
+from cairo.src.domain import Network
 from cairo.src.utils import pow2alloc128, felt_divmod
 from cairo.src.signer import commit_committee_key
 from cairo.src.ssz import MerkleTree
 from sha import SHA256, HashUtils
 from ec_ops import derive_g1_point_from_x
+from debug import print_felt_hex, print_uint384, print_string
 
 // Main function to update the committee
 func main{
@@ -38,38 +39,30 @@ func main{
     local aggregate_committee_key: UInt384;
     local slot: felt;
 
-    // Initialize variables from program input
-    %{
-        from cairo.py.utils import write_uint384, hex_to_chunks_32, print_u256
-        write_uint384(ids.aggregate_committee_key, int(program_input["circuit_inputs"]["next_aggregate_sync_committee"], 16))
-        committee_keys_root = hex_to_chunks_32(program_input["circuit_inputs"]["committee_keys_root"])
-        segments.write_arg(ids.committee_keys_root, committee_keys_root)
-        ids.slot = program_input["circuit_inputs"]["beacon_slot"]
-        path = [hex_to_chunks_32(node) for node in program_input["circuit_inputs"]["next_sync_committee_branch"]]
-        ids.path_len = len(path)
-        segments.write_arg(ids.path, path)
-    %}
+    %{ write_committee_update_inputs() %}
+
+    let fork = Network.get_fork_version(Network.SEPOLIA, slot);
+    local next_committee_index: felt;
+    if (fork == Network.ELECTRA) {
+        next_committee_index = 87;
+    } else {
+        next_committee_index = 55;
+    }
 
     // Compute hashes and update state
     with sha256_ptr, pow2_array {
         let leaf_hash = compute_leaf_hash(committee_keys_root, aggregate_committee_key);
-        // The next sync committee is always at index 55
+        
         let state_root = MerkleTree.hash_merkle_path(
-            path=path, path_len=path_len, leaf=leaf_hash, index=55
+            path=path, path_len=path_len, leaf=leaf_hash, index=next_committee_index
         );
         let committee_hash = compute_committee_hash(aggregate_committee_key);
     }
-    // %{ print_u256("Derived committee hash", ids.committee_hash) %}
 
     // Finalize SHA256 and write output
     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
 
-    %{
-        from cairo.py.utils import uint256_to_int
-        assert uint256_to_int(ids.state_root) == int(program_input["expected_circuit_outputs"]["state_root"], 16), "State Root Mismatch"
-        assert ids.slot == program_input["expected_circuit_outputs"]["slot"], "Slot Mismatch"
-        assert uint256_to_int(ids.committee_hash) == int(program_input["expected_circuit_outputs"]["committee_hash"], 16), "Committee Hash Mismatch"
-    %}
+    %{ assert_committee_update_result() %}
 
     assert [output_ptr] = state_root.low;
     assert [output_ptr + 1] = state_root.high;
@@ -113,10 +106,9 @@ func compute_committee_hash{
     let (flags, x_point) = decompress_g1(compressed_g1);
     assert flags.compression_bit = 1;
     assert flags.infinity_bit = 0;
-    let s = UInt384(d0=flags.sign_bit, d1=0, d2=0, d3=0);
 
     // Derive the full G1 point and hash it
-    let (point) = derive_g1_point_from_x(curve_id=1, x=x_point, s=s);
+    let (point) = derive_g1_point_from_x(curve_id=1, x=x_point, s=flags.sign_bit);
     let committee_hash = commit_committee_key(point=point);
 
     return committee_hash;
@@ -151,3 +143,12 @@ func decompress_g1{range_check_ptr}(compressed_g1: UInt384) -> (CompressedG1Flag
 
     return (CompressedG1Flags(compression_bit, infinity_bit, sign_bit), x_point);
 }
+
+
+struct CircuitInput {
+    beacon_slot: felt,
+    next_sync_committee_branch: Uint256*,
+    next_aggregate_sync_committee: UInt384,
+    committee_keys_root: Uint256,
+}
+

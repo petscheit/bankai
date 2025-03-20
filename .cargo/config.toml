@@ -1,0 +1,2 @@
+[alias]
+clippy-main = "clippy --workspace --exclude bankai-tests"
