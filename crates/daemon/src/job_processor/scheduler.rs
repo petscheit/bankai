@@ -49,15 +49,14 @@ pub(crate) async fn create_new_jobs(
         info!("Max concurrent jobs in progress limit reached, skipping epoch batch creation");
         return Ok(());
     }
-
-    let epoch_gap = compute_epoch_gap(parsed_event.slot, latest_verified_epoch_slot);
+    
+    let latest_verified_epoch = helpers::slot_to_epoch_id(latest_verified_epoch_slot);
+    let latest_scheduled_epoch = db_manager.get_latest_epoch_in_progress().await?.unwrap();
+    let latest_epoch = cmp::max(latest_verified_epoch, latest_scheduled_epoch);
+    let epoch_gap = helpers::slot_to_epoch_id(parsed_event.slot) - latest_epoch;
     if epoch_gap >= constants::TARGET_BATCH_SIZE {
         // we are in syncing mode and need to catch up
-        let latest_verified_epoch = helpers::slot_to_epoch_id(latest_verified_epoch_slot);
-        let latest_scheduled_epoch = db_manager.get_latest_epoch_in_progress().await?.unwrap();
-        let latest_epoch = cmp::max(latest_verified_epoch, latest_scheduled_epoch);
         let start_epoch = latest_epoch + 1;
-
         let current_sync_committee_id = helpers::get_sync_committee_id_by_epoch(start_epoch);
 
         // we need to make sure that each batch is completed within the same sync committee
@@ -80,10 +79,4 @@ pub(crate) async fn create_new_jobs(
     }
 
     Ok(())
-}
-
-fn compute_epoch_gap(current_slot: u64, latest_verified_epoch_slot: u64) -> u64 {
-    let current_epoch_id = helpers::slot_to_epoch_id(current_slot);
-    let latest_verified_epoch_id = helpers::slot_to_epoch_id(latest_verified_epoch_slot);
-    current_epoch_id - latest_verified_epoch_id
 }

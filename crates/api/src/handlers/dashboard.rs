@@ -40,8 +40,8 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
     };
 
     // Calculate average job duration
-    let avg_duration = db.get_average_job_duration().await.unwrap_or(0);
-    let avg_duration_str = format!("{}s", avg_duration);
+    let avg_duration = db.get_average_job_duration().await.unwrap_or(0) / 60;
+    let avg_duration_str = format!("{}m", avg_duration);
 
     let jobs_in_progress = db
         .count_jobs_in_progress()
@@ -103,7 +103,7 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
                 "║  Job   {:}: {}  {}     [{}] {:<32} {:<66}  {}   ║",
                 &entry.job.job_uuid.to_string()[..8],
                 entry.job.slot,
-                helpers::get_sync_committee_id_by_slot(entry.job.slot.to_u64().unwrap()),
+                helpers::get_sync_committee_id_by_slot(entry.job.slot.to_u64().unwrap()) + 1,
                 match entry.job.job_status {
                     JobStatus::Done => "✓",
                     JobStatus::Error => "✗",
