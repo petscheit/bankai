@@ -477,12 +477,18 @@
                     {
                         "matcher": {
                             "id": "byName",
-                            "options": "Slot"
+                            "options": "Job UUID"
                         },
                         "properties": [
                             {
-                                "id": "custom.width",
-                                "value": 105
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "targetBlank": true,
+                                        "title": "Job Details",
+                                        "url": "/d/de7fbeba-399b-4476-9ed3-fbc23bfe39a3/job-details?var-job_uuid=${__value.raw}\n"
+                                    }
+                                ]
                             }
                         ]
                     }
@@ -1149,7 +1155,26 @@
                         ]
                     }
                 },
-                "overrides": []
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Job UUID"
+                        },
+                        "properties": [
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "targetBlank": true,
+                                        "title": "Job Details",
+                                        "url": "/d/de7fbeba-399b-4476-9ed3-fbc23bfe39a3/job-details?var-job_uuid=${__value.raw}\n"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
             },
             "gridPos": {
                 "h": 17,
@@ -1219,6 +1244,6 @@
     "timezone": "",
     "title": "Jobs",
     "uid": "af3d32e8-da76-4066-be4e-602690e36eb2",
-    "version": 7,
+    "version": 11,
     "weekStart": ""
 }
