@@ -1,7 +1,11 @@
 [package]
-name = "api"
+name = "bankai-api"
 version = "0.1.0"
 edition = "2021"
+
+[[bin]]
+name = "bankai-api"
+path = "src/main.rs"
 
 [dependencies]
 axum.workspace = true

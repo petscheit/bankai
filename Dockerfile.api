@@ -1,0 +1,44 @@
+# Declare the Python version build argument globally.
+ARG PYTHON_VERSION=3.10-slim
+
+# Since the Api relies on types defined in bankai-core, we need python to be able to build it
+# A bit annoying, but is only required for building, and untangling the deps is not trivial
+
+# Stage 1: Build the daemon binary with Rust
+FROM python:${PYTHON_VERSION} AS builder
+
+# Install curl
+# Install required dependencies for building
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl3 \
+    libssl-dev \
+    curl \
+    build-essential
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+WORKDIR /app
+COPY . .
+
+# Build the application in release mode
+RUN cargo build --release -p bankai-api
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y ca-certificates libssl-dev && rm -rf /var/lib/apt/lists/*
+
+# Copy the binary from the builder stage
+COPY --from=builder /app/target/release/bankai-api /app/
+
+# Expose the port the API runs on
+EXPOSE 3001
+
+# Run the binary
+CMD ["/app/bankai-api"]

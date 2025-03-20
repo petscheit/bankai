@@ -4,7 +4,7 @@ services:
   daemon:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.daemon
     env_file:
       - .env.docker
     depends_on:
@@ -12,8 +12,6 @@ services:
         condition: service_healthy
     volumes:
       - batches_data:/app/batches
-    # Send container logs to stdout, which Docker captures
-    # So that Promtail can scrape them, or you can use Docker logging driver
     logging:
       driver: "json-file"
       options:
@@ -22,7 +20,20 @@ services:
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGTERM
-
+  
+  bankai-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env.docker
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - bankai-network
   db:
     image: postgres:15-alpine
     env_file:
@@ -76,9 +87,8 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=secret
-    # If you'd like to persist dashboards etc:
-    # volumes:
-    #   - grafana_data:/var/lib/grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
     restart: unless-stopped
 
 volumes:
@@ -86,10 +96,13 @@ volumes:
     name: postgres_data
   batches_data:
     name: batches_data
-  # For Loki data, if you want persistence:
   loki_data:
     name: loki_data
   promtail_positions:
-    name: promtail_positions
-  # grafana_data:
-  #   name: grafana_data
+    name: promtail_positions 
+  grafana_data:
+    name: grafana_data
+
+networks:
+  bankai-network:
+    driver: bridge

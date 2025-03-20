@@ -294,22 +294,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 
 [[package]]
-name = "api"
-version = "0.1.0"
-dependencies = [
- "axum",
- "bankai-core",
- "dotenv",
- "num-traits",
- "serde_json",
- "thiserror 2.0.12",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid 1.15.1",
-]
-
-[[package]]
 name = "arbitrary"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -645,6 +629,22 @@ dependencies = [
  "object",
  "rustc-demangle",
  "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "bankai-api"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "bankai-core",
+ "dotenv",
+ "num-traits",
+ "serde_json",
+ "thiserror 2.0.12",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid 1.15.1",
 ]
 
 [[package]]

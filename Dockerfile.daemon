@@ -46,7 +46,6 @@ gcc \
 libgmp-dev \
 && ln -s /usr/bin/python3 /usr/bin/python
 
-
 # Copy the entire repository including .git
 COPY . .
 
