@@ -1,7 +1,7 @@
 use std::{env, sync::Arc};
 
 use bankai_core::{db::manager::DatabaseManager, BankaiClient};
-use dotenv::from_filename;
+// use dotenv::from_filename;
 use std::net::SocketAddr;
 use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -16,7 +16,7 @@ use types::AppState;
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Load .env.sepolia file
-    from_filename(".env.sepolia").ok();
+    // from_filename(".env.sepolia").ok();
 
     let subscriber = FmtSubscriber::builder()
         //.with_max_level(Level::DEBUG)
@@ -31,7 +31,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         std::process::exit(1); // Exit if validation fails
     });
 
-    //let (tx, mut rx) = mpsc::channel(32);
     let connection_string = format!(
         "host={} user={} password={} dbname={}",
         env::var("POSTGRES_HOST").unwrap().as_str(),

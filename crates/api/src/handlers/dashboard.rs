@@ -18,7 +18,7 @@ pub async fn handle_get_dashboard(State(state): State<AppState>) -> String {
         .parse::<u64>()
         .unwrap_or(0);
 
-    let latest_beacon_committee = helpers::get_sync_committee_id_by_slot(latest_beacon_slot);
+    let latest_beacon_committee = helpers::get_sync_committee_id_by_slot(latest_beacon_slot) + 1;
 
     let latest_verified_committee = bankai
         .starknet_client

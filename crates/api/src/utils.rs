@@ -13,8 +13,6 @@ pub fn check_env_vars() -> Result<(), String> {
         "POSTGRES_USER",
         "POSTGRES_PASSWORD",
         "POSTGRES_DB",
-        "RPC_LISTEN_HOST",
-        "RPC_LISTEN_PORT",
         "TRANSACTOR_API_KEY",
     ];
 
