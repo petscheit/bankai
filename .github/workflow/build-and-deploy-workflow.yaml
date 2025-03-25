@@ -1,0 +1,21 @@
+# .github/workflows/main.yml
+name: Build and deploy
+
+### When to run
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+###
+
+permissions:
+  contents: write
+
+jobs:
+  call-deploy:
+    uses: HerodotusDev/cicd/.github/workflows/build-and-deploy.yaml@main
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}

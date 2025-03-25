@@ -1,0 +1,23 @@
+# .github/workflows/main.yml
+name: Deploy version
+
+### When to run
+on:
+  workflow_dispatch:
+    inputs:
+      # requires input parameter on trigger
+      version:
+        description: "Enter a image version to be deployed"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  call-deploy:
+    uses: HerodotusDev/cicd/.github/workflows/deploy.yaml@main
+    with:
+      version: ${{ inputs.version }}
+    secrets:
+      KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
