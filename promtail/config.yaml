@@ -1,0 +1,73 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Scrape container logs via Docker (docker_sd_configs):
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Extract the container name from Docker labels for easier filtering in Loki:
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+      - source_labels: [__meta_docker_container_name]
+        target_label: job
+      # Add a custom label for the daemon service
+      - source_labels: [__meta_docker_container_name]
+        regex: ".*-daemon-.*"
+        target_label: service
+        replacement: "daemon"
+      - source_labels: [__meta_docker_container_name]
+        regex: ".*-api-.*"
+        target_label: service
+        replacement: "api"
+    pipeline_stages:
+      - docker: {}
+      # Parse the JSON structure exactly as it appears in your logs
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: fields.message
+            job_id: fields.job_id
+            job_type: fields.job_type
+            atlantic_query_id: fields.atlantic_query_id
+            committee_id: fields.committee_id
+            tx_hash: fields.tx_hash
+            error: fields.error
+      - labels:
+          level:
+          job_id:
+          job_type:
+          atlantic_query_id:
+          committee_id:
+          tx_hash:
+          target:
+      - match:
+          selector: '{target=~".*job_processor.*|.*daemon::job_.*"}'
+          stages:
+            - json:
+                expressions:
+                  job_id: fields.job_id
+                  job_type: fields.job_type
+                  job_status: fields.job_status
+                  error: fields.error
+                  error_type: fields.error_type
+                  committee_id: fields.committee_id
+                  atlantic_query_id: fields.atlantic_query_id
+                  tx_hash: fields.tx_hash
+            - labels:
+                job_id:
+                job_type:
+                job_status:
+                error_type:
+                committee_id:
+                atlantic_query_id:

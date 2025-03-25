@@ -1,3 +1,4 @@
+#!/bin/bash
 # Check if python3.10 is installed
 if ! command -v python3.10 >/dev/null; then
     echo "python3.10 is not installed. Please install Python 3.10 and try again."
@@ -55,9 +56,6 @@ pip install py_ecc
 
 echo "Applying patch to instances.py..."
 patch venv/lib/python3.10/site-packages/starkware/cairo/lang/instances.py < cairo/packages/garaga_zero/tools/make/instances.patch
-
-echo "Applying patch to extension_field_modulo_circuit.py..."
-patch venv/lib/python3.10/site-packages/garaga/extension_field_modulo_circuit.py < cairo/packages/garaga_zero/tools/make/extension_field_modulo_circuit.patch
 
 deactivate
 

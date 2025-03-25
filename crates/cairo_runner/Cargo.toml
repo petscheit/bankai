@@ -1,0 +1,15 @@
+[package]
+name = "bankai-runner"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+garaga-zero = { path = "../../cairo/packages/garaga_zero" }
+cairo-vm.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+num-bigint.workspace = true
+hex.workspace = true
+beacon_types.workspace = true
+tracing.workspace = true
