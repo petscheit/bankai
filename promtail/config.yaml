@@ -25,6 +25,10 @@ scrape_configs:
         regex: ".*-daemon-.*"
         target_label: service
         replacement: "daemon"
+      - source_labels: [__meta_docker_container_name]
+        regex: ".*-api-.*"
+        target_label: service
+        replacement: "api"
     pipeline_stages:
       - docker: {}
       # Parse the JSON structure exactly as it appears in your logs
