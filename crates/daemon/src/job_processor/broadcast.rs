@@ -104,14 +104,6 @@ pub async fn broadcast_epoch_batch(
     let batch_root = update.expected_circuit_outputs.batch_root;
     for (index, epoch) in update.circuit_inputs.epochs.iter().enumerate() {
         {
-            info!(
-                job_id = %job.job_id,
-                job_type = %job.job_type,
-                batch_index = index,
-                epoch_data = ?epoch.expected_circuit_outputs,
-                "Inserting epoch data to DB"
-            );
-            
             db_manager
                 .insert_verified_epoch_decommitment_data(
                     helpers::slot_to_epoch_id(epoch.expected_circuit_outputs.slot), //index.to_u64().unwrap(),

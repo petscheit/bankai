@@ -65,7 +65,8 @@ impl BeaconListener {
                                             let tx = tx.clone();
                                             if let Err(e) = tx.send(event).await {
                                                 error!("Failed to send event to channel: {}", e);
-                                                // Continue processing other events
+                                                // Exit the program as this is a critical error, forcing restart
+                                                std::process::exit(1);
                                             }
                                         }
                                         Err(e) => {

@@ -337,6 +337,31 @@ impl DatabaseManager {
 
         Ok(())
     }
+    
+    /// Checks if a job exists for a specific epoch
+    ///
+    /// # Arguments
+    /// * `epoch_start` - The start epoch to check
+    /// * `epoch_end` - The end epoch to check
+    ///
+    /// # Returns
+    /// * `Result<bool, DatabaseError>` - Whether a job exists for this epoch
+    pub async fn check_job_exists(&self, epoch_start: u64, epoch_end: u64) -> Result<bool, DatabaseError> {
+        // Check if there's already a job that covers this epoch
+        let row = self.client
+            .query_one(
+                "SELECT EXISTS (
+                    SELECT 1 FROM jobs 
+                    WHERE job_status = 'DONE'
+                    AND batch_range_begin_epoch = $1 
+                    AND batch_range_end_epoch = $2
+                ) AS exists",
+                &[&(epoch_start as i64), &(epoch_end as i64)],
+            )
+            .await?;
+        
+        Ok(row.get::<_, bool>("exists"))
+    }
 
     /// Fetches the status of a job
     ///
