@@ -68,6 +68,11 @@ pub(crate) async fn create_new_jobs(
             last_epoch_in_sync_committee,
         );
 
+        if db_manager.check_job_exists(start_epoch, end_epoch).await? {
+            info!("Job already exists for epoch from {} to {}, skipping", start_epoch, end_epoch);
+            return Ok(());
+        }
+
         let epoch_batch = EpochBatchJobProcessor::create_job(
             db_manager.clone(),
             parsed_event.slot,
