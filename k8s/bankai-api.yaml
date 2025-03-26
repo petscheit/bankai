@@ -30,13 +30,13 @@ spec:
               memory: '2G'
           livenessProbe:
             httpGet:
-              path: /is-alive
+              path: /status
               port: 3001
             initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /is-alive
+              path: /status
               port: 3001
             initialDelaySeconds: 5
             periodSeconds: 5
