@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   call-deploy:
-    uses: HerodotusDev/cicd/.github/workflows/build-and-deploy.yaml@main
+    uses: HerodotusDev/cicd/.github/workflows/build-and-deploy-bankai.yaml@monorepo_support
     secrets:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
