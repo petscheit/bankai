@@ -7,8 +7,5 @@ namespace: bankai                                # namespace to be deploy
 app_name: bankai                                 # name of the app, must be equal to the name of the deployment and docker image
 dockerhub_project: dataprocessor                  # name of the dockerhub project the image will be pushed to / pulled from
 version_file: cargo.toml
-#deployment_file: ./k8s/deployment.yaml           # path to the k8s deployment manifest  // has a default value
-#ingress_file: ./k8s/ingress.yaml                 # path to the k8s ingress manifest  // has a default value
-#rollout_timeout: 300                             # time which github will wait until deployment rollsout  // has a default value
-#pull_etcd_config: true                           # bool - if true, will pull config from etcd
-#etcd_key: /grower/envs/.env.stage                # path to file to be pulled from etcd
+pull_etcd_config: true                           # bool - if true, will pull config from etcd
+etcd_key: /bankai/api/envs/.env.stage                # path to file to be pulled from etcd
