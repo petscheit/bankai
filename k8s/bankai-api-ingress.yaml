@@ -9,10 +9,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - staging.bankai.api.herodotus.cloud
+        - sepolia.bankai.herodotus.cloud
       secretName: bankai-api-tls
   rules:
-    - host: staging.bankai.api.herodotus.cloud
+    - host: sepolia.bankai.herodotus.cloud
       http:
         paths:
           - path: /
