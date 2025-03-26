@@ -27,7 +27,7 @@ spec:
               memory: '128Mi'
             limits:
               cpu: '1'
-              memory: '2G'
+              memory: '3G'
           livenessProbe:
             httpGet:
               path: /is-alive
