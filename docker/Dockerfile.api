@@ -23,6 +23,9 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 WORKDIR /app
 COPY . .
 
+# Initialize git submodule
+RUN git submodule update --init
+
 # Build the application in release mode
 RUN cargo build --release -p bankai-api
 
