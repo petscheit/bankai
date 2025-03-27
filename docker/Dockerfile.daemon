@@ -34,18 +34,21 @@ COPY . .
 # Initialize git submodule
 RUN git submodule update --init
 
+# Install uv and py_ecc
+RUN pip install --no-cache-dir --force-reinstall uv
 RUN pip install --no-cache-dir --force-reinstall py_ecc
-RUN pip install cairo-lang
+
+# Compile the requirements for the cairo package
+RUN uv pip compile cairo/packages/garaga_zero/pyproject.toml --output-file requirements.txt -q
+RUN uv pip install --no-cache-dir --force-reinstall --system -r requirements.txt
+
+# Compile the cairo files
 RUN mkdir -p cairo/build
 RUN cairo-compile --cairo_path=cairo/packages/garaga_zero/src cairo/src/epoch_batch.cairo --output "cairo/build/epoch_batch.json"
 RUN cairo-compile --cairo_path=cairo/packages/garaga_zero/src cairo/src/committee_update.cairo --output "cairo/build/committee_update.json"
 
-RUN pip install --no-cache-dir --force-reinstall uv
-RUN uv pip compile cairo/packages/garaga_zero/pyproject.toml --output-file requirements.txt -q
-
 # Build your daemon binary (adjust the package name if needed).
 RUN cargo build --release -p bankai-daemon
-
 
 # Stage 2: Final image with Python installed
 FROM python:${PYTHON_VERSION}
@@ -56,22 +59,17 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl3 \
     libssl-dev \
-    git \
     build-essential \
     gcc \
     libgmp-dev \
     && ln -s /usr/bin/python3 /usr/bin/python
 
 # Copy the entire repository including .git
-COPY . .
-
-# Initialize git submodule
-RUN git submodule update --init
-
-# Create build directory
-RUN mkdir -p cairo/build
+COPY --from=builder /app/requirements.txt .
+COPY --from=builder /app/cairo/packages/garaga_zero /app/cairo/packages/garaga_zero
 
 # Install Python dependencies
+RUN pip install --no-cache-dir --force-reinstall uv
 RUN uv pip install --no-cache-dir --force-reinstall --system -r requirements.txt
 RUN pip install --no-cache-dir --force-reinstall py_ecc
 
