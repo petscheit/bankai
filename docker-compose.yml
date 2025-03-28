@@ -4,7 +4,7 @@ services:
   daemon:
     build:
       context: .
-      dockerfile: Dockerfile.daemon
+      dockerfile: docker/Dockerfile.daemon
     env_file:
       - .env.docker
     depends_on:
@@ -24,7 +24,7 @@ services:
   bankai-api:
     build:
       context: .
-      dockerfile: Dockerfile.api
+      dockerfile: docker/Dockerfile.api
     ports:
       - "3001:3001"
     env_file:
