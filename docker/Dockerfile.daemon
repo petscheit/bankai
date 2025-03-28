@@ -42,10 +42,8 @@ RUN pip install --no-cache-dir --force-reinstall py_ecc
 RUN uv pip compile cairo/packages/garaga_zero/pyproject.toml --output-file requirements.txt -q
 RUN uv pip install --no-cache-dir --force-reinstall --system -r requirements.txt
 
-# Compile the cairo files
+# Create build directory but don't compile Cairo files
 RUN mkdir -p cairo/build
-RUN cairo-compile --cairo_path=cairo/packages/garaga_zero/src cairo/src/epoch_batch.cairo --output "cairo/build/epoch_batch.json"
-RUN cairo-compile --cairo_path=cairo/packages/garaga_zero/src cairo/src/committee_update.cairo --output "cairo/build/committee_update.json"
 
 # Build your daemon binary (adjust the package name if needed).
 RUN cargo build --release -p bankai-daemon
@@ -80,9 +78,9 @@ ENV PYTHONPATH=/usr/local/lib/python3.10:/app/cairo/packages/garaga_zero:/usr/lo
 # Copy the compiled daemon binary from the builder stage
 COPY --from=builder /app/target/release/bankai-daemon /app/bin/bankai-daemon
 
-# Copy the compiled cairo files into the image. Adjust source/destination as needed.
-COPY --from=builder /app/cairo/build/ /app/cairo/build/
-COPY --from=builder /app/cairo/verifier/ /app/cairo/verifier/
+# Copy the compiled cairo files from the host machine instead of building them
+COPY ./cairo/build/epoch_batch.json /app/cairo/build/
+COPY ./cairo/build/committee_update.json /app/cairo/build/
 
 # Define the entrypoint for the container.
 ENTRYPOINT ["/app/bin/bankai-daemon"] 
