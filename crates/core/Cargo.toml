@@ -35,3 +35,5 @@ thiserror.workspace = true
 strum.workspace = true
 bankai-runner.workspace = true
 cairo-vm.workspace = true
+postgres-openssl.workspace = true
+openssl.workspace = true

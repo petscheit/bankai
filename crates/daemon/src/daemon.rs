@@ -26,7 +26,7 @@ pub struct Daemon {
 impl Daemon {
     pub async fn new() -> Result<Self, DaemonError> {
         // Load .env.sepolia file
-        from_filename(".env.sepolia").ok();
+        from_filename(".env.docker").ok();
 
         // Replace the current subscriber setup with JSON formatting
         let subscriber = tracing_subscriber::fmt()
@@ -50,13 +50,15 @@ impl Daemon {
         let (tx_head_event, rx_head_event): (mpsc::Sender<HeadEvent>, mpsc::Receiver<HeadEvent>) =
             mpsc::channel(32);
 
-        // Initialize database connection
+        // Initialize database connection using PostgreSQL URL format
         let connection_string = format!(
-            "host={} user={} password={} dbname={}",
-            env::var("POSTGRES_HOST").unwrap().as_str(),
+            "postgresql://{}:{}@{}:{}/{}?sslmode={}",
             env::var("POSTGRES_USER").unwrap().as_str(),
             env::var("POSTGRES_PASSWORD").unwrap().as_str(),
-            env::var("POSTGRES_DB").unwrap().as_str()
+            env::var("POSTGRES_HOST").unwrap().as_str(),
+            "5432", // Explicitly set port
+            env::var("POSTGRES_DB").unwrap().as_str(),
+            env::var("POSTGRES_SSLMODE").unwrap_or_else(|_| "prefer".to_string())
         );
 
         // Create a new DatabaseManager
@@ -265,6 +267,7 @@ pub fn check_env_vars() -> Result<(), String> {
         "POSTGRES_USER",
         "POSTGRES_PASSWORD",
         "POSTGRES_DB",
+        "POSTGRES_SSLMODE",
         "TRANSACTOR_API_KEY",
     ];
 

@@ -8,6 +8,8 @@ use std::{collections::HashMap, str::FromStr};
 
 use chrono::NaiveDateTime;
 use num_traits::ToPrimitive;
+use openssl::ssl::{SslConnector, SslMethod};
+use postgres_openssl::MakeTlsConnector;
 use thiserror::Error;
 use tokio_postgres::{Client, Row};
 use tracing::{debug, error, info};
@@ -123,20 +125,27 @@ impl DatabaseManager {
     /// # Returns
     /// * `Self` - New database manager instance
     pub async fn new(db_url: &str) -> Self {
-        let client = match tokio_postgres::connect(db_url, tokio_postgres::NoTls).await {
+
+        // Create an SSL connector using OpenSSL.
+        let ssl_builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        let connector = ssl_builder.build();
+        let tls_connector = MakeTlsConnector::new(connector);
+
+        // Connect to the database using the TLS connector.
+        let client = match tokio_postgres::connect(db_url, tls_connector).await {
             Ok((client, connection)) => {
+                // Spawn the connection handling in the background.
                 tokio::spawn(async move {
                     if let Err(e) = connection.await {
                         eprintln!("Connection error: {}", e);
                     }
                 });
-
-                info!("Connected to the database successfully!");
+                println!("Connected to the database successfully!");
                 client
             }
             Err(err) => {
-                error!("Failed to connect to the database: {}", err);
-                std::process::exit(1); // Exit with non-zero status code
+                eprintln!("Failed to connect to the database: {}", err);
+                std::process::exit(1);
             }
         };
 
