@@ -62,9 +62,9 @@ RUN apt-get update && apt-get install -y \
     libgmp-dev \
     && ln -s /usr/bin/python3 /usr/bin/python
 
-# Copy the entire repository including .git
 COPY --from=builder /app/requirements.txt .
 COPY --from=builder /app/cairo/packages/garaga_zero /app/cairo/packages/garaga_zero
+COPY --from=builder /app/cairo/verifier/ /app/cairo/verifier/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --force-reinstall uv
