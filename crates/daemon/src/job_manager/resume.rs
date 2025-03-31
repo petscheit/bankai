@@ -32,7 +32,9 @@ pub async fn update_job_status_for_resume(
         };
 
         info!("[RETRY][{}] New status: {}", job.job_id, new_status);
-        db_manager.update_job_status(job.job_id, new_status.clone()).await?;
+        db_manager
+            .update_job_status(job.job_id, new_status.clone())
+            .await?;
 
         if new_status == JobStatus::Created {
             let job = db_manager
@@ -41,7 +43,7 @@ pub async fn update_job_status_for_resume(
                 .unwrap()
                 .try_into()
                 .unwrap();
-    
+
             tx.send(job).await?;
         }
     }

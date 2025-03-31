@@ -99,7 +99,7 @@ impl AtlanticClient {
 
         // Get file metadata to determine total size
         let stream = ReaderStream::new(file);
-        let progress_stream = stream.map(|chunk| chunk);  // Simply pass through the chunks
+        let progress_stream = stream.map(|chunk| chunk); // Simply pass through the chunks
 
         let file_part = Part::stream(Body::wrap_stream(progress_stream))
             .file_name(

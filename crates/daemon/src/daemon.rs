@@ -143,7 +143,8 @@ impl Daemon {
                     }
                     _ => {
                         tokio::spawn(async move {
-                            if let Err(e) = processor_clone.process_trace_gen_job(job.clone()).await {
+                            if let Err(e) = processor_clone.process_trace_gen_job(job.clone()).await
+                            {
                                 error!(
                                     job_id = %job_id,
                                     job_type = job.job_type.to_string(),

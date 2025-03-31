@@ -34,7 +34,7 @@ pub async fn process_offchain_proof_stage(
             status = %status,
             "Atlantic job status received"
         );
-        
+
         if status == "DONE" {
             info!(
                 job_id = %job.job_id,
@@ -64,7 +64,7 @@ pub async fn process_offchain_proof_stage(
                 job_type = "WRAP_PROOF_JOB",
                 "Sending proof wrapping query to Atlantic"
             );
-            
+
             let wrapping_batch_id = bankai
                 .atlantic_client
                 .submit_wrapped_proof(
@@ -73,7 +73,7 @@ pub async fn process_offchain_proof_stage(
                     batch_id.clone(),
                 )
                 .await?;
-                
+
             info!(
                 job_id = %job.job_id,
                 job_type = "WRAP_PROOF_JOB",
@@ -121,7 +121,7 @@ pub async fn process_committee_wrapping_stage(
 
     if let Some(job_data) = job_data {
         let batch_id = job_data.atlantic_proof_wrapper_batch_id.clone().unwrap();
-        
+
         info!(
             job_id = %job.job_id,
             job_type = %job.job_type,
@@ -185,7 +185,7 @@ pub async fn process_epoch_batch_wrapping_stage(
 
     if let Some(job_data) = job_data {
         let batch_id = job_data.atlantic_proof_wrapper_batch_id.clone().unwrap();
-        
+
         let status = bankai
             .atlantic_client
             .check_batch_status(batch_id.as_str())

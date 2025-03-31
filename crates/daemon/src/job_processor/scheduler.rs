@@ -49,7 +49,7 @@ pub(crate) async fn create_new_jobs(
         info!("Max concurrent jobs in progress limit reached, skipping epoch batch creation");
         return Ok(());
     }
-    
+
     let latest_verified_epoch = helpers::slot_to_epoch_id(latest_verified_epoch_slot);
     let latest_scheduled_epoch = db_manager.get_latest_epoch_in_progress().await?.unwrap();
     let latest_epoch = cmp::max(latest_verified_epoch, latest_scheduled_epoch);
@@ -69,7 +69,10 @@ pub(crate) async fn create_new_jobs(
         );
 
         if db_manager.check_job_exists(start_epoch, end_epoch).await? {
-            info!("Job already exists for epoch from {} to {}, skipping", start_epoch, end_epoch);
+            info!(
+                "Job already exists for epoch from {} to {}, skipping",
+                start_epoch, end_epoch
+            );
             return Ok(());
         }
 

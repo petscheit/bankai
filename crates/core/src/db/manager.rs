@@ -125,7 +125,6 @@ impl DatabaseManager {
     /// # Returns
     /// * `Self` - New database manager instance
     pub async fn new(db_url: &str) -> Self {
-
         // Create an SSL connector using OpenSSL.
         let ssl_builder = SslConnector::builder(SslMethod::tls()).unwrap();
         let connector = ssl_builder.build();
@@ -346,7 +345,7 @@ impl DatabaseManager {
 
         Ok(())
     }
-    
+
     /// Checks if a job exists for a specific epoch
     ///
     /// # Arguments
@@ -355,9 +354,14 @@ impl DatabaseManager {
     ///
     /// # Returns
     /// * `Result<bool, DatabaseError>` - Whether a job exists for this epoch
-    pub async fn check_job_exists(&self, epoch_start: u64, epoch_end: u64) -> Result<bool, DatabaseError> {
+    pub async fn check_job_exists(
+        &self,
+        epoch_start: u64,
+        epoch_end: u64,
+    ) -> Result<bool, DatabaseError> {
         // Check if there's already a job that covers this epoch
-        let row = self.client
+        let row = self
+            .client
             .query_one(
                 "SELECT EXISTS (
                     SELECT 1 FROM bankai.jobs 
@@ -368,7 +372,7 @@ impl DatabaseManager {
                 &[&(epoch_start as i64), &(epoch_end as i64)],
             )
             .await?;
-        
+
         Ok(row.get::<_, bool>("exists"))
     }
 
@@ -382,7 +386,10 @@ impl DatabaseManager {
     pub async fn fetch_job_status(&self, job_id: Uuid) -> Result<Option<JobStatus>, DatabaseError> {
         let row_opt = self
             .client
-            .query_opt("SELECT status FROM bankai.jobs WHERE job_uuid = $1", &[&job_id])
+            .query_opt(
+                "SELECT status FROM bankai.jobs WHERE job_uuid = $1",
+                &[&job_id],
+            )
             .await?;
 
         Ok(row_opt.map(|row| row.get("status")))
