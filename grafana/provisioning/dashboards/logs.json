@@ -20,12 +20,15 @@
     "graphTooltip": 0,
     "id": 1,
     "links": [],
-    "liveNow": false,
     "panels": [
         {
             "datasource": {
                 "type": "loki",
                 "uid": "b63075aa-d910-40b5-b142-e4ba10a5c744"
+            },
+            "fieldConfig": {
+                "defaults": {},
+                "overrides": []
             },
             "gridPos": {
                 "h": 22,
@@ -36,6 +39,7 @@
             "id": 1,
             "options": {
                 "dedupStrategy": "none",
+                "enableInfiniteScrolling": false,
                 "enableLogDetails": true,
                 "prettifyLogMessage": true,
                 "showCommonLabels": false,
@@ -44,6 +48,7 @@
                 "sortOrder": "Descending",
                 "wrapLogMessage": false
             },
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -60,16 +65,15 @@
             "type": "logs"
         }
     ],
+    "preload": false,
     "refresh": "",
-    "schemaVersion": 38,
-    "style": "dark",
+    "schemaVersion": 41,
     "tags": [],
     "templating": {
         "list": [
             {
                 "allValue": ".*",
                 "current": {
-                    "selected": false,
                     "text": "All",
                     "value": "$__all"
                 },
@@ -78,10 +82,8 @@
                     "uid": "b63075aa-d910-40b5-b142-e4ba10a5c744"
                 },
                 "definition": "",
-                "hide": 0,
                 "includeAll": true,
                 "label": "Job Id",
-                "multi": false,
                 "name": "job_id",
                 "options": [],
                 "query": {
@@ -92,14 +94,11 @@
                 },
                 "refresh": 1,
                 "regex": "",
-                "skipUrlSync": false,
-                "sort": 0,
                 "type": "query"
             },
             {
                 "allValue": ".*",
                 "current": {
-                    "selected": false,
                     "text": "All",
                     "value": "$__all"
                 },
@@ -108,10 +107,8 @@
                     "uid": "b63075aa-d910-40b5-b142-e4ba10a5c744"
                 },
                 "definition": "",
-                "hide": 0,
                 "includeAll": true,
                 "label": "Job Type",
-                "multi": false,
                 "name": "job_type",
                 "options": [],
                 "query": {
@@ -122,26 +119,21 @@
                 },
                 "refresh": 1,
                 "regex": "",
-                "skipUrlSync": false,
-                "sort": 0,
                 "type": "query"
             },
             {
                 "allValue": ".*",
                 "current": {
-                    "selected": false,
-                    "text": "ERROR",
-                    "value": "ERROR"
+                    "text": "All",
+                    "value": "$__all"
                 },
                 "datasource": {
                     "type": "loki",
                     "uid": "b63075aa-d910-40b5-b142-e4ba10a5c744"
                 },
                 "definition": "",
-                "hide": 0,
                 "includeAll": true,
                 "label": "Level",
-                "multi": false,
                 "name": "level",
                 "options": [],
                 "query": {
@@ -152,8 +144,6 @@
                 },
                 "refresh": 1,
                 "regex": "",
-                "skipUrlSync": false,
-                "sort": 0,
                 "type": "query"
             }
         ]
@@ -166,6 +156,5 @@
     "timezone": "",
     "title": "Logs",
     "uid": "da922587-6095-4659-8cc8-0af6331e971f",
-    "version": 6,
-    "weekStart": ""
+    "version": 7
 }

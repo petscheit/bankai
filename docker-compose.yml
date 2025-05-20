@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGTERM
-  
+
   bankai-api:
     build:
       context: .
@@ -39,6 +39,7 @@ services:
         max-file: "3"
     networks:
       - bankai-network
+
   db:
     image: postgres:15-alpine
     env_file:
@@ -56,22 +57,20 @@ services:
 
   # -- Loki service --
   loki:
-    image: grafana/loki:2.7.1
-    container_name: loki
+    image: grafana/loki:3.0.0
     ports:
       - "3100:3100"
     volumes:
       - ./loki/config.yaml:/etc/loki/config.yaml:ro
-      # If you want to persist data across restarts:
       - loki_data:/loki
     command: -config.file=/etc/loki/config.yaml
     restart: unless-stopped
+    networks:
+      - monitoring
 
   # -- Promtail service --
   promtail:
-    image: grafana/promtail:2.7.1
-    container_name: promtail
-    # We mount the Docker socket so promtail can discover containers
+    image: grafana/promtail:3.4.1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./promtail/config.yaml:/etc/promtail/config.yaml:ro
@@ -80,11 +79,12 @@ services:
     depends_on:
       - loki
     restart: unless-stopped
+    networks:
+      - monitoring
 
   # -- Grafana service --
   grafana:
-    image: grafana/grafana-oss:9.5.2
-    container_name: grafana
+    image: grafana/grafana:11.6.1
     ports:
       - "3000:3000"
     depends_on:
@@ -92,9 +92,26 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=secret
+      - GF_INSTALL_PLUGINS=https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip;grafana-lokiexplore-app
     volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
       - grafana_data:/var/lib/grafana
     restart: unless-stopped
+    networks:
+      - monitoring
+
+  # -- Prometheus service --
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+    networks:
+      - monitoring
+      - bankai-network
 
 volumes:
   postgres_data:
@@ -104,10 +121,12 @@ volumes:
   loki_data:
     name: loki_data
   promtail_positions:
-    name: promtail_positions 
+    name: promtail_positions
   grafana_data:
     name: grafana_data
 
 networks:
   bankai-network:
+    driver: bridge
+  monitoring:
     driver: bridge

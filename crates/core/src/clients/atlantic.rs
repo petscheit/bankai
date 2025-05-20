@@ -170,7 +170,6 @@ impl AtlanticClient {
         info!("Uploading to Atlantic...");
         // Serialize the proof to JSON string
         let proof_json = serde_json::to_string(&proof)?;
-        println!("program_path: {}", program_path);
         let program = fs::read(program_path).await?;
         let program_part = Part::bytes(program)
             .file_name("program.json") // Provide a filename
