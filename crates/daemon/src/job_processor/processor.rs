@@ -194,13 +194,13 @@ impl JobProcessor {
 
     pub async fn handle_job_error(&self, job_id: Uuid) -> Result<(), DaemonError> {
         let job_data = self.db_manager.get_job_by_id(job_id).await?.unwrap();
-        
+
         error!(
             job_id = %job_id,
             previous_status = ?job_data.job_status,
             "Setting job status to ERROR"
         );
-        
+
         self.db_manager
             .set_failure_info(job_id, job_data.job_status)
             .await?;

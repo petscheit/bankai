@@ -60,7 +60,7 @@ pub async fn broadcast_epoch_batch(
         .acquire()
         .await
         .expect("Failed to acquire semaphore");
-    
+
     info!(
         job_id = %job.job_id,
         job_type = %job.job_type,
@@ -96,7 +96,7 @@ pub async fn broadcast_epoch_batch(
         job_type = %job.job_type,
         "Transaction is confirmed on-chain"
     );
-    
+
     db_manager
         .update_job_status(job.job_id, JobStatus::Done)
         .await?;
@@ -143,7 +143,7 @@ pub async fn broadcast_sync_committee(
             .acquire()
             .await
             .expect("Failed to acquire semaphore");
-            
+
         info!(
             job_id = %job.job_id,
             job_type = %job.job_type,
@@ -177,7 +177,7 @@ pub async fn broadcast_sync_committee(
             job_type =  %job.job_type,
             "Transaction is confirmed on-chain"
         );
-        
+
         db_manager
             .update_job_status(job.job_id, JobStatus::OffchainProofRetrieved)
             .await?;
@@ -205,7 +205,7 @@ pub async fn broadcast_sync_committee(
         db_manager
             .insert_verified_sync_committee(slot, sync_committee_hash_str)
             .await?;
-            
+
         db_manager
             .update_job_status(job.job_id, JobStatus::Done)
             .await?;

@@ -38,7 +38,7 @@ impl BankaiClient {
         };
 
         Self {
-            client: BeaconRpcClient::new(env::var("BEACON_RPC_URL").unwrap()),
+            client: BeaconRpcClient::new(env::var("BEACON_RPC_URL").unwrap(), config.clone()),
             starknet_client: StarknetClient::new(
                 env::var("STARKNET_RPC_URL").unwrap().as_str(),
                 env::var("STARKNET_ADDRESS").unwrap().as_str(),
