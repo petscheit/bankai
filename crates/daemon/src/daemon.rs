@@ -30,7 +30,7 @@ impl Daemon {
 
         // Replace the current subscriber setup with JSON formatting
         let subscriber = tracing_subscriber::fmt()
-            .json()
+            // .json()
             .with_max_level(Level::INFO)
             .finish();
 

@@ -26,7 +26,7 @@ ENV PYO3_PYTHON=python3
 WORKDIR /app
 
 # Copy manifest files to cache dependencies.
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 
 # Copy the rest of the source code.
 COPY . .

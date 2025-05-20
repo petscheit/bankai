@@ -5,11 +5,12 @@ use itertools::Itertools;
 use reqwest::Client;
 use serde_json::Value;
 use thiserror::Error;
+use tokio::time::{sleep, Duration};
 use tracing::warn;
 
 use beacon_types::{eth_spec::MainnetEthSpec, BeaconBlockBody, FullPayload};
 
-use crate::{types::proofs::epoch_update::SyncCommitteeValidatorPubs, utils::constants};
+use crate::{types::proofs::epoch_update::SyncCommitteeValidatorPubs, utils::{config::BankaiConfig, constants}};
 
 #[derive(Debug, Error)]
 pub enum BeaconError {
@@ -33,6 +34,7 @@ pub enum BeaconError {
 pub struct BeaconRpcClient {
     provider: Client,
     pub rpc_url: String,
+    config: BankaiConfig,
 }
 
 impl BeaconRpcClient {
@@ -40,16 +42,27 @@ impl BeaconRpcClient {
     ///
     /// # Arguments
     /// * `rpc_url` - The base URL for the Beacon Chain RPC endpoint
-    pub fn new(rpc_url: String) -> Self {
+    pub fn new(rpc_url: String, config: BankaiConfig) -> Self {
         Self {
             provider: reqwest::Client::new(),
             rpc_url,
+            config,
         }
     }
 
     /// Makes an HTTP GET request and returns the JSON response.
     /// This is a helper method used by all other RPC calls.
     async fn get_json(&self, route: &str) -> Result<Value, BeaconError> {
+        // Add a delay to avoid hitting rate limits
+        sleep(Duration::from_millis(70)).await;
+
+        let _permit = self.config
+            .pie_generation_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .unwrap();
+
         let url = format!("{}/{}", self.rpc_url, route);
         let json = self.provider.get(url).send().await?.json().await?;
 
@@ -154,7 +167,6 @@ impl BeaconRpcClient {
         let validators = json["data"]
             .as_array()
             .ok_or(BeaconError::FetchSyncCommittee)?;
-
         // Match returned validators with requested indices and extract public keys
         indexes
             .iter()
