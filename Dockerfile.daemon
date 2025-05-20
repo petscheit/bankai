@@ -17,49 +17,87 @@ RUN apt-get update && apt-get install -y \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
+# Install cargo-chef
+RUN cargo install cargo-chef --locked
+
 # Optionally set the environment variable so that pyo3 uses python3.
 ENV PYO3_PYTHON=python3
 
 WORKDIR /app
 
-# Copy manifest files to cache dependencies.
+# --- Start Cargo Chef Integration ---
+
+# Layer 1: Prepare recipe.
+# This layer caches based on manifest files and minimal local crate structure.
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 
-# Copy the rest of the source code.
-COPY . .
+# Copy Cargo.toml for workspace members and create stub src files/dirs.
+# Paths are relative to the Docker build context.
+COPY crates/core/Cargo.toml ./crates/core/Cargo.toml
+COPY crates/cli/Cargo.toml ./crates/cli/Cargo.toml
+COPY crates/api/Cargo.toml ./crates/api/Cargo.toml
+COPY crates/daemon/Cargo.toml ./crates/daemon/Cargo.toml
+COPY crates/cairo_runner/Cargo.toml ./crates/cairo_runner/Cargo.toml
+RUN mkdir -p crates/core/src && touch crates/core/src/lib.rs && \
+    mkdir -p crates/cli/src && touch crates/cli/src/lib.rs && \
+    mkdir -p crates/api/src && touch crates/api/src/lib.rs && \
+    mkdir -p crates/daemon/src && touch crates/daemon/src/main.rs && \
+    mkdir -p crates/cairo_runner/src && touch crates/cairo_runner/src/lib.rs
 
-# Build your daemon binary (adjust the package name if needed).
+# Copy Cargo.toml for the path dependency and create stub src file/dir.
+# Path from Cargo.toml: "../cairo/packages/garaga-zero/hints/rust-vm"
+# Resolved from project root: "cairo/packages/garaga-zero/hints/rust-vm"
+COPY cairo/packages/garaga_zero/Cargo.toml ./cairo/packages/garaga_zero/Cargo.toml
+RUN mkdir -p cairo/packages/garaga_zero/hints/rust-vm/src && touch cairo/packages/garaga_zero/hints/rust-vm/src/lib.rs
+
+RUN cargo chef prepare --recipe-path recipe.json
+
+# Layer 2: Cook recipe (compile dependencies).
+# This layer caches based on the recipe.json.
+RUN cargo chef cook --release --recipe-path recipe.json -p bankai-daemon
+
+# Layer 3: Build the application.
+# This layer caches based on application source code changes.
+# Copy the full source code. This overwrites the stub files and Cargo.toml files
+# (which is fine as they are identical or the new ones are what we want for the build).
+COPY . .
 RUN cargo build --release -p bankai-daemon
+
+# --- End Cargo Chef Integration ---
 
 # Stage 2: Final image with Python installed
 FROM python:${PYTHON_VERSION}
 WORKDIR /app
 
-# Install the required runtime libraries, git, and build tools
+# Install the required runtime libraries, git, build tools, and uv
 RUN apt-get update && apt-get install -y \
-pkg-config \
-libssl3 \
-libssl-dev \
-git \
-build-essential \
-gcc \
-libgmp-dev \
-&& ln -s /usr/bin/python3 /usr/bin/python
+    pkg-config \
+    libssl3 \
+    libssl-dev \
+    git \
+    build-essential \
+    gcc \
+    libgmp-dev \
+    && ln -s /usr/bin/python3 /usr/bin/python \
+    && pip install --no-cache-dir --force-reinstall uv
 
-# Copy the entire repository including .git
-COPY . .
+# Copy only the pyproject.toml file first to leverage caching for dependencies
+COPY cairo/packages/garaga_zero/pyproject.toml ./cairo/packages/garaga_zero/pyproject.toml
 
-# Initialize git submodule
-RUN git submodule update --init
-
-# Create build directory
-RUN mkdir -p cairo/build
-
-# Install Python dependencies
-RUN pip install --no-cache-dir --force-reinstall uv
+# Install Python dependencies based on pyproject.toml
+# These layers will be cached if pyproject.toml hasn't changed
 RUN uv pip compile cairo/packages/garaga_zero/pyproject.toml --output-file requirements.txt -q
 RUN uv pip install --no-cache-dir --force-reinstall --system -r requirements.txt
 RUN pip install --no-cache-dir --force-reinstall py_ecc
+
+# Copy the rest of the application code, including .git for submodules
+COPY . .
+
+# Initialize git submodule (needs .git from the COPY . . above)
+RUN git submodule update --init
+
+# Create build directory (might be populated by submodules or build artifacts)
+RUN mkdir -p cairo/build
 
 # Set the environment variable for pyo3
 ENV PYO3_PYTHON=python3

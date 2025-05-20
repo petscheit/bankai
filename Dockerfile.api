@@ -4,26 +4,60 @@ ARG PYTHON_VERSION=3.10-slim
 # Since the Api relies on types defined in bankai-core, we need python to be able to build it
 # A bit annoying, but is only required for building, and untangling the deps is not trivial
 
-# Stage 1: Build the daemon binary with Rust
+# Stage 1: Build the API binary with Rust
 FROM python:${PYTHON_VERSION} AS builder
 
-# Install curl
 # Install required dependencies for building
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl3 \
     libssl-dev \
     curl \
-    build-essential
+    build-essential \
+    && ln -s /usr/bin/python3 /usr/bin/python
 
 # Install Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-WORKDIR /app
-COPY . .
+# Install cargo-chef
+RUN cargo install cargo-chef --locked
 
-# Build the application in release mode
+# Optionally set the environment variable so that pyo3 uses python3.
+# This is important if bankai-core or other dependencies use pyo3.
+ENV PYO3_PYTHON=python3
+
+WORKDIR /app
+
+# Layer 1: Prepare recipe.
+# This layer caches based on manifest files and minimal local crate structure.
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+
+# Copy Cargo.toml for workspace members and the path dependency, then create stub src files/dirs.
+# Paths are relative to the Docker build context.
+COPY crates/core/Cargo.toml ./crates/core/Cargo.toml
+COPY crates/cli/Cargo.toml ./crates/cli/Cargo.toml
+COPY crates/api/Cargo.toml ./crates/api/Cargo.toml
+COPY crates/daemon/Cargo.toml ./crates/daemon/Cargo.toml
+COPY crates/cairo_runner/Cargo.toml ./crates/cairo_runner/Cargo.toml
+COPY cairo/packages/garaga_zero/Cargo.toml ./cairo/packages/garaga_zero/Cargo.toml
+
+RUN mkdir -p crates/core/src && touch crates/core/src/lib.rs && \
+    mkdir -p crates/cli/src && touch crates/cli/src/main.rs && \
+    mkdir -p crates/api/src && touch crates/api/src/main.rs && \
+    mkdir -p crates/daemon/src && touch crates/daemon/src/main.rs && \
+    mkdir -p crates/cairo_runner/src && touch crates/cairo_runner/src/lib.rs && \
+    mkdir -p cairo/packages/garaga_zero/hints/rust-vm/src && touch cairo/packages/garaga_zero/hints/rust-vm/src/lib.rs
+
+RUN cargo chef prepare --recipe-path recipe.json
+
+# Layer 2: Cook recipe (compile dependencies).
+# This layer caches based on the recipe.json. We target bankai-api for this Dockerfile.
+RUN cargo chef cook --release --recipe-path recipe.json -p bankai-api
+
+# Layer 3: Build the application.
+# Copy the full source code. This overwrites the stub files and Cargo.toml files.
+COPY . .
 RUN cargo build --release -p bankai-api
 
 # Runtime stage
