@@ -26,7 +26,7 @@ pub struct Daemon {
 impl Daemon {
     pub async fn new() -> Result<Self, DaemonError> {
         // Load .env.sepolia file
-        from_filename(".env.sepolia").ok();
+        // from_filename(".env.sepolia").ok();
 
         // Replace the current subscriber setup with JSON formatting
         let subscriber = tracing_subscriber::fmt()
