@@ -25,8 +25,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
-    ports:
-      - "3001:3001"
     env_file:
       - .env.docker
     depends_on:
@@ -44,13 +42,16 @@ services:
     image: postgres:15-alpine
     env_file:
       - .env.docker
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/POSTGRES/data
-      - ./db_structure.sql:/docker-entrypoint-initdb.d/db_structure.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -85,14 +86,13 @@ services:
   # -- Grafana service --
   grafana:
     image: grafana/grafana:11.6.1
-    ports:
-      - "3000:3000"
     depends_on:
       - loki
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=secret
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-secret}
       - GF_INSTALL_PLUGINS=https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip;grafana-lokiexplore-app
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/
     volumes:
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
@@ -104,14 +104,36 @@ services:
   # -- Prometheus service --
   prometheus:
     image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     restart: unless-stopped
     networks:
       - monitoring
+
+  # -- Nginx Reverse Proxy --
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro # Site configurations
+      - ./nginx/certs:/etc/letsencrypt      # For SSL certificates (Certbot convention)
+      - ./nginx/www:/var/www/certbot        # For Let's Encrypt challenges
+    depends_on:
+      - bankai-api
+      - grafana
+      # - prometheus # Removed, not proxied directly
+    networks:
       - bankai-network
+      - monitoring
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - ./nginx/certs:/etc/letsencrypt
+      - ./nginx/www:/var/www/certbot
 
 volumes:
   postgres_data:
