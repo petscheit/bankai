@@ -945,7 +945,7 @@ impl DatabaseManager {
     ) -> Result<(), DatabaseError> {
         self.client
             .execute(
-                "UPDATE bankai.daemon_state SET latest_known_beacon_slot = $1, latest_known_beacon_block = NOW()",
+                "UPDATE bankai.daemon_state SET latest_known_beacon_slot = $1, latest_known_beacon_block = $2",
                 &[&latest_known_beacon_slot.to_string(), &latest_known_beacon_block.to_string()],
             )
             .await?;

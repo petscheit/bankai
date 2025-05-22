@@ -1,0 +1,5 @@
+# ./Dockerfile.certbot
+FROM certbot/certbot:latest
+
+# Add docker-cli to be able to reload nginx
+RUN apk add --no-cache docker-cli
