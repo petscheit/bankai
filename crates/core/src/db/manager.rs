@@ -142,7 +142,6 @@ impl DatabaseManager {
 
         Self { client }
     }
-
     /// Inserts a verified epoch into the database
     ///
     /// # Arguments
@@ -158,7 +157,7 @@ impl DatabaseManager {
     ) -> Result<(), DatabaseError> {
         self.client
             .execute(
-                "INSERT INTO verified_epoch (epoch_id, header_root, state_root, n_signers)
+                "INSERT INTO bankai.verified_epoch (epoch_id, header_root, state_root, n_signers)
              VALUES ($1, $2, $3, $4, $4, $6)",
                 &[
                     &epoch_id.to_string(),
@@ -206,7 +205,7 @@ impl DatabaseManager {
     ) -> Result<(), DatabaseError> {
         let rows_affected = self.client
             .execute(
-                "INSERT INTO verified_epoch (epoch_id, beacon_header_root, beacon_state_root, slot, committee_hash, n_signers, execution_header_hash, execution_header_height, epoch_index, batch_root)
+                "INSERT INTO bankai.verified_epoch (epoch_id, beacon_header_root, beacon_state_root, slot, committee_hash, n_signers, execution_header_hash, execution_header_height, epoch_index, batch_root)
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                  ON CONFLICT (epoch_id) DO NOTHING",
                 &[
@@ -249,7 +248,7 @@ impl DatabaseManager {
     ) -> Result<(), DatabaseError> {
         self.client
             .execute(
-                "INSERT INTO verified_sync_committee (sync_committee_id, sync_committee_hash)
+                "INSERT INTO bankai.verified_sync_committee (sync_committee_id, sync_committee_hash)
              VALUES ($1, $2)",
                 &[&sync_committee_id.to_i64(), &sync_committee_hash],
             )
@@ -277,7 +276,7 @@ impl DatabaseManager {
             AtlanticJobType::ProofGeneration => {
                 self.client
                 .execute(
-                    "UPDATE jobs SET atlantic_proof_generate_batch_id = $1, updated_at = NOW() WHERE job_uuid = $2",
+                    "UPDATE bankai.jobs SET atlantic_proof_generate_batch_id = $1, updated_at = NOW() WHERE job_uuid = $2",
                     &[&atlantic_batch_job_id.to_string(), &job_id],
                 )
                 .await?;
@@ -285,7 +284,7 @@ impl DatabaseManager {
             AtlanticJobType::ProofWrapping => {
                 self.client
                 .execute(
-                    "UPDATE jobs SET atlantic_proof_wrapper_batch_id = $1, updated_at = NOW() WHERE job_uuid = $2",
+                    "UPDATE bankai.jobs SET atlantic_proof_wrapper_batch_id = $1, updated_at = NOW() WHERE job_uuid = $2",
                     &[&atlantic_batch_job_id.to_string(), &job_id],
                 )
                 .await?;
@@ -307,7 +306,7 @@ impl DatabaseManager {
             JobType::EpochBatchUpdate => {
                 self.client
                     .execute(
-                        "INSERT INTO jobs (job_uuid, job_status, slot, type, batch_range_begin_epoch, batch_range_end_epoch) VALUES ($1, $2, $3, $4, $5, $6)",
+                        "INSERT INTO bankai.jobs (job_uuid, job_status, slot, type, batch_range_begin_epoch, batch_range_end_epoch) VALUES ($1, $2, $3, $4, $5, $6)",
                         &[
                             &job.job_id,
                             &job.job_status.to_string(),
@@ -323,7 +322,7 @@ impl DatabaseManager {
             JobType::SyncCommitteeUpdate => {
                 self.client
                     .execute(
-                        "INSERT INTO jobs (job_uuid, job_status, slot, type) VALUES ($1, $2, $3, $4)",
+                        "INSERT INTO bankai.jobs (job_uuid, job_status, slot, type) VALUES ($1, $2, $3, $4)",
                         &[
                             &job.job_id,
                             &job.job_status.to_string(),
@@ -337,7 +336,7 @@ impl DatabaseManager {
 
         Ok(())
     }
-    
+
     /// Checks if a job exists for a specific epoch
     ///
     /// # Arguments
@@ -346,12 +345,17 @@ impl DatabaseManager {
     ///
     /// # Returns
     /// * `Result<bool, DatabaseError>` - Whether a job exists for this epoch
-    pub async fn check_job_exists(&self, epoch_start: u64, epoch_end: u64) -> Result<bool, DatabaseError> {
+    pub async fn check_job_exists(
+        &self,
+        epoch_start: u64,
+        epoch_end: u64,
+    ) -> Result<bool, DatabaseError> {
         // Check if there's already a job that covers this epoch
-        let row = self.client
+        let row = self
+            .client
             .query_one(
                 "SELECT EXISTS (
-                    SELECT 1 FROM jobs 
+                    SELECT 1 FROM bankai.jobs 
                     WHERE job_status = 'DONE'
                     AND batch_range_begin_epoch = $1 
                     AND batch_range_end_epoch = $2
@@ -359,7 +363,7 @@ impl DatabaseManager {
                 &[&(epoch_start as i64), &(epoch_end as i64)],
             )
             .await?;
-        
+
         Ok(row.get::<_, bool>("exists"))
     }
 
@@ -373,7 +377,10 @@ impl DatabaseManager {
     pub async fn fetch_job_status(&self, job_id: Uuid) -> Result<Option<JobStatus>, DatabaseError> {
         let row_opt = self
             .client
-            .query_opt("SELECT status FROM jobs WHERE job_uuid = $1", &[&job_id])
+            .query_opt(
+                "SELECT status FROM bankai.jobs WHERE job_uuid = $1",
+                &[&job_id],
+            )
             .await?;
 
         Ok(row_opt.map(|row| row.get("status")))
@@ -389,14 +396,14 @@ impl DatabaseManager {
     pub async fn get_job_by_id(&self, job_id: Uuid) -> Result<Option<JobSchema>, DatabaseError> {
         let row_opt = self
             .client
-            .query_opt("SELECT * FROM jobs WHERE job_uuid = $1", &[&job_id])
+            .query_opt("SELECT * FROM bankai.jobs WHERE job_uuid = $1", &[&job_id])
             .await?;
         let job = row_opt.map(Self::map_row_to_job).transpose()?;
         Ok(job)
     }
 
     pub async fn fetch_jobs_in_proof_generation(&self) -> Result<Vec<Job>, DatabaseError> {
-        let rows = self.client.query("SELECT * FROM jobs WHERE job_status IN ('OFFCHAIN_PROOF_REQUESTED', 'WRAP_PROOF_REQUESTED')", &[]).await?;
+        let rows = self.client.query("SELECT * FROM bankai.jobs WHERE job_status IN ('OFFCHAIN_PROOF_REQUESTED', 'WRAP_PROOF_REQUESTED')", &[]).await?;
         let jobs = rows
             .into_iter()
             .map(Self::map_row_to_job)
@@ -411,7 +418,7 @@ impl DatabaseManager {
         let rows = self
             .client
             .query(
-                "SELECT * FROM jobs WHERE job_status IN ('OFFCHAIN_COMPUTATION_FINISHED')",
+                "SELECT * FROM bankai.jobs WHERE job_status IN ('OFFCHAIN_COMPUTATION_FINISHED')",
                 &[],
             )
             .await?;
@@ -429,7 +436,7 @@ impl DatabaseManager {
         let rows: Vec<Row> = self
             .client
             .query(
-                "SELECT * FROM jobs 
+                "SELECT * FROM bankai.jobs 
             WHERE job_status = 'ERROR' 
             AND (retries_count IS NULL OR retries_count < $1)",
                 &[&retry_limit],
@@ -449,7 +456,7 @@ impl DatabaseManager {
         let rows = self
             .client
             .query(
-                "SELECT * FROM jobs WHERE job_status NOT IN ($1, $2, $3, $4, $5, $6)",
+                "SELECT * FROM bankai.jobs WHERE job_status NOT IN ($1, $2, $3, $4, $5, $6)",
                 &[
                     &JobStatus::OffchainProofRequested.to_string(),
                     &JobStatus::WrapProofRequested.to_string(),
@@ -479,7 +486,7 @@ impl DatabaseManager {
         let row_opt = self
             .client
             .query_opt(
-                "SELECT batch_range_end_epoch FROM jobs
+                "SELECT batch_range_end_epoch FROM bankai.jobs
                  WHERE job_status NOT IN ('DONE')
                         AND batch_range_end_epoch != 0
                         AND type = 'EPOCH_BATCH_UPDATE'
@@ -510,7 +517,7 @@ impl DatabaseManager {
         let row_opt = self
             .client
             .query_opt(
-                "SELECT batch_range_end_epoch FROM jobs
+                "SELECT batch_range_end_epoch FROM bankai.jobs
                  WHERE job_status = 'DONE'
                         AND batch_range_end_epoch != 0
                         AND type = 'EPOCH_BATCH_UPDATE'
@@ -542,7 +549,7 @@ impl DatabaseManager {
         let row_opt = self
             .client
             .query_opt(
-                "SELECT slot FROM jobs
+                "SELECT slot FROM bankai.jobs
                  WHERE job_status NOT IN ('DONE')
                         AND type = 'SYNC_COMMITTEE_UPDATE'
                  ORDER BY slot DESC
@@ -575,7 +582,7 @@ impl DatabaseManager {
         let row_opt = self
             .client
             .query_opt(
-                "SELECT slot FROM jobs
+                "SELECT slot FROM bankai.jobs
                  WHERE job_status = 'DONE'
                         AND type = 'SYNC_COMMITTEE_UPDATE'
                  ORDER BY slot DESC
@@ -608,7 +615,7 @@ impl DatabaseManager {
         let row_opt = self
             .client
             .query_opt(
-                "SELECT COUNT(job_uuid) as count FROM jobs
+                "SELECT COUNT(job_uuid) as count FROM bankai.jobs
                  WHERE job_status NOT IN ('DONE', 'CANCELLED', 'ERROR')
                         AND type = 'EPOCH_BATCH_UPDATE'
                 ",
@@ -643,7 +650,7 @@ impl DatabaseManager {
             .client
             .query(
                 "SELECT path_index, merkle_path
-                 FROM epoch_merkle_paths
+                 FROM bankai.epoch_merkle_paths
                  WHERE epoch_id = $1
                  ORDER BY path_index ASC",
                 &[&epoch_id.to_i64()],
@@ -685,7 +692,7 @@ impl DatabaseManager {
                     execution_header_height,
                     batch_root,
                     epoch_index
-                FROM verified_epoch
+                FROM bankai.verified_epoch
                 WHERE epoch_id = $1
                 "#,
                 &[&epoch_id.to_i64()],
@@ -730,7 +737,7 @@ impl DatabaseManager {
         let rows = self
             .client
             .query(
-                "SELECT * FROM jobs
+                "SELECT * FROM bankai.jobs
                  WHERE job_status = $1",
                 &[&desired_status.to_string()],
             )
@@ -760,7 +767,7 @@ impl DatabaseManager {
         let row = self
             .client
             .query_one(
-                "SELECT  COUNT(*) FROM jobs
+                "SELECT  COUNT(*) FROM bankai.jobs
                  WHERE job_status = $1",
                 &[&desired_status.to_string()],
             )
@@ -789,7 +796,7 @@ impl DatabaseManager {
         );
         self.client
             .execute(
-                "UPDATE jobs SET job_status = $1, updated_at = NOW() WHERE job_uuid = $2",
+                "UPDATE bankai.jobs SET job_status = $1, updated_at = NOW() WHERE job_uuid = $2",
                 &[&new_status.to_string(), &job_id],
             )
             .await?;
@@ -811,7 +818,7 @@ impl DatabaseManager {
     ) -> Result<(), DatabaseError> {
         self.client
             .execute(
-                "UPDATE jobs SET failed_at_step = $1, updated_at = NOW(), last_failure_time = NOW() WHERE job_uuid = $2",
+                "UPDATE bankai.jobs SET failed_at_step = $1, updated_at = NOW(), last_failure_time = NOW() WHERE job_uuid = $2",
                 &[&failed_at_step.to_string(), &job_id],
             )
             .await?;
@@ -829,7 +836,7 @@ impl DatabaseManager {
     pub async fn set_job_txhash(&self, job_id: Uuid, txhash: Felt) -> Result<(), DatabaseError> {
         self.client
             .execute(
-                "UPDATE jobs SET tx_hash = $1, updated_at = NOW() WHERE job_uuid = $2",
+                "UPDATE bankai.jobs SET tx_hash = $1, updated_at = NOW() WHERE job_uuid = $2",
                 &[&txhash.to_hex_string(), &job_id],
             )
             .await?;
@@ -850,7 +857,7 @@ impl DatabaseManager {
     ) -> Result<(), DatabaseError> {
         self.client
             .execute(
-                "UPDATE jobs SET retries_count = COALESCE(retries_count, 0) + $1, updated_at = NOW() WHERE job_uuid = $2",
+                "UPDATE bankai.jobs SET retries_count = COALESCE(retries_count, 0) + $1, updated_at = NOW() WHERE job_uuid = $2",
                 &[&weight.to_i64(), &job_id],
             )
             .await?;
@@ -874,7 +881,7 @@ impl DatabaseManager {
     ) -> Result<(), DatabaseError> {
         let _rows_affected =self.client
             .execute(
-                "INSERT INTO epoch_merkle_paths (epoch_id, path_index, merkle_path) VALUES ($1, $2, $3)
+                "INSERT INTO bankai.epoch_merkle_paths (epoch_id, path_index, merkle_path) VALUES ($1, $2, $3)
                  ON CONFLICT (epoch_id, path_index) DO NOTHING",
                 &[&epoch.to_i64(), &path_index.to_i64(), &path],
             )
@@ -903,7 +910,7 @@ impl DatabaseManager {
             .map(|i| format!("${}", i))
             .collect();
         let query = format!(
-            "SELECT * FROM jobs WHERE job_status IN ({})",
+            "SELECT * FROM bankai.jobs WHERE job_status IN ({})",
             placeholders.join(", ")
         );
 
@@ -938,7 +945,7 @@ impl DatabaseManager {
     ) -> Result<(), DatabaseError> {
         self.client
             .execute(
-                "UPDATE daemon_state SET latest_known_beacon_slot = $1, latest_known_beacon_block = NOW()",
+                "UPDATE bankai.daemon_state SET latest_known_beacon_slot = $1, latest_known_beacon_block = $2",
                 &[&latest_known_beacon_slot.to_string(), &latest_known_beacon_block.to_string()],
             )
             .await?;
@@ -952,7 +959,7 @@ impl DatabaseManager {
     pub async fn count_total_jobs(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
         let row = self
             .client
-            .query_one("SELECT COUNT(*) as count FROM jobs WHERE job_status = 'DONE' OR job_status = 'ERROR'", &[])
+            .query_one("SELECT COUNT(*) as count FROM bankai.jobs WHERE job_status = 'DONE' OR job_status = 'ERROR'", &[])
             .await?;
 
         Ok(row.get::<_, i64>("count").to_u64().unwrap_or(0))
@@ -966,7 +973,7 @@ impl DatabaseManager {
         let row = self
             .client
             .query_one(
-                "SELECT COUNT(*) as count FROM jobs WHERE job_status = 'DONE'",
+                "SELECT COUNT(*) as count FROM bankai.jobs WHERE job_status = 'DONE'",
                 &[],
             )
             .await?;
@@ -985,7 +992,7 @@ impl DatabaseManager {
                 "SELECT EXTRACT(EPOCH FROM AVG(updated_at - created_at))::INTEGER AS avg_duration
                  FROM (                    
                     SELECT updated_at, created_at
-                    FROM jobs
+                    FROM bankai.jobs
                     WHERE job_status = 'DONE'
                     ORDER BY updated_at DESC
                     LIMIT 20
@@ -1016,7 +1023,7 @@ impl DatabaseManager {
                 "SELECT *,
                  to_char(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_time,
                  to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS') as updated_time
-                 FROM jobs
+                 FROM bankai.jobs
                  WHERE type = 'EPOCH_BATCH_UPDATE'
                  ORDER BY batch_range_begin_epoch DESC
                  LIMIT $1",
@@ -1057,7 +1064,7 @@ impl DatabaseManager {
                 "SELECT *,
                  to_char(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_time,
                  to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS') as updated_time
-                 FROM jobs
+                 FROM bankai.jobs
                  WHERE type = 'SYNC_COMMITTEE_UPDATE'
                  ORDER BY slot DESC
                  LIMIT $1",
@@ -1104,7 +1111,7 @@ impl DatabaseManager {
             .client
             .query(
                 "SELECT atlantic_proof_generate_batch_id, atlantic_proof_wrapper_batch_id
-                 FROM jobs
+                 FROM bankai.jobs
                  WHERE job_status != 'DONE'
                  ORDER BY slot DESC
                  LIMIT $1",
@@ -1142,7 +1149,7 @@ impl DatabaseManager {
         let row_opt = self
             .client
             .query_opt(
-                "SELECT epoch_id FROM verified_epoch WHERE execution_header_height = $1
+                "SELECT epoch_id FROM bankai.verified_epoch WHERE execution_header_height = $1
                  LIMIT 1",
                 &[&execution_header_height],
             )
@@ -1163,7 +1170,7 @@ impl DatabaseManager {
         let rows = self
             .client
             .query(
-                "SELECT job_status, COUNT(*) AS job_count FROM jobs GROUP BY job_status",
+                "SELECT job_status, COUNT(*) AS job_count FROM bankai.jobs GROUP BY job_status",
                 &[],
             )
             .await?;

@@ -20,7 +20,6 @@
     "graphTooltip": 0,
     "id": 3,
     "links": [],
-    "liveNow": false,
     "panels": [
         {
             "datasource": {
@@ -44,8 +43,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -57,7 +55,7 @@
                 "overrides": []
             },
             "gridPos": {
-                "h": 14,
+                "h": 19,
                 "w": 24,
                 "x": 0,
                 "y": 0
@@ -75,7 +73,7 @@
                 },
                 "showHeader": true
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -85,7 +83,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT \n    'Job UUID' AS \"Field\", job_uuid::text AS \"Value\"\nFROM jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Type', type\nFROM jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Status', job_status\nFROM jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Offchain Proof ID', COALESCE(atlantic_proof_generate_batch_id, 'N/A')\nFROM jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Wrap Proof ID', COALESCE(atlantic_proof_wrapper_batch_id, 'N/A')\nFROM jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Slot', slot::text\nFROM jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Range Start',  COALESCE(batch_range_begin_epoch::text, 'N/A')\nFROM jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Range End', COALESCE(batch_range_end_epoch::text, 'N/A')\nFROM jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Committee ID', COALESCE(FLOOR(batch_range_begin_epoch / 256)::text, 'N/A')\nFROM jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Created At', created_at::text\nFROM jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Updated At', updated_at::text\nFROM jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Transaction Hash', COALESCE(tx_hash, 'N/A')\nFROM jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Failed At Step', COALESCE(failed_at_step, 'N/A')\nFROM jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Retries Count', COALESCE(retries_count::text, '0')\nFROM jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Last Failure Time', COALESCE(last_failure_time::text, 'N/A')\nFROM jobs WHERE job_uuid = '$job_uuid';\n",
+                    "rawSql": "SELECT \n    'Job UUID' AS \"Field\", job_uuid::text AS \"Value\"\nFROM bankai.jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Type', type\nFROM bankai.jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Status', job_status\nFROM bankai.jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Offchain Proof ID', COALESCE(atlantic_proof_generate_batch_id, 'N/A')\nFROM bankai.jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Wrap Proof ID', COALESCE(atlantic_proof_wrapper_batch_id, 'N/A')\nFROM bankai.jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Slot', slot::text\nFROM bankai.jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Range Start',  COALESCE(batch_range_begin_epoch::text, 'N/A')\nFROM bankai.jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Range End', COALESCE(batch_range_end_epoch::text, 'N/A')\nFROM bankai.jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Committee ID', COALESCE(FLOOR(batch_range_begin_epoch / 256)::text, 'N/A')\nFROM bankai.jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Created At', created_at::text\nFROM bankai.jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Updated At', updated_at::text\nFROM bankai.jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Transaction Hash', COALESCE(tx_hash, 'N/A')\nFROM bankai.jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Failed At Step', COALESCE(failed_at_step, 'N/A')\nFROM bankai.jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Retries Count', COALESCE(retries_count::text, '0')\nFROM bankai.jobs WHERE job_uuid = '$job_uuid'\nUNION ALL\nSELECT 'Last Failure Time', COALESCE(last_failure_time::text, 'N/A')\nFROM bankai.jobs WHERE job_uuid = '$job_uuid';",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -108,28 +106,69 @@
             ],
             "title": "Job Details",
             "type": "table"
+        },
+        {
+            "datasource": {
+                "type": "loki",
+                "uid": "b63075aa-d910-40b5-b142-e4ba10a5c744"
+            },
+            "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 19,
+                "w": 24,
+                "x": 0,
+                "y": 19
+            },
+            "id": 2,
+            "options": {
+                "dedupStrategy": "none",
+                "enableInfiniteScrolling": false,
+                "enableLogDetails": true,
+                "prettifyLogMessage": false,
+                "showCommonLabels": false,
+                "showLabels": false,
+                "showTime": false,
+                "sortOrder": "Descending",
+                "wrapLogMessage": false
+            },
+            "pluginVersion": "11.6.1",
+            "targets": [
+                {
+                    "direction": "backward",
+                    "editorMode": "code",
+                    "expr": "   {service=\"daemon\", job_id=~\"$job_uuid\"}",
+                    "queryType": "range",
+                    "refId": "A"
+                }
+            ],
+            "title": "Panel Title",
+            "type": "logs"
         }
     ],
+    "preload": false,
     "refresh": "",
-    "schemaVersion": 38,
-    "style": "dark",
+    "schemaVersion": 41,
     "tags": [],
     "templating": {
         "list": [
             {
-                "current": {},
-                "hide": 0,
+                "current": {
+                    "text": "830b316c-9d41-41c0-bf0e-69ac32cdfc4a",
+                    "value": "830b316c-9d41-41c0-bf0e-69ac32cdfc4a"
+                },
                 "label": "Job UUID",
                 "name": "job_uuid",
                 "options": [
                     {
                         "selected": true,
-                        "text": "",
-                        "value": ""
+                        "text": "830b316c-9d41-41c0-bf0e-69ac32cdfc4a",
+                        "value": "830b316c-9d41-41c0-bf0e-69ac32cdfc4a"
                     }
                 ],
-                "query": "",
-                "skipUrlSync": false,
+                "query": "830b316c-9d41-41c0-bf0e-69ac32cdfc4a",
                 "type": "textbox"
             }
         ]
@@ -142,6 +181,5 @@
     "timezone": "",
     "title": "Job Details",
     "uid": "de7fbeba-399b-4476-9ed3-fbc23bfe39a3",
-    "version": 6,
-    "weekStart": ""
+    "version": 10
 }

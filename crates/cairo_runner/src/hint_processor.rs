@@ -88,6 +88,14 @@ impl CustomHintProcessor {
             basic_field_ops::hint_not_zero_mod_p,
         );
         hints.insert(
+            basic_field_ops::HINT_SUM_INV_MOD_P.into(),
+            basic_field_ops::hint_sum_inv_mod_p,
+        );
+        hints.insert(
+            basic_field_ops::HINT_ADD_MUL_MOD_CIRCUIT.into(),
+            basic_field_ops::hint_add_mul_mod_circuit,
+        );
+        hints.insert(
             basic_field_ops::HINT_IS_ZERO_MOD_P.into(),
             basic_field_ops::hint_is_zero_mod_p,
         );

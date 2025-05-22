@@ -20,7 +20,6 @@
     "graphTooltip": 0,
     "id": 2,
     "links": [],
-    "liveNow": false,
     "panels": [
         {
             "collapsed": false,
@@ -50,8 +49,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -74,6 +72,7 @@
                 "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
+                "percentChangeColorMode": "standard",
                 "reduceOptions": {
                     "calcs": [
                         "lastNotNull"
@@ -81,9 +80,11 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "auto"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -93,7 +94,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  COUNT(*)\nFROM jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND type = 'SYNC_COMMITTEE_UPDATE';",
+                    "rawSql": "SELECT\n  COUNT(*)\nFROM bankai.jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND type = 'SYNC_COMMITTEE_UPDATE';",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -132,8 +133,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -156,6 +156,7 @@
                 "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
+                "percentChangeColorMode": "standard",
                 "reduceOptions": {
                     "calcs": [
                         "lastNotNull"
@@ -163,9 +164,11 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "auto"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -175,7 +178,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  COUNT(*)\nFROM jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND job_status = 'DONE'\n  AND type = 'SYNC_COMMITTEE_UPDATE';",
+                    "rawSql": "SELECT\n  COUNT(*)\nFROM bankai.jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND job_status = 'DONE'\n  AND type = 'SYNC_COMMITTEE_UPDATE';",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -214,8 +217,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -238,6 +240,7 @@
                 "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
+                "percentChangeColorMode": "standard",
                 "reduceOptions": {
                     "calcs": [
                         "lastNotNull"
@@ -245,9 +248,11 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "auto"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -257,7 +262,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  COUNT(*)\nFROM jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND job_status = 'ERROR'\n  AND type = 'SYNC_COMMITTEE_UPDATE';",
+                    "rawSql": "SELECT\n  COUNT(*)\nFROM bankai.jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND job_status = 'ERROR'\n  AND type = 'SYNC_COMMITTEE_UPDATE';",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -296,8 +301,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -320,6 +324,7 @@
                 "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
+                "percentChangeColorMode": "standard",
                 "reduceOptions": {
                     "calcs": [
                         "lastNotNull"
@@ -327,9 +332,11 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "auto"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -339,7 +346,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  COUNT(*)\nFROM jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND job_status NOT IN ('DONE', 'ERROR')\n  AND type = 'SYNC_COMMITTEE_UPDATE';",
+                    "rawSql": "SELECT\n  COUNT(*)\nFROM bankai.jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND job_status NOT IN ('DONE', 'ERROR')\n  AND type = 'SYNC_COMMITTEE_UPDATE';",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -378,8 +385,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             }
                         ]
                     }
@@ -398,6 +404,7 @@
                 "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
+                "percentChangeColorMode": "standard",
                 "reduceOptions": {
                     "calcs": [
                         "lastNotNull"
@@ -405,9 +412,11 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "auto"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -417,7 +426,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT \n  FLOOR(MAX(sync_committee_id) / 8192) + 1 AS committee_group\nFROM verified_sync_committee;",
+                    "rawSql": "SELECT \n  FLOOR(MAX(sync_committee_id) / 8192) + 1 AS committee_group\nFROM bankai.verified_sync_committee;",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -463,8 +472,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -514,7 +522,7 @@
                 "showHeader": true,
                 "sortBy": []
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -524,7 +532,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  job_uuid                           AS \"Job UUID\",\n  job_status                         AS \"Status\",\n  slot AS \"Slot\",\n  FLOOR(slot / 8192) + 1 AS \"Committee ID\",\n  created_at,\n  AGE(updated_at, created_at)         AS \"Total Runtime\"\nFROM jobs\nWHERE (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\nAND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\nAND type = 'SYNC_COMMITTEE_UPDATE'\nORDER BY created_at DESC",
+                    "rawSql": "SELECT\n  job_uuid                           AS \"Job UUID\",\n  job_status                         AS \"Status\",\n  slot AS \"Slot\",\n  FLOOR(slot / 8192) + 1 AS \"Committee ID\",\n  created_at,\n  AGE(updated_at, created_at)         AS \"Total Runtime\"\nFROM bankai.jobs\nWHERE (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\nAND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\nAND type = 'SYNC_COMMITTEE_UPDATE'\nORDER BY created_at DESC",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -576,8 +584,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -600,6 +607,7 @@
                 "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
+                "percentChangeColorMode": "standard",
                 "reduceOptions": {
                     "calcs": [
                         "lastNotNull"
@@ -607,9 +615,11 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "auto"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -619,7 +629,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  COUNT(*)\nFROM jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND type = 'EPOCH_BATCH_UPDATE';",
+                    "rawSql": "SELECT\n  COUNT(*)\nFROM bankai.jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND type = 'EPOCH_BATCH_UPDATE';",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -658,8 +668,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -682,6 +691,7 @@
                 "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
+                "percentChangeColorMode": "standard",
                 "reduceOptions": {
                     "calcs": [
                         "lastNotNull"
@@ -689,9 +699,11 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "auto"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -701,7 +713,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  COUNT(*)\nFROM jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND job_status = 'DONE'\n  AND type = 'EPOCH_BATCH_UPDATE';",
+                    "rawSql": "SELECT\n  COUNT(*)\nFROM bankai.jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND job_status = 'DONE'\n  AND type = 'EPOCH_BATCH_UPDATE';",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -740,8 +752,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -764,6 +775,7 @@
                 "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
+                "percentChangeColorMode": "standard",
                 "reduceOptions": {
                     "calcs": [
                         "lastNotNull"
@@ -771,9 +783,11 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "auto"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -783,7 +797,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  COUNT(*)\nFROM jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND job_status = 'ERROR'\n  AND type = 'EPOCH_BATCH_UPDATE';",
+                    "rawSql": "SELECT\n  COUNT(*)\nFROM bankai.jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND job_status = 'ERROR'\n  AND type = 'EPOCH_BATCH_UPDATE';",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -822,8 +836,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -846,6 +859,7 @@
                 "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
+                "percentChangeColorMode": "standard",
                 "reduceOptions": {
                     "calcs": [
                         "lastNotNull"
@@ -853,9 +867,11 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "auto"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -865,7 +881,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  COUNT(*)\nFROM jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND job_status NOT IN ('DONE', 'ERROR')\n  AND type = 'EPOCH_BATCH_UPDATE';",
+                    "rawSql": "SELECT\n  COUNT(*)\nFROM bankai.jobs\nWHERE \n  (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\n  AND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\n  AND job_status NOT IN ('DONE', 'ERROR')\n  AND type = 'EPOCH_BATCH_UPDATE';",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -904,8 +920,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             }
                         ]
                     }
@@ -924,6 +939,7 @@
                 "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
+                "percentChangeColorMode": "standard",
                 "reduceOptions": {
                     "calcs": [
                         "lastNotNull"
@@ -931,9 +947,11 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "auto"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -943,7 +961,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  MAX(epoch_id)\nFROM verified_epoch;",
+                    "rawSql": "SELECT\n  MAX(epoch_id)\nFROM bankai.verified_epoch;",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -982,8 +1000,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             }
                         ]
                     }
@@ -1002,6 +1019,7 @@
                 "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
+                "percentChangeColorMode": "standard",
                 "reduceOptions": {
                     "calcs": [
                         "lastNotNull"
@@ -1009,9 +1027,11 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "auto"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -1021,7 +1041,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  MAX(slot)\nFROM verified_epoch;",
+                    "rawSql": "SELECT\n  MAX(slot)\nFROM bankai.verified_epoch;",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -1060,8 +1080,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             }
                         ]
                     }
@@ -1080,6 +1099,7 @@
                 "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
+                "percentChangeColorMode": "standard",
                 "reduceOptions": {
                     "calcs": [
                         "lastNotNull"
@@ -1087,9 +1107,11 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "auto"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -1099,7 +1121,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  MAX(execution_header_height)\nFROM verified_epoch;",
+                    "rawSql": "SELECT\n  MAX(execution_header_height)\nFROM bankai.verified_epoch;",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -1145,8 +1167,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -1195,7 +1216,7 @@
                 },
                 "showHeader": true
             },
-            "pluginVersion": "9.5.2",
+            "pluginVersion": "11.6.1",
             "targets": [
                 {
                     "datasource": {
@@ -1205,7 +1226,7 @@
                     "editorMode": "code",
                     "format": "table",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  job_uuid                           AS \"Job UUID\",\n  job_status                         AS \"Status\",\n  slot AS \"Slot\",\n  batch_range_begin_epoch AS \"Range Start\",\n  batch_range_end_epoch   AS \"Range End\",\n  FLOOR(batch_range_begin_epoch / 256) AS \"Committee ID\",\n  created_at,\n  AGE(updated_at, created_at)         AS \"Total Runtime\"\nFROM jobs\nWHERE (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\nAND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\nAND type = 'EPOCH_BATCH_UPDATE'\nORDER BY created_at DESC",
+                    "rawSql": "SELECT\n  job_uuid                           AS \"Job UUID\",\n  job_status                         AS \"Status\",\n  slot AS \"Slot\",\n  batch_range_begin_epoch AS \"Range Start\",\n  batch_range_end_epoch   AS \"Range End\",\n  FLOOR(batch_range_begin_epoch / 256) AS \"Committee ID\",\n  created_at,\n  AGE(updated_at, created_at)         AS \"Total Runtime\"\nFROM bankai.jobs\nWHERE (created_at AT TIME ZONE 'Europe/Berlin') >= $__timeFrom()\nAND (created_at AT TIME ZONE 'Europe/Berlin') <= $__timeTo()\nAND type = 'EPOCH_BATCH_UPDATE'\nORDER BY created_at DESC",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -1226,12 +1247,13 @@
                     }
                 }
             ],
+            "title": "",
             "type": "table"
         }
     ],
+    "preload": false,
     "refresh": "",
-    "schemaVersion": 38,
-    "style": "dark",
+    "schemaVersion": 41,
     "tags": [],
     "templating": {
         "list": []
@@ -1244,6 +1266,5 @@
     "timezone": "",
     "title": "Jobs",
     "uid": "af3d32e8-da76-4066-be4e-602690e36eb2",
-    "version": 11,
-    "weekStart": ""
+    "version": 14
 }
