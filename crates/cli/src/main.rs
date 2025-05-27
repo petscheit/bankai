@@ -95,7 +95,7 @@ enum ProveCommands {
         batch_id: String,
     },
     /// Generate Stwo proof files for a specific epoch
-    EpochStwoDev {
+    EpochStwo {
         /// The epoch number to generate proof files for
         #[arg(long, short)]
         epoch: u64,
@@ -103,6 +103,17 @@ enum ProveCommands {
         #[arg(long, short, default_value = "./stwo_output")]
         output: String,
     },
+    EpochBatchStwo {
+        /// The epoch number to generate proof files for
+        #[arg(long, short)]
+        epoch: u64,
+        /// The size of the batch to generate proof files for
+        #[arg(long, short, default_value = "32")]
+        size: u64,
+        /// Output directory for the Stwo files (defaults to ./stwo_output)
+        #[arg(long, short, default_value = "./stwo_output")]
+        output: String,
+    }
 }
 
 #[derive(Subcommand)]
@@ -312,7 +323,7 @@ async fn main() -> Result<(), BankaiCliError> {
                     println!("Batch not completed yet. Status: {}", status);
                 }
             }
-            ProveCommands::EpochStwoDev { epoch, output } => {
+            ProveCommands::EpochStwo { epoch, output } => {
                 println!("Generating Stwo files for epoch: {}", epoch);
 
                 let epoch_slot = epoch * 32;
@@ -340,6 +351,35 @@ async fn main() -> Result<(), BankaiCliError> {
                 println!("  - {}/air_private_inputs.json", output);
                 println!("  - {}/trace.bin", output);
                 println!("  - {}/memory.bin", output);
+            }
+            ProveCommands::EpochBatchStwo { epoch, size, output } => {
+                println!("Generating Stwo files for epoch batch: {}", epoch);
+
+                let epoch_slot = epoch * 32;
+                let start_slot = epoch_slot / 32 * 32;
+                let end_slot = epoch_slot + 32 * size;
+
+                println!("Fetching inputs for epoch batch: {} - {}", start_slot, end_slot);
+
+                let batch = EpochUpdateBatch::new_from_slots(&bankai, start_slot, end_slot)
+                    .await
+                    .map_err(|e| BankaiCliError::ProofFetch(e.into()))?;
+
+                let circuit: bankai_runner::epoch_batch::EpochUpdateBatchCircuit = batch.into();
+
+                bankai_runner::run_epoch_batch_stwo(
+                    &bankai.config.epoch_batch_circuit_path,
+                    circuit,
+                    &output
+                ).map_err(|e| BankaiCliError::CairoRunner(e.into()))?;
+                
+                println!("Stwo files generated successfully in: {}", output);
+                println!("Files created:");
+                println!("  - {}/air_public_inputs.json", output);
+                println!("  - {}/air_private_inputs.json", output);
+                println!("  - {}/trace.bin", output);
+                println!("  - {}/memory.bin", output);
+
             }
         },
         Commands::Fetch(cmd) => match cmd {
