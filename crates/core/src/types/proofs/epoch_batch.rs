@@ -255,6 +255,74 @@ impl EpochUpdateBatch {
 
         Ok(batch)
     }
+
+    /// Creates a new epoch update batch from specified slot range
+    ///
+    /// Fetches epoch data from the start slot to end slot and creates a batch
+    /// with appropriate merkle proofs. This is a CLI-only version that doesn't
+    /// interact with the database.
+    ///
+    /// # Arguments
+    /// * `bankai` - Reference to the Bankai client
+    /// * `start_slot` - Starting slot number
+    /// * `end_slot` - Ending slot number
+    ///
+    /// # Returns
+    /// * `Result<EpochUpdateBatch, EpochBatchError>` - New batch or error
+    pub async fn new_from_slots(
+        bankai: &BankaiClient,
+        start_slot: u64,
+        end_slot: u64,
+    ) -> Result<EpochUpdateBatch, EpochBatchError> {
+        info!("Creating batch from slots: Start {}, End {}", start_slot, end_slot);
+        info!("Epoch Count: {}", (end_slot - start_slot) / SLOTS_PER_EPOCH);
+
+        let mut epochs = vec![];
+
+        let mut current_slot = start_slot;
+        while current_slot < end_slot {
+            info!(
+                "Getting data for slot: {} Epoch: {} Epochs batch position {}/{}",
+                current_slot,
+                slot_to_epoch_id(current_slot),
+                epochs.len(),
+                (end_slot - start_slot) / SLOTS_PER_EPOCH
+            );
+            let epoch_update = EpochUpdate::new(&bankai.client, current_slot).await?;
+            epochs.push(epoch_update);
+            current_slot += SLOTS_PER_EPOCH;
+        }
+
+        let circuit_inputs = EpochUpdateBatchInputs {
+            committee_hash: get_committee_hash(epochs[0].circuit_inputs.aggregate_pub.0),
+            epochs,
+        };
+
+        let expected_circuit_outputs = ExpectedEpochBatchOutputs::from_inputs(&circuit_inputs);
+
+        let epoch_hashes = circuit_inputs
+            .epochs
+            .iter()
+            .map(|epoch| epoch.expected_circuit_outputs.hash())
+            .collect::<Vec<Felt>>();
+
+        let (root, paths) = compute_paths(epoch_hashes.clone());
+
+        for (index, path) in paths.iter().enumerate() {
+            let computed_root = hash_path(epoch_hashes[index], path, index);
+            if computed_root != root {
+                panic!("Path {} does not match root", index);
+            }
+        }
+
+        let batch = EpochUpdateBatch {
+            circuit_inputs,
+            expected_circuit_outputs,
+            merkle_paths: paths,
+        };
+
+        Ok(batch)
+    }
 }
 
 impl EpochUpdateBatch {

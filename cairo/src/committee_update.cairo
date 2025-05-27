@@ -1,6 +1,6 @@
-%builtins output range_check bitwise poseidon range_check96 add_mod mul_mod
+%builtins output pedersen range_check bitwise poseidon range_check96 add_mod mul_mod
 
-from starkware.cairo.common.cairo_builtins import PoseidonBuiltin, ModBuiltin, BitwiseBuiltin
+from starkware.cairo.common.cairo_builtins import PoseidonBuiltin, ModBuiltin, BitwiseBuiltin, HashBuiltin
 from starkware.cairo.common.bitwise import bitwise_and
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.alloc import alloc
@@ -19,6 +19,7 @@ from debug import print_felt_hex, print_uint384, print_string
 // Main function to update the committee
 func main{
     output_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
     range_check_ptr,
     bitwise_ptr: BitwiseBuiltin*,
     poseidon_ptr: PoseidonBuiltin*,

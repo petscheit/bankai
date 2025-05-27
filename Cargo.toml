@@ -33,7 +33,7 @@ starknet = "0.12.0"
 starknet-crypto = "0.7.3"
 bls12_381 = "0.8.0"
 beacon-state-proof = { git = "https://github.com/petscheit/beacon-state-proof", rev = "9dddb71f2b037d68097bf50c0a7b02229bf4c3e2" }
-cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", tag = "v2.0.0", features = ["extensive_hints", "clap", "cairo-1-hints", "mod_builtin"] }
+cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", tag = "v2.1.0", features = ["extensive_hints", "clap", "cairo-1-hints", "mod_builtin"] }
 beacon_types = { git = "https://github.com/petscheit/lighthouse.git", package = "types", rev = "2ef065a16"}
 alloy-primitives = "0.8.13"
 alloy-rpc-types-beacon = "0.7.2"
@@ -51,6 +51,7 @@ sha2 = "0.10.8"
 rand = "0.8.5"
 itertools = "0.13.0"
 glob = "0.3.2"
+bincode = "2.0.1"
 
 # Error Handling & Logging
 thiserror = "2.0.9"

@@ -17,3 +17,5 @@ venv
 
 !cairo/build/epoch_batch.json
 !cairo/build/committee_update.json
+
+stwo_output/

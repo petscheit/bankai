@@ -1,6 +1,6 @@
-%builtins output range_check bitwise poseidon range_check96 add_mod mul_mod
+%builtins output pedersen range_check ecdsa bitwise ec_op keccak poseidon range_check96 add_mod mul_mod
 
-from starkware.cairo.common.cairo_builtins import PoseidonBuiltin, ModBuiltin, BitwiseBuiltin
+from starkware.cairo.common.cairo_builtins import PoseidonBuiltin, ModBuiltin, BitwiseBuiltin, HashBuiltin
 from starkware.cairo.common.registers import get_fp_and_pc
 from definitions import G2Point
 
@@ -8,13 +8,16 @@ from cairo.src.utils import pow2alloc128
 from sha import SHA256
 from cairo.src.types import EpochUpdate
 
-
 from cairo.src.verify_epoch import run_epoch_update
 
 func main{
     output_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
     range_check_ptr,
+    ecdsa_ptr: felt*,
     bitwise_ptr: BitwiseBuiltin*,
+    ec_op_ptr: felt*,
+    keccak_ptr: felt*,
     poseidon_ptr: PoseidonBuiltin*,
     range_check96_ptr: felt*,
     add_mod_ptr: ModBuiltin*,
@@ -37,4 +40,4 @@ func main{
     SHA256.finalize(sha256_start_ptr=sha256_ptr_start, sha256_end_ptr=sha256_ptr);
 
     return ();
-}
+
